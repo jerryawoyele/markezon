@@ -1,8 +1,10 @@
-
 import { Search, Briefcase, Code, Palette, Camera, Music, Book } from "lucide-react";
 import { ServiceCard } from "@/components/ServiceCard";
 import { CategoryButton } from "@/components/CategoryButton";
 import { Button } from "@/components/ui/button";
+import { Header } from "@/components/Header";
+import { Footer } from "@/components/Footer";
+import { Link } from "react-router-dom";
 
 const FEATURED_SERVICES = [
   {
@@ -40,8 +42,10 @@ const CATEGORIES = [
 const Index = () => {
   return (
     <div className="min-h-screen bg-gradient-to-b from-background to-background/95">
+      <Header />
+      
       {/* Hero Section */}
-      <section className="relative py-20 overflow-hidden">
+      <section className="relative py-32 overflow-hidden">
         <div className="container px-4 mx-auto">
           <div className="max-w-3xl mx-auto text-center animate-fade-down">
             <h1 className="text-4xl md:text-6xl font-bold mb-6 bg-clip-text text-transparent bg-gradient-to-r from-white to-white/70">
@@ -51,9 +55,11 @@ const Index = () => {
               Your gateway to a network of professional services. Find, connect, and collaborate with businesses in your area.
             </p>
             <div className="flex items-center justify-center gap-4">
-              <Button size="lg" className="bg-white text-background hover:bg-white/90">
-                Get Started
-              </Button>
+              <Link to="/auth">
+                <Button size="lg" className="bg-white text-background hover:bg-white/90">
+                  Get Started
+                </Button>
+              </Link>
               <Button size="lg" variant="ghost" className="text-white border border-white/10 hover:bg-white/5">
                 Learn More
               </Button>
@@ -127,6 +133,8 @@ const Index = () => {
           </div>
         </div>
       </section>
+
+      <Footer />
     </div>
   );
 };

@@ -1,3 +1,4 @@
+
 import { Search, Briefcase, Code, Palette, Camera, Music, Book } from "lucide-react";
 import { ServiceCard } from "@/components/ServiceCard";
 import { CategoryButton } from "@/components/CategoryButton";
@@ -46,7 +47,17 @@ const Index = () => {
       
       {/* Hero Section */}
       <section className="relative py-32 overflow-hidden">
-        <div className="container px-4 mx-auto">
+        {/* Hero Background Image */}
+        <div className="absolute inset-0 z-0">
+          <img
+            src="https://images.unsplash.com/photo-1605810230434-7631ac76ec81?auto=format&fit=crop&q=80"
+            alt="People collaborating"
+            className="w-full h-full object-cover opacity-20"
+          />
+          <div className="absolute inset-0 bg-gradient-to-b from-background via-background/95 to-background" />
+        </div>
+
+        <div className="container px-4 mx-auto relative z-10">
           <div className="max-w-3xl mx-auto text-center animate-fade-down">
             <h1 className="text-4xl md:text-6xl font-bold mb-6 bg-clip-text text-transparent bg-gradient-to-r from-white to-white/70">
               Discover & Connect with Local Business Services

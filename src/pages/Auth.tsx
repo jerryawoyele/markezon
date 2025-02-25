@@ -1,5 +1,5 @@
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -14,13 +14,37 @@ export default function Auth() {
   const navigate = useNavigate();
   const { toast } = useToast();
 
+  useEffect(() => {
+    // Check if we're already logged in
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session) {
+        navigate('/home');
+      }
+    });
+
+    // Listen for auth changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (session) {
+        navigate('/home');
+      }
+    });
+
+    return () => subscription.unsubscribe();
+  }, [navigate]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
 
     try {
       const { error } = isSignUp
-        ? await supabase.auth.signUp({ email, password })
+        ? await supabase.auth.signUp({
+            email,
+            password,
+            options: {
+              emailRedirectTo: `${window.location.origin}/home`
+            }
+          })
         : await supabase.auth.signInWithPassword({ email, password });
 
       if (error) throw error;
@@ -138,4 +162,4 @@ export default function Auth() {
       </div>
     </div>
   );
-}
+};

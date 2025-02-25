@@ -40,7 +40,7 @@ export function Footer() {
           </div>
         </div>
         <div className="mt-12 pt-8 border-t border-white/10 text-center text-white/60">
-          <p>&copy; {new Date().getFullYear()} biznectify. All rights reserved.</p>
+          <p>&copy; {new Date().getFullYear()} Markezon. All rights reserved.</p>
         </div>
       </div>
     </footer>

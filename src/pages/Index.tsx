@@ -1,11 +1,12 @@
-
-import { Search, Briefcase, Code, Palette, Camera, Music, Book } from "lucide-react";
+import { Search, Briefcase, Code, Palette, Camera, Music, Book, Send } from "lucide-react";
 import { ServiceCard } from "@/components/ServiceCard";
 import { CategoryButton } from "@/components/CategoryButton";
 import { Button } from "@/components/ui/button";
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
 import { Link } from "react-router-dom";
+import { useState } from "react";
+import { useToast } from "@/components/ui/use-toast";
 
 const FEATURED_SERVICES = [
   {
@@ -41,6 +42,18 @@ const CATEGORIES = [
 ];
 
 const Index = () => {
+  const [email, setEmail] = useState("");
+  const { toast } = useToast();
+
+  const handleNewsletterSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    toast({
+      title: "Thank you for subscribing!",
+      description: "You'll receive our latest updates in your inbox.",
+    });
+    setEmail("");
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-b from-background to-background/95">
       <Header />
@@ -50,11 +63,11 @@ const Index = () => {
         {/* Hero Background Image */}
         <div className="absolute inset-0 z-0">
           <img
-            src="https://images.unsplash.com/photo-1605810230434-7631ac76ec81?auto=format&fit=crop&q=80"
-            alt="People collaborating"
-            className="w-full h-full object-cover opacity-20"
+            src="https://images.unsplash.com/photo-1664575602276-acd073f104c1?auto=format&fit=crop&q=80"
+            alt="Business marketplace"
+            className="w-full h-full object-cover opacity-30"
           />
-          <div className="absolute inset-0 bg-gradient-to-b from-background via-background/95 to-background" />
+          <div className="absolute inset-0 bg-gradient-to-b from-background/80 via-background/90 to-background" />
         </div>
 
         <div className="container px-4 mx-auto relative z-10">
@@ -141,6 +154,32 @@ const Index = () => {
                 <p className="text-sm text-white/60">Expand your network and grow your business</p>
               </div>
             </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Newsletter Section */}
+      <section className="py-20 relative overflow-hidden">
+        <div className="container px-4 mx-auto">
+          <div className="max-w-2xl mx-auto text-center">
+            <h2 className="text-3xl font-bold mb-4">Stay Updated</h2>
+            <p className="text-white/60 mb-8">
+              Subscribe to our newsletter for the latest business opportunities and marketplace updates.
+            </p>
+            <form onSubmit={handleNewsletterSubmit} className="flex gap-2 max-w-md mx-auto">
+              <input
+                type="email"
+                placeholder="Enter your email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                required
+                className="flex-1 bg-white/5 border border-white/10 rounded-lg px-4 py-2 text-white placeholder:text-white/40 focus:outline-none focus:ring-2 focus:ring-white/20"
+              />
+              <Button type="submit" size="lg" className="bg-white text-background hover:bg-white/90">
+                <Send className="w-4 h-4 mr-2" />
+                Subscribe
+              </Button>
+            </form>
           </div>
         </div>
       </section>

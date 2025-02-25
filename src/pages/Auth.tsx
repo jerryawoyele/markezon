@@ -32,7 +32,7 @@ export default function Auth() {
           : "You have successfully logged in.",
       });
 
-      if (!isSignUp) navigate("/");
+      if (!isSignUp) navigate("/home");
     } catch (error: any) {
       toast({
         variant: "destructive",
@@ -49,7 +49,7 @@ export default function Auth() {
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          redirectTo: window.location.origin
+          redirectTo: `${window.location.origin}/home`
         }
       });
       

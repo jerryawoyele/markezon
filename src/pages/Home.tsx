@@ -2,9 +2,20 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
-import { Home as HomeIcon, PlusSquare, Heart, Send, Menu } from "lucide-react";
+import { 
+  Home as HomeIcon, 
+  PlusSquare, 
+  Heart, 
+  Send, 
+  Search, 
+  Compass, 
+  Film, 
+  User,
+  LogOut
+} from "lucide-react";
 import { Avatar } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 
 interface Profile {
   id: string;
@@ -21,8 +32,20 @@ interface Post {
   profiles: Profile | null;
 }
 
+const SIDEBAR_ITEMS = [
+  { icon: HomeIcon, label: "Home" },
+  { icon: Search, label: "Search" },
+  { icon: Compass, label: "Explore" },
+  { icon: Film, label: "Reels" },
+  { icon: Send, label: "Messages" },
+  { icon: Heart, label: "Notifications" },
+  { icon: PlusSquare, label: "Create" },
+  { icon: User, label: "Profile" },
+];
+
 const Home = () => {
   const [posts, setPosts] = useState<Post[]>([]);
+  const [activeTab, setActiveTab] = useState("Home");
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -48,79 +71,68 @@ const Home = () => {
 
   const fetchPosts = async () => {
     try {
-      const { data, error } = await supabase
-        .from('profiles')
+      const { data: posts, error } = await supabase
+        .from('posts')
         .select(`
-          id,
-          username,
-          avatar_url
-        `);
+          *,
+          profiles:user_id (
+            username,
+            avatar_url
+          )
+        `)
+        .order('created_at', { ascending: false });
 
-      if (error) {
-        console.error('Error fetching profiles:', error);
-        return;
-      }
-
-      // For now, let's use some mock data since the posts table isn't set up yet
-      const mockPosts: Post[] = [
-        {
-          id: '1',
-          user_id: data?.[0]?.id || '',
-          image_url: 'https://source.unsplash.com/random/1000x1000?nature',
-          caption: 'Beautiful day!',
-          created_at: new Date().toISOString(),
-          profiles: data?.[0] || null
-        },
-        {
-          id: '2',
-          user_id: data?.[0]?.id || '',
-          image_url: 'https://source.unsplash.com/random/1000x1000?city',
-          caption: 'City life',
-          created_at: new Date().toISOString(),
-          profiles: data?.[0] || null
-        }
-      ];
-
-      setPosts(mockPosts);
+      if (error) throw error;
+      if (posts) setPosts(posts);
     } catch (error) {
       console.error('Error fetching posts:', error);
     }
   };
 
   return (
-    <div className="min-h-screen bg-background">
-      {/* Header */}
-      <header className="fixed top-0 left-0 right-0 h-16 border-b border-white/10 bg-background/95 backdrop-blur-sm z-50">
-        <div className="container h-full mx-auto px-4 flex items-center justify-between">
-          <h1 className="text-xl font-semibold">Markezon</h1>
+    <div className="min-h-screen bg-background flex">
+      {/* Left Sidebar */}
+      <aside className="w-64 fixed left-0 top-0 h-screen border-r border-white/10 bg-background p-4">
+        <div className="flex flex-col h-full">
+          <h1 className="text-xl font-semibold mb-8 px-4">Markezon</h1>
           
-          <div className="flex items-center gap-4">
-            <Button variant="ghost" size="icon">
-              <HomeIcon className="w-5 h-5" />
-            </Button>
-            <Button variant="ghost" size="icon">
-              <Send className="w-5 h-5" />
-            </Button>
-            <Button variant="ghost" size="icon">
-              <PlusSquare className="w-5 h-5" />
-            </Button>
-            <Button variant="ghost" size="icon">
-              <Heart className="w-5 h-5" />
-            </Button>
-            <Button variant="ghost" size="icon" onClick={async () => {
+          <nav className="flex-1">
+            <ul className="space-y-2">
+              {SIDEBAR_ITEMS.map((item) => (
+                <li key={item.label}>
+                  <Button
+                    variant="ghost"
+                    className={cn(
+                      "w-full justify-start gap-4 text-base font-normal",
+                      activeTab === item.label && "bg-white/10"
+                    )}
+                    onClick={() => setActiveTab(item.label)}
+                  >
+                    <item.icon className="w-6 h-6" />
+                    {item.label}
+                  </Button>
+                </li>
+              ))}
+            </ul>
+          </nav>
+
+          <Button
+            variant="ghost"
+            className="justify-start gap-4 text-base font-normal mt-auto"
+            onClick={async () => {
               await supabase.auth.signOut();
               navigate('/auth');
-            }}>
-              <Menu className="w-5 h-5" />
-            </Button>
-          </div>
+            }}
+          >
+            <LogOut className="w-6 h-6" />
+            Logout
+          </Button>
         </div>
-      </header>
+      </aside>
 
       {/* Main Content */}
-      <main className="container mx-auto pt-20 px-4 lg:px-0 flex">
-        {/* Feed */}
-        <div className="flex-1 max-w-xl mx-auto space-y-6">
+      <main className="flex-1 ml-64">
+        <div className="max-w-xl mx-auto py-8 px-4 space-y-6">
           {posts.map((post) => (
             <article key={post.id} className="bg-black/20 rounded-lg overflow-hidden">
               {/* Post Header */}

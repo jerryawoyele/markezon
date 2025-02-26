@@ -166,7 +166,7 @@ const Index = () => {
             <p className="text-white/60 mb-8">
               Subscribe to our newsletter for the latest business opportunities and marketplace updates.
             </p>
-            <form onSubmit={handleNewsletterSubmit} className="flex gap-2 max-w-md mx-auto">
+            <form onSubmit={handleNewsletterSubmit} className="flex flex-col sm:flex-row gap-2 max-w-md mx-auto">
               <input
                 type="email"
                 placeholder="Enter your email"

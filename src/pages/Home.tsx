@@ -35,16 +35,23 @@ interface Post {
 
 const SIDEBAR_ITEMS = [
   { icon: HomeIcon, label: "Home" },
-  { icon: Search, label: "Search" },
+  { icon: Search, label: "Explore" }, // Changed from Search to Explore
   { icon: Send, label: "Messages" },
   { icon: Heart, label: "Notifications" },
   { icon: User, label: "Profile" },
 ];
 
 const TRENDING_SERVICES = [
-  { title: "Web Development", views: "12.5k", category: "Technology" },
-  { title: "Digital Marketing", views: "10.2k", category: "Marketing" },
-  { title: "Graphic Design", views: "8.7k", category: "Design" },
+  { title: "Web Development", views: "12.5k", category: "Technology", hashtag: "#webdev" },
+  { title: "Digital Marketing", views: "10.2k", category: "Marketing", hashtag: "#digitalmarketing" },
+  { title: "Graphic Design", views: "8.7k", category: "Design", hashtag: "#graphicdesign" },
+  { title: "Content Writing", views: "7.9k", category: "Content", hashtag: "#contentwriting" },
+  { title: "SEO Services", views: "7.2k", category: "Marketing", hashtag: "#seo" },
+  { title: "UI/UX Design", views: "6.8k", category: "Design", hashtag: "#uidesign" },
+  { title: "Mobile Development", views: "6.5k", category: "Technology", hashtag: "#mobiledev" },
+  { title: "Social Media", views: "6.1k", category: "Marketing", hashtag: "#socialmedia" },
+  { title: "Video Editing", views: "5.9k", category: "Media", hashtag: "#videoediting" },
+  { title: "Data Analytics", views: "5.7k", category: "Technology", hashtag: "#dataanalytics" },
 ];
 
 const Home = () => {
@@ -114,9 +121,9 @@ const Home = () => {
   return (
     <div className="min-h-screen bg-background flex">
       {/* Left Sidebar */}
-      <aside className="w-72 fixed left-0 top-0 h-screen border-r border-white/10 bg-background p-6">
+      <aside className="w-20 md:w-72 fixed left-0 top-0 h-screen border-r border-white/10 bg-background p-4 md:p-6">
         <div className="flex flex-col h-full">
-          <h1 className="text-2xl font-bold mb-10 px-4">Markezon</h1>
+          <h1 className="text-2xl font-bold mb-10 px-4 hidden md:block">Markezon</h1>
           
           <nav className="flex-1">
             <ul className="space-y-4">
@@ -125,13 +132,13 @@ const Home = () => {
                   <Button
                     variant="ghost"
                     className={cn(
-                      "w-full justify-start gap-4 text-lg font-semibold py-6",
+                      "w-full justify-center md:justify-start gap-4 text-lg py-6",
                       activeTab === item.label && "bg-white/10"
                     )}
                     onClick={() => setActiveTab(item.label)}
                   >
                     <item.icon className="w-7 h-7" />
-                    {item.label}
+                    <span className="hidden md:inline">{item.label}</span>
                   </Button>
                 </li>
               ))}
@@ -140,22 +147,22 @@ const Home = () => {
 
           <Button
             variant="ghost"
-            className="justify-start gap-4 text-lg font-semibold py-6"
+            className="justify-center md:justify-start gap-4 text-lg py-6"
             onClick={async () => {
               await supabase.auth.signOut();
               navigate('/auth');
             }}
           >
             <LogOut className="w-7 h-7" />
-            Logout
+            <span className="hidden md:inline">Logout</span>
           </Button>
         </div>
       </aside>
 
       {/* Main Content */}
-      <main className="flex-1 ml-72">
+      <main className="flex-1 ml-20 md:ml-72">
         <div className="max-w-[calc(100vw-32rem)] mx-auto py-8 px-4">
-          <div className="grid grid-cols-[1fr,320px] gap-6">
+          <div className="grid grid-cols-1 xl:grid-cols-[1fr,380px] gap-6">
             {/* Feed Column */}
             <div className="space-y-6">
               {/* Create Post Card */}
@@ -229,11 +236,20 @@ const Home = () => {
             </div>
 
             {/* Right Sidebar */}
-            <div className="space-y-6">
+            <div className="space-y-6 xl:border-l border-white/10 pl-6">
+              {/* Search Bar */}
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-white/40 w-5 h-5" />
+                <Input
+                  placeholder="Search services..."
+                  className="pl-10"
+                />
+              </div>
+
               {/* Trending Services Card */}
               <Card className="p-6 bg-black/20 border-white/5">
                 <h2 className="text-lg font-semibold mb-4">Trending Services</h2>
-                <div className="space-y-4">
+                <div className="space-y-4 max-h-[600px] overflow-y-auto">
                   {TRENDING_SERVICES.map((service) => (
                     <div 
                       key={service.title}
@@ -241,7 +257,10 @@ const Home = () => {
                     >
                       <div>
                         <h3 className="font-medium">{service.title}</h3>
-                        <p className="text-sm text-white/60">{service.category}</p>
+                        <div className="flex items-center gap-2">
+                          <p className="text-sm text-white/60">{service.category}</p>
+                          <p className="text-sm text-white/60">{service.hashtag}</p>
+                        </div>
                       </div>
                       <span className="text-sm text-white/60">{service.views} views</span>
                     </div>

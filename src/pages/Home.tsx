@@ -71,19 +71,35 @@ const Home = () => {
 
   const fetchPosts = async () => {
     try {
-      const { data: posts, error } = await supabase
-        .from('posts')
-        .select(`
-          *,
-          profiles:user_id (
-            username,
-            avatar_url
-          )
-        `)
-        .order('created_at', { ascending: false });
+      // For now, let's use mock data until we populate the posts table
+      const mockPosts: Post[] = [
+        {
+          id: '1',
+          user_id: '123',
+          image_url: 'https://source.unsplash.com/random/1000x1000?nature',
+          caption: 'Beautiful day!',
+          created_at: new Date().toISOString(),
+          profiles: {
+            id: '123',
+            username: 'johndoe',
+            avatar_url: 'https://source.unsplash.com/100x100/?portrait'
+          }
+        },
+        {
+          id: '2',
+          user_id: '123',
+          image_url: 'https://source.unsplash.com/random/1000x1000?city',
+          caption: 'City life',
+          created_at: new Date().toISOString(),
+          profiles: {
+            id: '123',
+            username: 'johndoe',
+            avatar_url: 'https://source.unsplash.com/100x100/?portrait'
+          }
+        }
+      ];
 
-      if (error) throw error;
-      if (posts) setPosts(posts);
+      setPosts(mockPosts);
     } catch (error) {
       console.error('Error fetching posts:', error);
     }

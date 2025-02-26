@@ -6,16 +6,19 @@ import { Home as HomeIcon, PlusSquare, Heart, Send, Menu } from "lucide-react";
 import { Avatar } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 
+interface Profile {
+  id: string;
+  username: string | null;
+  avatar_url: string | null;
+}
+
 interface Post {
   id: string;
+  user_id: string;
   image_url: string;
-  caption: string;
+  caption: string | null;
   created_at: string;
-  user: {
-    username: string;
-    avatar_url: string;
-  };
-  likes: number;
+  profiles: Profile | null;
 }
 
 const Home = () => {
@@ -45,16 +48,40 @@ const Home = () => {
 
   const fetchPosts = async () => {
     try {
-      const { data: posts, error } = await supabase
-        .from('posts')
+      const { data, error } = await supabase
+        .from('profiles')
         .select(`
-          *,
-          profiles:user_id (username, avatar_url)
-        `)
-        .order('created_at', { ascending: false });
+          id,
+          username,
+          avatar_url
+        `);
 
-      if (error) throw error;
-      if (posts) setPosts(posts);
+      if (error) {
+        console.error('Error fetching profiles:', error);
+        return;
+      }
+
+      // For now, let's use some mock data since the posts table isn't set up yet
+      const mockPosts: Post[] = [
+        {
+          id: '1',
+          user_id: data?.[0]?.id || '',
+          image_url: 'https://source.unsplash.com/random/1000x1000?nature',
+          caption: 'Beautiful day!',
+          created_at: new Date().toISOString(),
+          profiles: data?.[0] || null
+        },
+        {
+          id: '2',
+          user_id: data?.[0]?.id || '',
+          image_url: 'https://source.unsplash.com/random/1000x1000?city',
+          caption: 'City life',
+          created_at: new Date().toISOString(),
+          profiles: data?.[0] || null
+        }
+      ];
+
+      setPosts(mockPosts);
     } catch (error) {
       console.error('Error fetching posts:', error);
     }
@@ -100,19 +127,19 @@ const Home = () => {
               <div className="p-4 flex items-center gap-3">
                 <Avatar>
                   <img 
-                    src={post.user.avatar_url || 'https://source.unsplash.com/100x100/?portrait'} 
-                    alt={post.user.username}
+                    src={post.profiles?.avatar_url || 'https://source.unsplash.com/100x100/?portrait'} 
+                    alt={post.profiles?.username || 'User'}
                     className="w-full h-full object-cover"
                   />
                 </Avatar>
-                <span className="font-medium">{post.user.username}</span>
+                <span className="font-medium">{post.profiles?.username || 'Anonymous'}</span>
               </div>
               
               {/* Post Image */}
               <div className="aspect-square">
                 <img 
                   src={post.image_url} 
-                  alt={post.caption}
+                  alt={post.caption || 'Post image'}
                   className="w-full h-full object-cover"
                 />
               </div>
@@ -131,7 +158,7 @@ const Home = () => {
                 {/* Caption */}
                 {post.caption && (
                   <p className="text-sm">
-                    <span className="font-medium mr-2">{post.user.username}</span>
+                    <span className="font-medium mr-2">{post.profiles?.username}</span>
                     {post.caption}
                   </p>
                 )}

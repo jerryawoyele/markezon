@@ -1,47 +1,25 @@
 
-import { Search, Briefcase, Code, Palette, Camera, Music, Book } from "lucide-react";
-import { ServiceCard } from "@/components/ServiceCard";
-import { CategoryButton } from "@/components/CategoryButton";
-import { Header } from "@/components/Header";
-import { Footer } from "@/components/Footer";
-import { useEffect } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
+import { Home as HomeIcon, PlusSquare, Heart, Send, Menu } from "lucide-react";
+import { Avatar } from "@/components/ui/avatar";
+import { Button } from "@/components/ui/button";
 
-const FEATURED_SERVICES = [
-  {
-    title: "Professional Web Development",
-    description: "Custom web applications built with modern technologies",
-    category: "Technology",
-    image: "https://images.unsplash.com/photo-1488590528505-98d2b5aba04b?auto=format&fit=crop&q=80",
-    business: "TechCraft Solutions"
-  },
-  {
-    title: "Brand Identity Design",
-    description: "Comprehensive branding and visual identity services",
-    category: "Design",
-    image: "https://images.unsplash.com/photo-1519389950473-47ba0277781c?auto=format&fit=crop&q=80",
-    business: "Creative Studio"
-  },
-  {
-    title: "Professional Photography",
-    description: "High-quality photography for events and products",
-    category: "Photography",
-    image: "https://images.unsplash.com/photo-1581091226825-a6a2a5aee158?auto=format&fit=crop&q=80",
-    business: "Capture Moments"
-  }
-];
-
-const CATEGORIES = [
-  { name: "All", icon: <Briefcase size={18} /> },
-  { name: "Technology", icon: <Code size={18} /> },
-  { name: "Design", icon: <Palette size={18} /> },
-  { name: "Photography", icon: <Camera size={18} /> },
-  { name: "Music", icon: <Music size={18} /> },
-  { name: "Education", icon: <Book size={18} /> },
-];
+interface Post {
+  id: string;
+  image_url: string;
+  caption: string;
+  created_at: string;
+  user: {
+    username: string;
+    avatar_url: string;
+  };
+  likes: number;
+}
 
 const Home = () => {
+  const [posts, setPosts] = useState<Post[]>([]);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -49,6 +27,8 @@ const Home = () => {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) {
         navigate('/auth');
+      } else {
+        fetchPosts();
       }
     };
 
@@ -63,61 +43,103 @@ const Home = () => {
     return () => subscription.unsubscribe();
   }, [navigate]);
 
+  const fetchPosts = async () => {
+    try {
+      const { data: posts, error } = await supabase
+        .from('posts')
+        .select(`
+          *,
+          profiles:user_id (username, avatar_url)
+        `)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      if (posts) setPosts(posts);
+    } catch (error) {
+      console.error('Error fetching posts:', error);
+    }
+  };
+
   return (
-    <div className="min-h-screen bg-gradient-to-b from-background to-background/95">
-      <Header />
-      
-      <main className="pt-20">
-        {/* Welcome Section */}
-        <section className="py-8 border-b border-white/10">
-          <div className="container px-4 mx-auto">
-            <h1 className="text-2xl font-semibold mb-2">Welcome to your Dashboard</h1>
-            <p className="text-white/60">Discover and connect with services tailored for you</p>
+    <div className="min-h-screen bg-background">
+      {/* Header */}
+      <header className="fixed top-0 left-0 right-0 h-16 border-b border-white/10 bg-background/95 backdrop-blur-sm z-50">
+        <div className="container h-full mx-auto px-4 flex items-center justify-between">
+          <h1 className="text-xl font-semibold">Markezon</h1>
+          
+          <div className="flex items-center gap-4">
+            <Button variant="ghost" size="icon">
+              <HomeIcon className="w-5 h-5" />
+            </Button>
+            <Button variant="ghost" size="icon">
+              <Send className="w-5 h-5" />
+            </Button>
+            <Button variant="ghost" size="icon">
+              <PlusSquare className="w-5 h-5" />
+            </Button>
+            <Button variant="ghost" size="icon">
+              <Heart className="w-5 h-5" />
+            </Button>
+            <Button variant="ghost" size="icon" onClick={async () => {
+              await supabase.auth.signOut();
+              navigate('/auth');
+            }}>
+              <Menu className="w-5 h-5" />
+            </Button>
           </div>
-        </section>
+        </div>
+      </header>
 
-        {/* Search and Categories */}
-        <section className="py-8">
-          <div className="container px-4 mx-auto">
-            <div className="max-w-4xl mx-auto">
-              <div className="glass rounded-2xl p-2 mb-8">
-                <div className="relative">
-                  <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-white/40" />
-                  <input
-                    type="text"
-                    placeholder="Search for services..."
-                    className="w-full bg-white/5 border-0 rounded-xl py-3 pl-12 pr-4 text-white placeholder:text-white/40 focus:ring-0 focus:outline-none"
+      {/* Main Content */}
+      <main className="container mx-auto pt-20 px-4 lg:px-0 flex">
+        {/* Feed */}
+        <div className="flex-1 max-w-xl mx-auto space-y-6">
+          {posts.map((post) => (
+            <article key={post.id} className="bg-black/20 rounded-lg overflow-hidden">
+              {/* Post Header */}
+              <div className="p-4 flex items-center gap-3">
+                <Avatar>
+                  <img 
+                    src={post.user.avatar_url || 'https://source.unsplash.com/100x100/?portrait'} 
+                    alt={post.user.username}
+                    className="w-full h-full object-cover"
                   />
+                </Avatar>
+                <span className="font-medium">{post.user.username}</span>
+              </div>
+              
+              {/* Post Image */}
+              <div className="aspect-square">
+                <img 
+                  src={post.image_url} 
+                  alt={post.caption}
+                  className="w-full h-full object-cover"
+                />
+              </div>
+              
+              {/* Post Actions */}
+              <div className="p-4 space-y-3">
+                <div className="flex items-center gap-4">
+                  <Button variant="ghost" size="icon">
+                    <Heart className="w-5 h-5" />
+                  </Button>
+                  <Button variant="ghost" size="icon">
+                    <Send className="w-5 h-5" />
+                  </Button>
                 </div>
+                
+                {/* Caption */}
+                {post.caption && (
+                  <p className="text-sm">
+                    <span className="font-medium mr-2">{post.user.username}</span>
+                    {post.caption}
+                  </p>
+                )}
               </div>
-              <div className="flex gap-2 overflow-x-auto pb-4" style={{ scrollbarWidth: 'none' }}>
-                {CATEGORIES.map((category) => (
-                  <CategoryButton
-                    key={category.name}
-                    name={category.name}
-                    icon={category.icon}
-                    isSelected={category.name === "All"}
-                  />
-                ))}
-              </div>
-            </div>
-          </div>
-        </section>
-
-        {/* Services Grid */}
-        <section className="py-8">
-          <div className="container px-4 mx-auto">
-            <h2 className="text-xl font-semibold mb-6">Recommended Services</h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {FEATURED_SERVICES.map((service, index) => (
-                <ServiceCard key={index} {...service} />
-              ))}
-            </div>
-          </div>
-        </section>
+            </article>
+          ))}
+        </div>
       </main>
-
-      <Footer />
     </div>
   );
 };

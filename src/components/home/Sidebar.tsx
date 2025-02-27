@@ -28,25 +28,49 @@ interface SidebarProps {
 export function Sidebar({ activeTab, setActiveTab }: SidebarProps) {
   const navigate = useNavigate();
 
-  return (
-    <aside className="w-20 md:w-72 fixed left-0 top-0 h-screen border-r border-white/10 bg-background p-4 md:p-6">
-      <div className="flex flex-col h-full">
-        <h1 className="text-2xl font-bold mb-10 px-4 hidden md:block">Markezon</h1>
+  // Mobile Bottom Navigation
+  const mobileNav = (
+    <nav className="fixed bottom-0 left-0 right-0 bg-background border-t border-white/10 px-2 py-1 xl:hidden z-50">
+      <ul className="flex justify-around">
+        {SIDEBAR_ITEMS.map((item) => (
+          <li key={item.label}>
+            <Button
+              variant="ghost"
+              className={cn(
+                "flex flex-col items-center gap-1 px-2 py-3",
+                activeTab === item.label && "bg-white/10"
+              )}
+              onClick={() => setActiveTab(item.label)}
+            >
+              <item.icon className="w-5 h-5" />
+              <span className="text-xs">{item.label}</span>
+            </Button>
+          </li>
+        ))}
+      </ul>
+    </nav>
+  );
+
+  // Desktop Sidebar
+  const desktopNav = (
+    <aside className="hidden xl:flex w-72 fixed left-0 top-0 h-screen border-r border-white/10 bg-background p-4">
+      <div className="flex flex-col h-full w-full">
+        <h1 className="text-2xl font-bold mb-8 px-4">Markezon</h1>
         
         <nav className="flex-1">
-          <ul className="space-y-4">
+          <ul className="space-y-2">
             {SIDEBAR_ITEMS.map((item) => (
               <li key={item.label}>
                 <Button
                   variant="ghost"
                   className={cn(
-                    "w-full justify-center md:justify-start gap-4 text-lg py-6",
+                    "w-full justify-start gap-3 py-3 px-4",
                     activeTab === item.label && "bg-white/10"
                   )}
                   onClick={() => setActiveTab(item.label)}
                 >
-                  <item.icon className="w-7 h-7" />
-                  <span className="hidden md:inline">{item.label}</span>
+                  <item.icon className="w-5 h-5" />
+                  <span>{item.label}</span>
                 </Button>
               </li>
             ))}
@@ -55,16 +79,23 @@ export function Sidebar({ activeTab, setActiveTab }: SidebarProps) {
 
         <Button
           variant="ghost"
-          className="justify-center md:justify-start gap-4 text-lg py-6"
+          className="justify-start gap-3 py-3 px-4"
           onClick={async () => {
             await supabase.auth.signOut();
             navigate('/auth');
           }}
         >
-          <LogOut className="w-7 h-7" />
-          <span className="hidden md:inline">Logout</span>
+          <LogOut className="w-5 h-5" />
+          <span>Logout</span>
         </Button>
       </div>
     </aside>
+  );
+
+  return (
+    <>
+      {desktopNav}
+      {mobileNav}
+    </>
   );
 }

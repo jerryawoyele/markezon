@@ -1,49 +1,58 @@
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Search } from "lucide-react";
 import { Sidebar } from "@/components/home/Sidebar";
 import { MobileHeader } from "@/components/home/MobileHeader";
+import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "@/components/ui/use-toast";
 
-interface Service {
+interface Post {
   id: string;
-  title: string;
-  category: string;
-  hashtag: string;
-  image: string;
-  views: string;
+  image_url: string;
+  caption: string | null;
+  created_at: string;
+  profiles: {
+    username: string | null;
+  };
 }
-
-const SERVICES: Service[] = [
-  {
-    id: "1",
-    title: "Web Development",
-    category: "Technology",
-    hashtag: "#webdev",
-    image: "https://source.unsplash.com/random/800x600/?coding",
-    views: "12.5k"
-  },
-  {
-    id: "2",
-    title: "Digital Marketing",
-    category: "Marketing",
-    hashtag: "#marketing",
-    image: "https://source.unsplash.com/random/800x600/?marketing",
-    views: "10.2k"
-  },
-  {
-    id: "3",
-    title: "Graphic Design",
-    category: "Design",
-    hashtag: "#design",
-    image: "https://source.unsplash.com/random/800x600/?design",
-    views: "8.7k"
-  }
-];
 
 export default function Explore() {
   const [activeTab, setActiveTab] = useState("Explore");
+  const [posts, setPosts] = useState<Post[]>([]);
+  const [loading, setLoading] = useState(true);
+  const { toast } = useToast();
+
+  useEffect(() => {
+    fetchPosts();
+  }, []);
+
+  const fetchPosts = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('posts')
+        .select(`
+          *,
+          profiles (
+            username
+          )
+        `)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      setPosts(data || []);
+    } catch (error) {
+      console.error('Error fetching posts:', error);
+      toast({
+        title: "Error",
+        description: "Failed to load posts",
+        variant: "destructive"
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-background flex">
@@ -57,37 +66,46 @@ export default function Explore() {
             <div className="relative">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-white/40 w-5 h-5" />
               <Input
-                placeholder="Search services..."
+                placeholder="Search posts..."
                 className="pl-10"
               />
             </div>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {SERVICES.map((service) => (
-              <Card 
-                key={service.id}
-                className="overflow-hidden bg-black/20 border-white/5 hover:bg-black/30 transition-colors cursor-pointer"
-              >
-                <div className="aspect-video">
-                  <img 
-                    src={service.image} 
-                    alt={service.title}
-                    className="w-full h-full object-cover"
-                  />
-                </div>
-                <div className="p-4">
-                  <h3 className="font-medium mb-2">{service.title}</h3>
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm text-white/60">{service.category}</span>
-                      <span className="text-sm text-white/60">{service.hashtag}</span>
-                    </div>
-                    <span className="text-sm text-white/60">{service.views} views</span>
+            {loading ? (
+              Array(6).fill(0).map((_, i) => (
+                <Card 
+                  key={i}
+                  className="overflow-hidden bg-black/20 border-white/5 animate-pulse"
+                >
+                  <div className="aspect-video bg-white/5" />
+                  <div className="p-4 space-y-2">
+                    <div className="h-4 bg-white/5 rounded w-3/4" />
+                    <div className="h-4 bg-white/5 rounded w-1/2" />
                   </div>
-                </div>
-              </Card>
-            ))}
+                </Card>
+              ))
+            ) : (
+              posts.map((post) => (
+                <Card 
+                  key={post.id}
+                  className="overflow-hidden bg-black/20 border-white/5 hover:bg-black/30 transition-colors cursor-pointer"
+                >
+                  <div className="aspect-video">
+                    <img 
+                      src={post.image_url} 
+                      alt={post.caption || 'Post'}
+                      className="w-full h-full object-cover"
+                    />
+                  </div>
+                  <div className="p-4">
+                    <h3 className="font-medium mb-2">{post.profiles.username || 'Anonymous'}</h3>
+                    <p className="text-sm text-white/60 line-clamp-2">{post.caption}</p>
+                  </div>
+                </Card>
+              ))
+            )}
           </div>
         </div>
       </div>

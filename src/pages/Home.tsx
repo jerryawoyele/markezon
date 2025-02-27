@@ -7,6 +7,7 @@ import { CreatePost } from "@/components/home/CreatePost";
 import { Post } from "@/components/home/Post";
 import { TrendingServices } from "@/components/home/TrendingServices";
 import { MobileHeader } from "@/components/home/MobileHeader";
+import { useToast } from "@/components/ui/use-toast";
 
 interface Profile {
   id: string;
@@ -28,7 +29,9 @@ const Home = () => {
   const [activeTab, setActiveTab] = useState("Home");
   const [postText, setPostText] = useState("");
   const [postImage, setPostImage] = useState("");
+  const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
+  const { toast } = useToast();
 
   useEffect(() => {
     const checkAuth = async () => {
@@ -53,36 +56,29 @@ const Home = () => {
 
   const fetchPosts = async () => {
     try {
-      const mockPosts: Post[] = [
-        {
-          id: '1',
-          user_id: '123',
-          image_url: 'https://source.unsplash.com/random/1000x1000?nature',
-          caption: 'Beautiful day!',
-          created_at: new Date().toISOString(),
-          profiles: {
-            id: '123',
-            username: 'johndoe',
-            avatar_url: 'https://source.unsplash.com/100x100/?portrait'
-          }
-        },
-        {
-          id: '2',
-          user_id: '123',
-          image_url: 'https://source.unsplash.com/random/1000x1000?city',
-          caption: 'City life',
-          created_at: new Date().toISOString(),
-          profiles: {
-            id: '123',
-            username: 'johndoe',
-            avatar_url: 'https://source.unsplash.com/100x100/?portrait'
-          }
-        }
-      ];
+      const { data, error } = await supabase
+        .from('posts')
+        .select(`
+          *,
+          profiles (
+            id,
+            username,
+            avatar_url
+          )
+        `)
+        .order('created_at', { ascending: false });
 
-      setPosts(mockPosts);
+      if (error) throw error;
+      setPosts(data || []);
     } catch (error) {
       console.error('Error fetching posts:', error);
+      toast({
+        title: "Error",
+        description: "Failed to load posts",
+        variant: "destructive"
+      });
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -90,13 +86,13 @@ const Home = () => {
     <div className="min-h-screen bg-background flex">
       <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} />
 
-      <div className="flex-1 xl:ml-72 pb-24 xl:pb-0">
+      <div className="flex-1 xl:ml-72">
         <MobileHeader />
         
-        <div className="max-w-[calc(100vw-32rem)] mx-auto py-8 px-4">
+        <div className="max-w-[100vw] mx-auto px-4">
           <div className="grid grid-cols-1 xl:grid-cols-[1fr,400px] gap-10">
             {/* Feed Column */}
-            <div className="space-y-6 xl:pr-12">
+            <div className="space-y-6 xl:pr-12 my-8">
               <CreatePost
                 postText={postText}
                 postImage={postImage}
@@ -104,13 +100,21 @@ const Home = () => {
                 setPostImage={setPostImage}
               />
 
-              {posts.map((post) => (
-                <Post key={post.id} {...post} />
-              ))}
+              {loading ? (
+                <div className="space-y-4">
+                  {[1, 2, 3].map((n) => (
+                    <div key={n} className="h-64 bg-white/5 rounded-lg animate-pulse" />
+                  ))}
+                </div>
+              ) : (
+                posts.map((post) => (
+                  <Post key={post.id} {...post} />
+                ))
+              )}
             </div>
 
             {/* Right Sidebar - Hidden on mobile */}
-            <div className="hidden xl:block border-l border-white/10 pl-8">
+            <div className="hidden xl:block border-l border-white/10 pl-8 my-8">
               <TrendingServices />
             </div>
           </div>
@@ -118,6 +122,6 @@ const Home = () => {
       </div>
     </div>
   );
-};
+}
 
 export default Home;

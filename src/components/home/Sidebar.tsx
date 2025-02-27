@@ -42,7 +42,7 @@ export function Sidebar({ activeTab, setActiveTab }: SidebarProps) {
             <Button
               variant="ghost"
               className={cn(
-                "flex items-center px-2 py-5",
+                "flex items-center px-2 py-6",
                 activeTab === item.label && "bg-white/10"
               )}
               onClick={() => handleNavigation(item.label, item.path)}
@@ -68,7 +68,7 @@ export function Sidebar({ activeTab, setActiveTab }: SidebarProps) {
                 <Button
                   variant="ghost"
                   className={cn(
-                    "w-full justify-start gap-3 py-5 px-4",
+                    "w-full justify-start gap-3 py-6 px-4",
                     activeTab === item.label && "bg-white/10"
                   )}
                   onClick={() => handleNavigation(item.label, item.path)}
@@ -83,7 +83,7 @@ export function Sidebar({ activeTab, setActiveTab }: SidebarProps) {
 
         <Button
           variant="ghost"
-          className="justify-start gap-3 py-5 px-4"
+          className="justify-start gap-3 py-6 px-4"
           onClick={async () => {
             await supabase.auth.signOut();
             navigate('/auth');

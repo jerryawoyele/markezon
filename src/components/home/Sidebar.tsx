@@ -1,4 +1,3 @@
-
 import { useNavigate } from "react-router-dom";
 import { 
   Home as HomeIcon, 
@@ -30,20 +29,19 @@ export function Sidebar({ activeTab, setActiveTab }: SidebarProps) {
 
   // Mobile Bottom Navigation
   const mobileNav = (
-    <nav className="fixed bottom-0 left-0 right-0 bg-background border-t border-white/10 px-2 py-1 xl:hidden z-50">
+    <nav className="fixed bottom-0 left-0 right-0 bg-background border-t border-white/10 px-2 py-3 xl:hidden z-50">
       <ul className="flex justify-around">
         {SIDEBAR_ITEMS.map((item) => (
           <li key={item.label}>
             <Button
               variant="ghost"
               className={cn(
-                "flex flex-col items-center gap-1 px-2 py-3",
+                "flex items-center px-2 py-4",
                 activeTab === item.label && "bg-white/10"
               )}
               onClick={() => setActiveTab(item.label)}
             >
               <item.icon className="w-5 h-5" />
-              <span className="text-xs">{item.label}</span>
             </Button>
           </li>
         ))}
@@ -64,7 +62,7 @@ export function Sidebar({ activeTab, setActiveTab }: SidebarProps) {
                 <Button
                   variant="ghost"
                   className={cn(
-                    "w-full justify-start gap-3 py-3 px-4",
+                    "w-full justify-start gap-3 py-4 px-4",
                     activeTab === item.label && "bg-white/10"
                   )}
                   onClick={() => setActiveTab(item.label)}
@@ -79,7 +77,7 @@ export function Sidebar({ activeTab, setActiveTab }: SidebarProps) {
 
         <Button
           variant="ghost"
-          className="justify-start gap-3 py-3 px-4"
+          className="justify-start gap-3 py-4 px-4"
           onClick={async () => {
             await supabase.auth.signOut();
             navigate('/auth');

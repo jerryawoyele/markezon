@@ -90,13 +90,13 @@ const Home = () => {
     <div className="min-h-screen bg-background flex">
       <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} />
 
-      <div className="flex-1 xl:ml-72 pb-20 xl:pb-0">
+      <div className="flex-1 xl:ml-72 pb-24 xl:pb-0">
         <MobileHeader />
         
         <div className="max-w-[calc(100vw-32rem)] mx-auto py-8 px-4">
-          <div className="grid grid-cols-1 xl:grid-cols-[1fr,400px] gap-6">
+          <div className="grid grid-cols-1 xl:grid-cols-[1fr,400px] gap-10">
             {/* Feed Column */}
-            <div className="space-y-6">
+            <div className="space-y-6 xl:pr-12">
               <CreatePost
                 postText={postText}
                 postImage={postImage}

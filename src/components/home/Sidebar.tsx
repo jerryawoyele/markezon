@@ -1,3 +1,4 @@
+
 import { useNavigate } from "react-router-dom";
 import { 
   Home as HomeIcon, 
@@ -12,11 +13,11 @@ import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 
 const SIDEBAR_ITEMS = [
-  { icon: HomeIcon, label: "Home" },
-  { icon: Compass, label: "Explore" },
-  { icon: Send, label: "Messages" },
-  { icon: Heart, label: "Notifications" },
-  { icon: User, label: "Profile" },
+  { icon: HomeIcon, label: "Home", path: "/home" },
+  { icon: Compass, label: "Explore", path: "/explore" },
+  { icon: Send, label: "Messages", path: "/messages" },
+  { icon: Heart, label: "Notifications", path: "/notifications" },
+  { icon: User, label: "Profile", path: "/profile" },
 ];
 
 interface SidebarProps {
@@ -27,19 +28,24 @@ interface SidebarProps {
 export function Sidebar({ activeTab, setActiveTab }: SidebarProps) {
   const navigate = useNavigate();
 
+  const handleNavigation = (label: string, path: string) => {
+    setActiveTab(label);
+    navigate(path);
+  };
+
   // Mobile Bottom Navigation
   const mobileNav = (
-    <nav className="fixed bottom-0 left-0 right-0 bg-background border-t border-white/10 px-2 py-3 xl:hidden z-50">
+    <nav className="fixed bottom-0 left-0 w-full bg-background border-t border-white/10 px-2 py-3 xl:hidden z-50">
       <ul className="flex justify-around">
         {SIDEBAR_ITEMS.map((item) => (
           <li key={item.label}>
             <Button
               variant="ghost"
               className={cn(
-                "flex items-center px-2 py-4",
+                "flex items-center px-2 py-5",
                 activeTab === item.label && "bg-white/10"
               )}
-              onClick={() => setActiveTab(item.label)}
+              onClick={() => handleNavigation(item.label, item.path)}
             >
               <item.icon className="w-5 h-5" />
             </Button>
@@ -62,10 +68,10 @@ export function Sidebar({ activeTab, setActiveTab }: SidebarProps) {
                 <Button
                   variant="ghost"
                   className={cn(
-                    "w-full justify-start gap-3 py-4 px-4",
+                    "w-full justify-start gap-3 py-5 px-4",
                     activeTab === item.label && "bg-white/10"
                   )}
-                  onClick={() => setActiveTab(item.label)}
+                  onClick={() => handleNavigation(item.label, item.path)}
                 >
                   <item.icon className="w-5 h-5" />
                   <span>{item.label}</span>
@@ -77,7 +83,7 @@ export function Sidebar({ activeTab, setActiveTab }: SidebarProps) {
 
         <Button
           variant="ghost"
-          className="justify-start gap-3 py-4 px-4"
+          className="justify-start gap-3 py-5 px-4"
           onClick={async () => {
             await supabase.auth.signOut();
             navigate('/auth');

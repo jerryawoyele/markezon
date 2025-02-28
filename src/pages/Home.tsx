@@ -110,23 +110,78 @@ const Home = () => {
     }
   };
 
+  const handleCreatePost = async () => {
+    if (!postText.trim() && !postImage.trim()) {
+      toast({
+        title: "Error",
+        description: "Please provide text or an image for your post",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        toast({
+          title: "Error",
+          description: "You must be logged in to create a post",
+          variant: "destructive"
+        });
+        return;
+      }
+
+      const { error } = await supabase
+        .from('posts')
+        .insert({
+          user_id: user.id,
+          caption: postText,
+          image_url: postImage || 'https://source.unsplash.com/random/600x400/?nature'
+        });
+
+      if (error) throw error;
+
+      toast({
+        title: "Success",
+        description: "Post created successfully",
+      });
+
+      // Reset form
+      setPostText("");
+      setPostImage("");
+      
+      // Refetch posts to show the new one
+      fetchPosts();
+    } catch (error) {
+      console.error('Error creating post:', error);
+      toast({
+        title: "Error",
+        description: "Failed to create post",
+        variant: "destructive"
+      });
+    }
+  };
+
   return (
-    <div className="min-h-screen bg-background flex">
+    <div className="min-h-screen bg-background flex flex-col xl:flex-row">
       <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} />
 
       <div className="flex-1 xl:ml-72">
         <MobileHeader />
         
-        <div className="max-w-[100vw] mx-auto px-4">
+        <div className="max-w-[100vw] mx-auto px-4 pb-24 xl:pb-0 overflow-y-auto h-[calc(100vh-64px)]">
           <div className="grid grid-cols-1 xl:grid-cols-[1fr,400px] gap-10">
             {/* Feed Column */}
             <div className="space-y-6 xl:pr-12 my-8">
-              <CreatePost
-                postText={postText}
-                postImage={postImage}
-                setPostText={setPostText}
-                setPostImage={setPostImage}
-              />
+              <div className="max-w-3xl mx-auto">
+                <CreatePost
+                  postText={postText}
+                  postImage={postImage}
+                  setPostText={setPostText}
+                  setPostImage={setPostImage}
+                  onCreatePost={handleCreatePost}
+                />
+              </div>
 
               {loading ? (
                 <div className="space-y-4">

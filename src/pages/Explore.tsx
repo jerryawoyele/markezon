@@ -21,7 +21,7 @@ interface Post {
 }
 
 export default function Explore() {
-  const [activeTab, setActiveTab] = useState("Explore");
+  const [activeTab, setActiveTab] = useState("Discover");
   const [posts, setPosts] = useState<Post[]>([]);
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
@@ -74,7 +74,7 @@ export default function Explore() {
       <div className="flex-1 xl:ml-72 pb-24 xl:pb-0">
         <MobileHeader />
         
-        <div className="max-w-7xl mx-auto py-8 px-4">
+        <div className="max-w-7xl mx-auto py-8 px-4 mt-16 xl:mt-0 h-[calc(100vh-64px)] overflow-y-auto">
           <div className="max-w-xl mx-auto mb-8">
             <div className="relative">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-white/40 w-5 h-5" />

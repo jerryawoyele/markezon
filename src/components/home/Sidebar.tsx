@@ -14,7 +14,7 @@ import { supabase } from "@/integrations/supabase/client";
 
 const SIDEBAR_ITEMS = [
   { icon: HomeIcon, label: "Home", path: "/home" },
-  { icon: Compass, label: "Explore", path: "/explore" },
+  { icon: Compass, label: "Discover", path: "/explore" },
   { icon: Send, label: "Messages", path: "/messages" },
   { icon: Heart, label: "Notifications", path: "/notifications" },
   { icon: User, label: "Profile", path: "/profile" },

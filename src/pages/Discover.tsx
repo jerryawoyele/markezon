@@ -7,6 +7,7 @@ import { Sidebar } from "@/components/home/Sidebar";
 import { MobileHeader } from "@/components/home/MobileHeader";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/components/ui/use-toast";
+import { useNavigate } from "react-router-dom";
 
 interface Post {
   id: string;
@@ -20,12 +21,13 @@ interface Post {
   };
 }
 
-export default function Explore() {
+export default function Discover() {
   const [activeTab, setActiveTab] = useState("Discover");
   const [posts, setPosts] = useState<Post[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const { toast } = useToast();
+  const navigate = useNavigate();
 
   useEffect(() => {
     fetchPosts();
@@ -89,6 +91,10 @@ export default function Explore() {
     // In a real app, you might navigate to a detailed post view
   };
 
+  const handleUserClick = (userId: string) => {
+    navigate(`/user/${userId}`);
+  };
+
   return (
     <div className="min-h-screen bg-background flex">
       <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} />
@@ -138,7 +144,24 @@ export default function Explore() {
                     />
                   </div>
                   <div className="p-4">
-                    <h3 className="font-medium mb-2">{post.profiles.username || 'Anonymous'}</h3>
+                    <button 
+                      className="font-medium mb-2 hover:underline flex items-center gap-2"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleUserClick(post.user_id);
+                      }}
+                    >
+                      <div className="w-6 h-6 rounded-full overflow-hidden bg-white/10">
+                        {post.profiles.avatar_url && (
+                          <img 
+                            src={post.profiles.avatar_url} 
+                            alt={post.profiles.username || "User"} 
+                            className="w-full h-full object-cover"
+                          />
+                        )}
+                      </div>
+                      {post.profiles.username || 'Anonymous'}
+                    </button>
                     <p className="text-sm text-white/60 line-clamp-2">{post.caption}</p>
                   </div>
                 </Card>

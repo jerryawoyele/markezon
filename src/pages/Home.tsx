@@ -4,10 +4,14 @@ import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Sidebar } from "@/components/home/Sidebar";
 import { CreatePost } from "@/components/home/CreatePost";
+import { CreatePostModal } from "@/components/home/CreatePostModal";
 import { Post } from "@/components/home/Post";
 import { TrendingServices } from "@/components/home/TrendingServices";
 import { MobileHeader } from "@/components/home/MobileHeader";
+import { SearchDropdown } from "@/components/home/SearchDropdown";
 import { useToast } from "@/components/ui/use-toast";
+import { Button } from "@/components/ui/button";
+import { PlusCircle } from "lucide-react";
 
 interface Profile {
   id: string;
@@ -31,6 +35,8 @@ const Home = () => {
   const [postImage, setPostImage] = useState("");
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
+  const [showSearchResults, setShowSearchResults] = useState(false);
+  const [createPostOpen, setCreatePostOpen] = useState(false);
   const navigate = useNavigate();
   const { toast } = useToast();
 
@@ -117,16 +123,7 @@ const Home = () => {
     }
   };
 
-  const handleCreatePost = async () => {
-    if (!postText.trim() && !postImage.trim()) {
-      toast({
-        title: "Error",
-        description: "Please provide text or an image for your post",
-        variant: "destructive"
-      });
-      return;
-    }
-
+  const handleCreatePost = async (caption: string, imageFile: File | null, type: "text" | "image") => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) {
@@ -138,12 +135,24 @@ const Home = () => {
         return;
       }
 
+      let imageUrl = 'https://source.unsplash.com/random/600x400/?nature';
+      
+      // If there's an image file, we would upload it
+      // For now, just create a post with the default image or URL
+      if (imageFile) {
+        // In a real app, you would upload the image to your storage
+        console.log("Would upload:", imageFile.name);
+        
+        // For demo purposes, use a random image
+        imageUrl = 'https://source.unsplash.com/random/600x400/?technology';
+      }
+
       const { error } = await supabase
         .from('posts')
         .insert({
           user_id: user.id,
-          caption: postText,
-          image_url: postImage || 'https://source.unsplash.com/random/600x400/?nature'
+          caption: caption,
+          image_url: imageUrl
         });
 
       if (error) throw error;
@@ -152,10 +161,6 @@ const Home = () => {
         title: "Success",
         description: "Post created successfully",
       });
-
-      // Reset form
-      setPostText("");
-      setPostImage("");
       
       // Refetch posts to show the new one
       fetchPosts();
@@ -171,7 +176,7 @@ const Home = () => {
 
   const handleSearch = (query: string) => {
     setSearchQuery(query);
-    fetchPosts();
+    setShowSearchResults(!!query);
   };
 
   const handleLikePost = async (postId: string) => {
@@ -212,13 +217,15 @@ const Home = () => {
             {/* Feed Column */}
             <div className="space-y-6 xl:pr-12 my-8">
               <div className="max-w-3xl mx-auto">
-                <CreatePost
-                  postText={postText}
-                  postImage={postImage}
-                  setPostText={setPostText}
-                  setPostImage={setPostImage}
-                  onCreatePost={handleCreatePost}
-                />
+                <Card className="p-6 bg-black/20 border-white/5 w-full cursor-pointer hover:bg-black/30 transition-colors" onClick={() => setCreatePostOpen(true)}>
+                  <div className="flex items-center gap-4">
+                    <PlusCircle className="w-8 h-8 text-white/60" />
+                    <div className="flex-1">
+                      <h3 className="text-lg font-medium">Create a new post</h3>
+                      <p className="text-white/60">Share your thoughts or upload an image</p>
+                    </div>
+                  </div>
+                </Card>
               </div>
 
               {loading ? (
@@ -247,8 +254,29 @@ const Home = () => {
             {/* Right Sidebar - Hidden on mobile */}
             <div className="hidden xl:block border-l border-white/10 pl-8 my-8">
               <TrendingServices />
+              <div className="relative">
+                <input
+                  type="text"
+                  placeholder="Search..."
+                  className="w-full p-2 bg-black/20 border border-white/10 rounded-md"
+                  value={searchQuery}
+                  onChange={(e) => handleSearch(e.target.value)}
+                  onFocus={() => setShowSearchResults(true)}
+                />
+                <SearchDropdown 
+                  searchQuery={searchQuery} 
+                  show={showSearchResults} 
+                  onClose={() => setShowSearchResults(false)} 
+                />
+              </div>
             </div>
           </div>
+
+          <CreatePostModal
+            open={createPostOpen}
+            onOpenChange={setCreatePostOpen}
+            onCreatePost={handleCreatePost}
+          />
         </div>
       </div>
     </div>

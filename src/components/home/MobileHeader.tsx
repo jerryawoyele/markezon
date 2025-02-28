@@ -2,6 +2,7 @@
 import { useState } from "react";
 import { Input } from "@/components/ui/input";
 import { Search } from "lucide-react";
+import { SearchDropdown } from "./SearchDropdown";
 
 interface MobileHeaderProps {
   onSearch?: (query: string) => void;
@@ -9,11 +10,19 @@ interface MobileHeaderProps {
 
 export function MobileHeader({ onSearch }: MobileHeaderProps) {
   const [searchQuery, setSearchQuery] = useState("");
+  const [showResults, setShowResults] = useState(false);
 
   const handleSearch = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter' && onSearch) {
       onSearch(searchQuery);
     }
+  };
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    setSearchQuery(value);
+    if (onSearch) onSearch(value);
+    setShowResults(!!value);
   };
 
   return (
@@ -25,8 +34,14 @@ export function MobileHeader({ onSearch }: MobileHeaderProps) {
           placeholder="Search services..."
           className="pl-9"
           value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
+          onChange={handleChange}
           onKeyPress={handleSearch}
+          onFocus={() => setShowResults(!!searchQuery)}
+        />
+        <SearchDropdown 
+          searchQuery={searchQuery} 
+          show={showResults} 
+          onClose={() => setShowResults(false)} 
         />
       </div>
     </div>

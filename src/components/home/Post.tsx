@@ -1,18 +1,22 @@
 
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Avatar } from "@/components/ui/avatar";
 import { Input } from "@/components/ui/input";
 import { Heart, Send, MessageCircle } from "lucide-react";
-import { LikesModal } from "./LikesModal";
-import { CommentsModal } from "./CommentsModal";
 
 interface Profile {
   id: string;
   username: string | null;
   avatar_url: string | null;
+}
+
+interface Comment {
+  id: string;
+  text: string;
+  username: string;
+  avatar_url: string;
 }
 
 interface PostProps {
@@ -23,13 +27,12 @@ interface PostProps {
   created_at: string;
   profiles: Profile;
   onLike?: () => void;
-  onComment?: (postId: string, comment: string) => Promise<void>;
+  onComment?: (postId: string, comment: string) => void;
   onShare?: () => void;
 }
 
 export function Post({ 
   id, 
-  user_id,
   profiles, 
   image_url, 
   caption, 
@@ -38,29 +41,34 @@ export function Post({
   onShare 
 }: PostProps) {
   const [showComments, setShowComments] = useState(false);
-  const [showLikesModal, setShowLikesModal] = useState(false);
-  const [showCommentsModal, setShowCommentsModal] = useState(false);
   const [newComment, setNewComment] = useState("");
   const [liked, setLiked] = useState(false);
-  const [likesCount, setLikesCount] = useState(Math.floor(Math.random() * 50)); // Mock count
-  const [commentsCount, setCommentsCount] = useState(Math.floor(Math.random() * 20)); // Mock count
-  const navigate = useNavigate();
+
+  // Mock comments data
+  const comments: Comment[] = [
+    {
+      id: "1",
+      text: "Great post!",
+      username: "jane_doe",
+      avatar_url: "https://source.unsplash.com/100x100/?portrait",
+    },
+    {
+      id: "2",
+      text: "Nice work",
+      username: "john_smith",
+      avatar_url: "https://source.unsplash.com/100x100/?face",
+    },
+  ];
 
   const handleLike = () => {
     setLiked(!liked);
-    if (!liked) {
-      setLikesCount(likesCount + 1);
-    } else {
-      setLikesCount(Math.max(0, likesCount - 1));
-    }
     if (onLike) onLike();
   };
 
-  const handleComment = async () => {
+  const handleComment = () => {
     if (newComment.trim() && onComment) {
-      await onComment(id, newComment);
+      onComment(id, newComment);
       setNewComment("");
-      setCommentsCount(commentsCount + 1);
     }
   };
 
@@ -68,28 +76,17 @@ export function Post({
     if (onShare) onShare();
   };
 
-  const handleProfileClick = () => {
-    navigate(`/user/${user_id}`);
-  };
-
   return (
     <Card className="overflow-hidden bg-black/20 border-white/5 max-w-3xl w-full mx-auto">
       <div className="p-4 flex items-center gap-3">
-        <button onClick={handleProfileClick}>
-          <Avatar>
-            <img 
-              src={profiles?.avatar_url || 'https://source.unsplash.com/100x100/?portrait'} 
-              alt={profiles?.username || 'User'}
-              className="w-full h-full object-cover"
-            />
-          </Avatar>
-        </button>
-        <button 
-          className="font-medium hover:underline"
-          onClick={handleProfileClick}
-        >
-          {profiles?.username || 'Anonymous'}
-        </button>
+        <Avatar>
+          <img 
+            src={profiles?.avatar_url || 'https://source.unsplash.com/100x100/?portrait'} 
+            alt={profiles?.username || 'User'}
+            className="w-full h-full object-cover"
+          />
+        </Avatar>
+        <span className="font-medium">{profiles?.username || 'Anonymous'}</span>
       </div>
       
       <div className="aspect-video">
@@ -113,21 +110,6 @@ export function Post({
           </Button>
         </div>
         
-        <div className="flex space-x-4 text-sm">
-          <button 
-            className="hover:underline font-medium"
-            onClick={() => setShowLikesModal(true)}
-          >
-            {likesCount} likes
-          </button>
-          <button 
-            className="hover:underline"
-            onClick={() => setShowCommentsModal(true)}
-          >
-            View all {commentsCount} comments
-          </button>
-        </div>
-
         {caption && (
           <p className="text-sm">
             <span className="font-medium mr-2">{profiles?.username || 'Anonymous'}</span>
@@ -147,22 +129,27 @@ export function Post({
               />
               <Button onClick={handleComment}>Post</Button>
             </div>
+
+            <div className="space-y-3">
+              {comments.map((comment) => (
+                <div key={comment.id} className="flex items-start gap-2">
+                  <Avatar className="w-8 h-8">
+                    <img 
+                      src={comment.avatar_url}
+                      alt={comment.username}
+                      className="w-full h-full object-cover"
+                    />
+                  </Avatar>
+                  <div>
+                    <span className="font-medium text-sm mr-2">{comment.username}</span>
+                    <span className="text-sm text-white/70">{comment.text}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
         )}
       </div>
-      
-      <LikesModal 
-        open={showLikesModal} 
-        onOpenChange={setShowLikesModal} 
-        postId={id} 
-      />
-      
-      <CommentsModal 
-        open={showCommentsModal} 
-        onOpenChange={setShowCommentsModal} 
-        postId={id} 
-        onAddComment={onComment || (async () => {})}
-      />
     </Card>
   );
 }

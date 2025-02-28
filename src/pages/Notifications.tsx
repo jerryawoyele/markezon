@@ -2,6 +2,7 @@
 import { useState, useEffect } from "react";
 import { Card } from "@/components/ui/card";
 import { Avatar } from "@/components/ui/avatar";
+import { Button } from "@/components/ui/button";
 import { Sidebar } from "@/components/home/Sidebar";
 import { MobileHeader } from "@/components/home/MobileHeader";
 import { supabase } from "@/integrations/supabase/client";
@@ -49,6 +50,64 @@ export default function Notifications() {
     }
   };
 
+  const markAsRead = async (id: string) => {
+    try {
+      const { error } = await supabase
+        .from('notifications')
+        .update({ read: true })
+        .eq('id', id);
+      
+      if (error) throw error;
+      
+      // Update local state
+      setNotifications(notifications.map(notification => 
+        notification.id === id ? { ...notification, read: true } : notification
+      ));
+      
+      toast({
+        title: "Notification marked as read",
+      });
+    } catch (error) {
+      console.error('Error marking notification as read:', error);
+      toast({
+        title: "Error",
+        description: "Failed to update notification",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const markAllAsRead = async () => {
+    try {
+      const unreadIds = notifications
+        .filter(n => !n.read)
+        .map(n => n.id);
+      
+      if (unreadIds.length === 0) return;
+      
+      const { error } = await supabase
+        .from('notifications')
+        .update({ read: true })
+        .in('id', unreadIds);
+      
+      if (error) throw error;
+      
+      // Update local state
+      setNotifications(notifications.map(notification => ({ ...notification, read: true })));
+      
+      toast({
+        title: "All notifications marked as read",
+      });
+    } catch (error) {
+      console.error('Error marking all notifications as read:', error);
+      toast({
+        title: "Error",
+        description: "Failed to update notifications",
+        variant: "destructive",
+      });
+    }
+  };
+
   return (
     <div className="min-h-screen bg-background flex">
       <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} />
@@ -56,8 +115,15 @@ export default function Notifications() {
       <div className="flex-1 xl:ml-72">
         <MobileHeader />
         
-        <div className="max-w-3xl mx-auto py-8 px-4 pb-24 xl:pb-8">
-          <h1 className="text-2xl font-bold mb-6">Notifications</h1>
+        <div className="max-w-3xl mx-auto py-8 px-4 pb-20 xl:pb-8 mt-16 xl:mt-0">
+          <div className="flex justify-between items-center mb-6">
+            <h1 className="text-2xl font-bold">Notifications</h1>
+            {notifications.some(n => !n.read) && (
+              <Button variant="outline" size="sm" onClick={markAllAsRead}>
+                Mark all as read
+              </Button>
+            )}
+          </div>
 
           <div className="space-y-4">
             {loading ? (
@@ -85,6 +151,15 @@ export default function Notifications() {
                         {new Date(notification.created_at).toLocaleDateString()}
                       </span>
                     </div>
+                    {!notification.read && (
+                      <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        onClick={() => markAsRead(notification.id)}
+                      >
+                        Mark as read
+                      </Button>
+                    )}
                   </div>
                 </Card>
               ))

@@ -30,6 +30,7 @@ const Home = () => {
   const [postText, setPostText] = useState("");
   const [postImage, setPostImage] = useState("");
   const [loading, setLoading] = useState(true);
+  const [searchQuery, setSearchQuery] = useState("");
   const navigate = useNavigate();
   const { toast } = useToast();
 
@@ -72,8 +73,7 @@ const Home = () => {
         await supabase.from('profiles').insert({ id: user.id });
       }
 
-      // Now fetch posts with profiles
-      const { data, error } = await supabase
+      let query = supabase
         .from('posts')
         .select(`
           *,
@@ -84,6 +84,13 @@ const Home = () => {
           )
         `)
         .order('created_at', { ascending: false });
+
+      // If search query is present, filter posts by caption
+      if (searchQuery) {
+        query = query.ilike('caption', `%${searchQuery}%`);
+      }
+
+      const { data, error } = await query;
 
       if (error) throw error;
       
@@ -162,14 +169,45 @@ const Home = () => {
     }
   };
 
+  const handleSearch = (query: string) => {
+    setSearchQuery(query);
+    fetchPosts();
+  };
+
+  const handleLikePost = async (postId: string) => {
+    toast({
+      title: "Liked",
+      description: "You liked this post",
+    });
+  };
+
+  const handleCommentPost = async (postId: string, comment: string) => {
+    if (!comment.trim()) return;
+    
+    toast({
+      title: "Comment added",
+      description: "Your comment has been added",
+    });
+  };
+
+  const handleSharePost = async (postId: string) => {
+    // In a real app, this might copy a link to clipboard or open a share dialog
+    navigator.clipboard.writeText(`https://yourapp.com/posts/${postId}`);
+    
+    toast({
+      title: "Shared",
+      description: "Post link copied to clipboard",
+    });
+  };
+
   return (
     <div className="min-h-screen bg-background flex flex-col xl:flex-row">
       <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} />
 
       <div className="flex-1 xl:ml-72">
-        <MobileHeader />
+        <MobileHeader onSearch={handleSearch} />
         
-        <div className="max-w-[100vw] mx-auto px-4 pb-24 xl:pb-0 overflow-y-auto h-[calc(100vh-64px)]">
+        <div className="max-w-[100vw] mx-auto px-4 pb-20 xl:pb-0 mt-16 xl:mt-0 overflow-y-auto min-h-[calc(100vh-64px)]">
           <div className="grid grid-cols-1 xl:grid-cols-[1fr,400px] gap-10">
             {/* Feed Column */}
             <div className="space-y-6 xl:pr-12 my-8">
@@ -189,10 +227,20 @@ const Home = () => {
                     <div key={n} className="h-64 bg-white/5 rounded-lg animate-pulse" />
                   ))}
                 </div>
-              ) : (
+              ) : posts.length > 0 ? (
                 posts.map((post) => (
-                  <Post key={post.id} {...post} />
+                  <Post 
+                    key={post.id} 
+                    {...post} 
+                    onLike={() => handleLikePost(post.id)}
+                    onComment={handleCommentPost}
+                    onShare={() => handleSharePost(post.id)}
+                  />
                 ))
+              ) : (
+                <div className="text-center py-8 text-white/60">
+                  {searchQuery ? "No posts match your search" : "No posts yet. Be the first to create one!"}
+                </div>
               )}
             </div>
 

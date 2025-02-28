@@ -11,7 +11,6 @@ import { MobileHeader } from "@/components/home/MobileHeader";
 import { SearchDropdown } from "@/components/home/SearchDropdown";
 import { useToast } from "@/components/ui/use-toast";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
 import { PlusCircle } from "lucide-react";
 
 interface Profile {

@@ -24,16 +24,15 @@ export default function Explore() {
   const [activeTab, setActiveTab] = useState("Discover");
   const [posts, setPosts] = useState<Post[]>([]);
   const [loading, setLoading] = useState(true);
-  const [searchQuery, setSearchQuery] = useState("");
   const { toast } = useToast();
 
   useEffect(() => {
     fetchPosts();
-  }, [searchQuery]);
+  }, []);
 
   const fetchPosts = async () => {
     try {
-      let query = supabase
+      const { data, error } = await supabase
         .from('posts')
         .select(`
           *,
@@ -41,17 +40,8 @@ export default function Explore() {
             username,
             avatar_url
           )
-        `);
-      
-      // Add search filter if query exists
-      if (searchQuery) {
-        query = query.ilike('caption', `%${searchQuery}%`);
-      }
-      
-      // Add ordering by created_at
-      query = query.order('created_at', { ascending: false });
-      
-      const { data, error } = await query;
+        `)
+        .order('created_at', { ascending: false });
 
       if (error) throw error;
       
@@ -77,24 +67,12 @@ export default function Explore() {
     }
   };
 
-  const handleSearch = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setSearchQuery(e.target.value);
-  };
-
-  const handleCardClick = (postId: string) => {
-    toast({
-      title: "Post details",
-      description: `Viewing post ${postId}`,
-    });
-    // In a real app, you might navigate to a detailed post view
-  };
-
   return (
     <div className="min-h-screen bg-background flex">
       <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} />
 
-      <div className="flex-1 xl:ml-72 pb-20 xl:pb-0">
-        <MobileHeader onSearch={setSearchQuery} />
+      <div className="flex-1 xl:ml-72 pb-24 xl:pb-0">
+        <MobileHeader />
         
         <div className="max-w-7xl mx-auto py-8 px-4 mt-16 xl:mt-0 h-[calc(100vh-64px)] overflow-y-auto">
           <div className="max-w-xl mx-auto mb-8">
@@ -103,8 +81,6 @@ export default function Explore() {
               <Input
                 placeholder="Search posts..."
                 className="pl-10"
-                value={searchQuery}
-                onChange={handleSearch}
               />
             </div>
           </div>
@@ -123,12 +99,11 @@ export default function Explore() {
                   </div>
                 </Card>
               ))
-            ) : posts.length > 0 ? (
+            ) : (
               posts.map((post) => (
                 <Card 
                   key={post.id}
                   className="overflow-hidden bg-black/20 border-white/5 hover:bg-black/30 transition-colors cursor-pointer"
-                  onClick={() => handleCardClick(post.id)}
                 >
                   <div className="aspect-video">
                     <img 
@@ -143,10 +118,6 @@ export default function Explore() {
                   </div>
                 </Card>
               ))
-            ) : (
-              <div className="col-span-full text-center py-8 text-white/60">
-                {searchQuery ? "No posts match your search" : "No posts available"}
-              </div>
             )}
           </div>
         </div>

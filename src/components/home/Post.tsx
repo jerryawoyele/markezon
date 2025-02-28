@@ -26,23 +26,11 @@ interface PostProps {
   caption: string | null;
   created_at: string;
   profiles: Profile;
-  onLike?: () => void;
-  onComment?: (postId: string, comment: string) => void;
-  onShare?: () => void;
 }
 
-export function Post({ 
-  id, 
-  profiles, 
-  image_url, 
-  caption, 
-  onLike, 
-  onComment, 
-  onShare 
-}: PostProps) {
+export function Post({ profiles, image_url, caption }: PostProps) {
   const [showComments, setShowComments] = useState(false);
   const [newComment, setNewComment] = useState("");
-  const [liked, setLiked] = useState(false);
 
   // Mock comments data
   const comments: Comment[] = [
@@ -60,20 +48,12 @@ export function Post({
     },
   ];
 
-  const handleLike = () => {
-    setLiked(!liked);
-    if (onLike) onLike();
-  };
-
   const handleComment = () => {
-    if (newComment.trim() && onComment) {
-      onComment(id, newComment);
+    if (newComment.trim()) {
+      // Here you would typically save the comment to your backend
+      console.log("New comment:", newComment);
       setNewComment("");
     }
-  };
-
-  const handleShare = () => {
-    if (onShare) onShare();
   };
 
   return (
@@ -99,20 +79,20 @@ export function Post({
       
       <div className="p-4 space-y-4">
         <div className="flex items-center gap-4">
-          <Button variant="ghost" size="icon" onClick={handleLike}>
-            <Heart className={`w-5 h-5 ${liked ? 'fill-current text-red-500' : ''}`} />
+          <Button variant="ghost" size="icon">
+            <Heart className="w-5 h-5" />
           </Button>
           <Button variant="ghost" size="icon" onClick={() => setShowComments(!showComments)}>
             <MessageCircle className="w-5 h-5" />
           </Button>
-          <Button variant="ghost" size="icon" onClick={handleShare}>
+          <Button variant="ghost" size="icon">
             <Send className="w-5 h-5" />
           </Button>
         </div>
         
         {caption && (
           <p className="text-sm">
-            <span className="font-medium mr-2">{profiles?.username || 'Anonymous'}</span>
+            <span className="font-medium mr-2">{profiles?.username}</span>
             {caption}
           </p>
         )}
@@ -124,7 +104,6 @@ export function Post({
                 placeholder="Add a comment..."
                 value={newComment}
                 onChange={(e) => setNewComment(e.target.value)}
-                onKeyPress={(e) => e.key === 'Enter' && handleComment()}
                 className="flex-1"
               />
               <Button onClick={handleComment}>Post</Button>

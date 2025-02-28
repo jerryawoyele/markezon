@@ -21,7 +21,7 @@ interface Post {
   image_url: string;
   caption: string | null;
   created_at: string;
-  profiles: Profile | null;
+  profiles: Profile;
 }
 
 const Home = () => {
@@ -56,11 +56,28 @@ const Home = () => {
 
   const fetchPosts = async () => {
     try {
+      // First, check if the current user has a profile
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      // Check if user has a profile
+      const { data: profileData, error: profileError } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', user.id)
+        .single();
+      
+      if (profileError && profileError.code !== 'PGRST116') {
+        // Create a profile if it doesn't exist (except for not-found errors)
+        await supabase.from('profiles').insert({ id: user.id });
+      }
+
+      // Now fetch posts with profiles
       const { data, error } = await supabase
         .from('posts')
         .select(`
           *,
-          profiles (
+          profiles:user_id (
             id,
             username,
             avatar_url
@@ -69,7 +86,18 @@ const Home = () => {
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      setPosts(data || []);
+      
+      // Transform data to match expected type
+      const transformedData = data?.map(post => ({
+        ...post,
+        profiles: post.profiles || {
+          id: post.user_id,
+          username: 'Anonymous',
+          avatar_url: null
+        }
+      }));
+      
+      setPosts(transformedData || []);
     } catch (error) {
       console.error('Error fetching posts:', error);
       toast({

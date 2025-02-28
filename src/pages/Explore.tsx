@@ -13,8 +13,10 @@ interface Post {
   image_url: string;
   caption: string | null;
   created_at: string;
+  user_id: string;
   profiles: {
     username: string | null;
+    avatar_url: string | null;
   };
 }
 
@@ -34,14 +36,25 @@ export default function Explore() {
         .from('posts')
         .select(`
           *,
-          profiles (
-            username
+          profiles:user_id (
+            username,
+            avatar_url
           )
         `)
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      setPosts(data || []);
+      
+      // Transform data to match expected type
+      const transformedData = data?.map(post => ({
+        ...post,
+        profiles: post.profiles || {
+          username: 'Anonymous',
+          avatar_url: null
+        }
+      }));
+      
+      setPosts(transformedData || []);
     } catch (error) {
       console.error('Error fetching posts:', error);
       toast({

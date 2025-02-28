@@ -25,7 +25,7 @@ interface PostProps {
   image_url: string;
   caption: string | null;
   created_at: string;
-  profiles: Profile | null;
+  profiles: Profile;
 }
 
 export function Post({ profiles, image_url, caption }: PostProps) {

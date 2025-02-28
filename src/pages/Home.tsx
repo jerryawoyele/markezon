@@ -4,40 +4,17 @@ import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Sidebar } from "@/components/home/Sidebar";
 import { CreatePost } from "@/components/home/CreatePost";
-import { CreatePostModal } from "@/components/home/CreatePostModal";
-import { Post } from "@/components/home/Post";
 import { TrendingServices } from "@/components/home/TrendingServices";
 import { MobileHeader } from "@/components/home/MobileHeader";
-import { SearchDropdown } from "@/components/home/SearchDropdown";
 import { useToast } from "@/components/ui/use-toast";
-import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { PlusCircle } from "lucide-react";
-
-interface Profile {
-  id: string;
-  username: string | null;
-  avatar_url: string | null;
-}
-
-interface Post {
-  id: string;
-  user_id: string;
-  image_url: string;
-  caption: string | null;
-  created_at: string;
-  profiles: Profile;
-}
+import { Button } from "@/components/ui/button";
+import { Post } from "@/components/home/Post";
 
 const Home = () => {
-  const [posts, setPosts] = useState<Post[]>([]);
+  const [posts, setPosts] = useState([]);
   const [activeTab, setActiveTab] = useState("Home");
-  const [postText, setPostText] = useState("");
-  const [postImage, setPostImage] = useState("");
   const [loading, setLoading] = useState(true);
-  const [searchQuery, setSearchQuery] = useState("");
-  const [showSearchResults, setShowSearchResults] = useState(false);
-  const [createPostOpen, setCreatePostOpen] = useState(false);
   const navigate = useNavigate();
   const { toast } = useToast();
 
@@ -64,7 +41,7 @@ const Home = () => {
 
   const fetchPosts = async () => {
     try {
-      // First, check if the current user has a profile
+      // Check if the current user has a profile
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
@@ -80,7 +57,7 @@ const Home = () => {
         await supabase.from('profiles').insert({ id: user.id });
       }
 
-      let query = supabase
+      const { data, error } = await supabase
         .from('posts')
         .select(`
           *,
@@ -92,26 +69,9 @@ const Home = () => {
         `)
         .order('created_at', { ascending: false });
 
-      // If search query is present, filter posts by caption
-      if (searchQuery) {
-        query = query.ilike('caption', `%${searchQuery}%`);
-      }
-
-      const { data, error } = await query;
-
       if (error) throw error;
       
-      // Transform data to match expected type
-      const transformedData = data?.map(post => ({
-        ...post,
-        profiles: post.profiles || {
-          id: post.user_id,
-          username: 'Anonymous',
-          avatar_url: null
-        }
-      }));
-      
-      setPosts(transformedData || []);
+      setPosts(data || []);
     } catch (error) {
       console.error('Error fetching posts:', error);
       toast({
@@ -124,7 +84,7 @@ const Home = () => {
     }
   };
 
-  const handleCreatePost = async (caption: string, imageFile: File | null, type: "text" | "image") => {
+  const handleNewPost = async ({ text, image_url }) => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) {
@@ -136,24 +96,15 @@ const Home = () => {
         return;
       }
 
-      let imageUrl = 'https://source.unsplash.com/random/600x400/?nature';
-      
-      // If there's an image file, we would upload it
-      // For now, just create a post with the default image or URL
-      if (imageFile) {
-        // In a real app, you would upload the image to your storage
-        console.log("Would upload:", imageFile.name);
-        
-        // For demo purposes, use a random image
-        imageUrl = 'https://source.unsplash.com/random/600x400/?technology';
-      }
+      // Use placeholder image if none provided
+      const finalImageUrl = image_url || 'https://source.unsplash.com/random/600x400/?nature';
 
       const { error } = await supabase
         .from('posts')
         .insert({
           user_id: user.id,
-          caption: caption,
-          image_url: imageUrl
+          caption: text,
+          image_url: finalImageUrl
         });
 
       if (error) throw error;
@@ -175,113 +126,67 @@ const Home = () => {
     }
   };
 
-  const handleSearch = (query: string) => {
-    setSearchQuery(query);
-    setShowSearchResults(!!query);
-  };
-
-  const handleLikePost = async (postId: string) => {
+  const handleLikePost = async (postId) => {
     toast({
       title: "Liked",
       description: "You liked this post",
     });
+    // Add actual like functionality here
   };
 
-  const handleCommentPost = async (postId: string, comment: string) => {
-    if (!comment.trim()) return;
-    
+  const handleCommentPost = async (postId, comment) => {
     toast({
       title: "Comment added",
       description: "Your comment has been added",
     });
+    // Add actual comment functionality here
   };
 
-  const handleSharePost = async (postId: string) => {
-    // In a real app, this might copy a link to clipboard or open a share dialog
-    navigator.clipboard.writeText(`https://yourapp.com/posts/${postId}`);
-    
+  const handleSharePost = async (postId) => {
     toast({
       title: "Shared",
       description: "Post link copied to clipboard",
     });
+    // Add actual share functionality here
   };
 
   return (
-    <div className="min-h-screen bg-background flex flex-col xl:flex-row">
+    <div className="min-h-screen bg-background flex">
       <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} />
 
       <div className="flex-1 xl:ml-72">
-        <MobileHeader onSearch={handleSearch} />
+        <MobileHeader />
         
-        <div className="max-w-[100vw] mx-auto px-4 pb-20 xl:pb-0 mt-16 xl:mt-0 overflow-y-auto min-h-[calc(100vh-64px)]">
-          <div className="grid grid-cols-1 xl:grid-cols-[1fr,400px] gap-10">
-            {/* Feed Column */}
-            <div className="space-y-6 xl:pr-12 my-8">
-              <div className="max-w-3xl mx-auto">
-                <Card className="p-6 bg-black/20 border-white/5 w-full cursor-pointer hover:bg-black/30 transition-colors" onClick={() => setCreatePostOpen(true)}>
-                  <div className="flex items-center gap-4">
-                    <PlusCircle className="w-8 h-8 text-white/60" />
-                    <div className="flex-1">
-                      <h3 className="text-lg font-medium">Create a new post</h3>
-                      <p className="text-white/60">Share your thoughts or upload an image</p>
-                    </div>
-                  </div>
-                </Card>
-              </div>
+        <div className="max-w-4xl mx-auto py-8 px-4 pb-20 xl:pb-8 mt-16 xl:mt-0">
+          <CreatePost onSubmit={handleNewPost} />
 
-              {loading ? (
-                <div className="space-y-4">
-                  {[1, 2, 3].map((n) => (
-                    <div key={n} className="h-64 bg-white/5 rounded-lg animate-pulse" />
-                  ))}
-                </div>
-              ) : posts.length > 0 ? (
-                posts.map((post) => (
-                  <Post 
-                    key={post.id} 
-                    {...post} 
-                    onLike={() => handleLikePost(post.id)}
-                    onComment={handleCommentPost}
-                    onShare={() => handleSharePost(post.id)}
-                  />
-                ))
-              ) : (
-                <div className="text-center py-8 text-white/60">
-                  {searchQuery ? "No posts match your search" : "No posts yet. Be the first to create one!"}
-                </div>
-              )}
-            </div>
-
-            {/* Right Sidebar - Hidden on mobile */}
-            <div className="hidden xl:block border-l border-white/10 pl-8 my-8">
-              <TrendingServices />
-              <div className="relative">
-                <input
-                  type="text"
-                  placeholder="Search..."
-                  className="w-full p-2 bg-black/20 border border-white/10 rounded-md"
-                  value={searchQuery}
-                  onChange={(e) => handleSearch(e.target.value)}
-                  onFocus={() => setShowSearchResults(true)}
-                />
-                <SearchDropdown 
-                  searchQuery={searchQuery} 
-                  show={showSearchResults} 
-                  onClose={() => setShowSearchResults(false)} 
-                />
+          <div className="space-y-6 mt-8">
+            {loading ? (
+              <div className="space-y-4">
+                {[1, 2, 3].map((n) => (
+                  <Card key={n} className="h-64 bg-black/20 border-white/5 animate-pulse" />
+                ))}
               </div>
-            </div>
+            ) : posts.length > 0 ? (
+              posts.map((post) => (
+                <Post 
+                  key={post.id} 
+                  {...post} 
+                  onLike={() => handleLikePost(post.id)}
+                  onComment={handleCommentPost}
+                  onShare={() => handleSharePost(post.id)}
+                />
+              ))
+            ) : (
+              <div className="text-center py-8 text-white/60">
+                No posts yet. Be the first to create one!
+              </div>
+            )}
           </div>
-
-          <CreatePostModal
-            open={createPostOpen}
-            onOpenChange={setCreatePostOpen}
-            onCreatePost={handleCreatePost}
-          />
         </div>
       </div>
     </div>
   );
-}
+};
 
 export default Home;

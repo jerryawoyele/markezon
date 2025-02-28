@@ -1,7 +1,9 @@
+
 import { Search, Briefcase, Code, Palette, Camera, Music, Book, Send } from "lucide-react";
 import { ServiceCard } from "@/components/ServiceCard";
 import { CategoryButton } from "@/components/CategoryButton";
 import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
 import { Link } from "react-router-dom";

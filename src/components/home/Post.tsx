@@ -6,8 +6,6 @@ import { Card } from "@/components/ui/card";
 import { Avatar } from "@/components/ui/avatar";
 import { Input } from "@/components/ui/input";
 import { Heart, Send, MessageCircle } from "lucide-react";
-import { LikesModal } from "./LikesModal";
-import { CommentsModal } from "./CommentsModal";
 
 interface Profile {
   id: string;
@@ -38,8 +36,6 @@ export function Post({
   onShare 
 }: PostProps) {
   const [showComments, setShowComments] = useState(false);
-  const [showLikesModal, setShowLikesModal] = useState(false);
-  const [showCommentsModal, setShowCommentsModal] = useState(false);
   const [newComment, setNewComment] = useState("");
   const [liked, setLiked] = useState(false);
   const [likesCount, setLikesCount] = useState(Math.floor(Math.random() * 50)); // Mock count
@@ -114,18 +110,8 @@ export function Post({
         </div>
         
         <div className="flex space-x-4 text-sm">
-          <button 
-            className="hover:underline font-medium"
-            onClick={() => setShowLikesModal(true)}
-          >
-            {likesCount} likes
-          </button>
-          <button 
-            className="hover:underline"
-            onClick={() => setShowCommentsModal(true)}
-          >
-            View all {commentsCount} comments
-          </button>
+          <span className="font-medium">{likesCount} likes</span>
+          <span>{commentsCount} comments</span>
         </div>
 
         {caption && (
@@ -150,19 +136,6 @@ export function Post({
           </div>
         )}
       </div>
-      
-      <LikesModal 
-        open={showLikesModal} 
-        onOpenChange={setShowLikesModal} 
-        postId={id} 
-      />
-      
-      <CommentsModal 
-        open={showCommentsModal} 
-        onOpenChange={setShowCommentsModal} 
-        postId={id} 
-        onAddComment={onComment || (async () => {})}
-      />
     </Card>
   );
 }

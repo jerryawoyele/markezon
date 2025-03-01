@@ -43,7 +43,7 @@ export function Sidebar({ activeTab, setActiveTab }: SidebarProps) {
               variant="ghost"
               className={cn(
                 "flex flex-col items-center px-2 py-3",
-                activeTab === item.label && "bg-white/10"
+                activeTab === item.label && "bg-primary/20 text-primary"
               )}
               onClick={() => handleNavigation(item.label, item.path)}
             >
@@ -58,7 +58,7 @@ export function Sidebar({ activeTab, setActiveTab }: SidebarProps) {
 
   // Desktop Sidebar
   const desktopNav = (
-    <aside className="hidden lg:flex w-72 fixed left-0 top-0 h-screen border-r border-white/10 bg-background p-4">
+    <aside className="hidden md:flex w-72 fixed left-0 top-0 h-screen border-r border-white/10 bg-background p-4">
       <div className="flex flex-col h-full w-full">
         <h1 className="text-2xl font-bold mb-8 px-4">Markezon</h1>
         
@@ -70,7 +70,7 @@ export function Sidebar({ activeTab, setActiveTab }: SidebarProps) {
                   variant="ghost"
                   className={cn(
                     "w-full justify-start gap-3 py-6 px-4",
-                    activeTab === item.label && "bg-white/10"
+                    activeTab === item.label && "bg-primary/20 text-primary"
                   )}
                   onClick={() => handleNavigation(item.label, item.path)}
                 >

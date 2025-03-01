@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -12,6 +13,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useToast } from "@/components/ui/use-toast";
 
 interface CreatePostProps {
   onSubmit: (data: { text: string; image_url: string }) => Promise<void>;
@@ -25,6 +27,7 @@ export function CreatePost({ onSubmit }: CreatePostProps) {
   const [loading, setLoading] = useState(false);
   const [isOpen, setIsOpen] = useState(false);
   const [activeTab, setActiveTab] = useState("text");
+  const { toast } = useToast();
 
   // Handle file change
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -49,7 +52,14 @@ export function CreatePost({ onSubmit }: CreatePostProps) {
   };
 
   const handleSubmit = async () => {
-    if ((!text.trim() && !localImagePreview)) return;
+    if ((!text.trim() && !localImagePreview)) {
+      toast({
+        title: "Cannot create empty post",
+        description: "Please add some text or an image to your post",
+        variant: "destructive"
+      });
+      return;
+    }
 
     setLoading(true);
     try {
@@ -91,8 +101,18 @@ export function CreatePost({ onSubmit }: CreatePostProps) {
       await onSubmit({ text, image_url: finalImageUrl });
       resetForm();
       setIsOpen(false);
+      
+      toast({
+        title: "Post created!",
+        description: "Your post has been published successfully."
+      });
     } catch (error) {
       console.error("Error creating post:", error);
+      toast({
+        title: "Error creating post",
+        description: "There was a problem creating your post. Please try again.",
+        variant: "destructive"
+      });
     } finally {
       setLoading(false);
     }
@@ -101,7 +121,7 @@ export function CreatePost({ onSubmit }: CreatePostProps) {
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
       <DialogTrigger asChild>
-        <Card className="bg-black/20 border border-white/5 rounded-xl shadow-sm p-6">
+        <Card className="bg-black/20 border border-white/5 rounded-xl shadow-sm p-8">
           <div className="flex gap-3">
             <Avatar>
               <img
@@ -112,7 +132,7 @@ export function CreatePost({ onSubmit }: CreatePostProps) {
             </Avatar>
             <div className="flex-1 space-y-4">
               <div className="w-full bg-white/5 rounded-full px-4 py-2 text-white/60">
-                What's on your mind?
+                What's happening in your business?
               </div>
             </div>
           </div>
@@ -131,21 +151,32 @@ export function CreatePost({ onSubmit }: CreatePostProps) {
           </TabsList>
           
           <div className="mt-4 space-y-4">
-            <textarea
-              placeholder="What's on your mind?"
-              className="w-full bg-transparent border border-white/10 rounded-md resize-none focus:outline-none focus:border-white/30 p-3 min-h-[120px] text-white/80"
-              value={text}
-              onChange={e => setText(e.target.value)}
-            />
-            
-            {activeTab === "image" && (
+            {activeTab === "text" ? (
+              <div className="bg-black/30 rounded-lg p-4 border border-white/10">
+                <textarea
+                  placeholder="What's happening in your business?"
+                  className="w-full bg-transparent border-none resize-none focus:outline-none focus:ring-0 min-h-[120px] text-white/80"
+                  value={text}
+                  onChange={e => setText(e.target.value)}
+                />
+              </div>
+            ) : (
               <div className="space-y-4">
+                <div className="bg-black/30 rounded-lg p-4 border border-white/10">
+                  <textarea
+                    placeholder="Add a caption to your image..."
+                    className="w-full bg-transparent border-none resize-none focus:outline-none focus:ring-0 min-h-[80px] text-white/80"
+                    value={text}
+                    onChange={e => setText(e.target.value)}
+                  />
+                </div>
+                
                 {localImagePreview ? (
-                  <div className="relative">
+                  <div className="relative rounded-lg overflow-hidden border border-white/10">
                     <img
                       src={localImagePreview}
                       alt="Post preview"
-                      className="w-full h-60 object-cover rounded-md"
+                      className="w-full h-60 object-cover"
                     />
                     <button
                       className="absolute top-2 right-2 bg-black/70 text-white p-1 rounded-full"
@@ -158,7 +189,7 @@ export function CreatePost({ onSubmit }: CreatePostProps) {
                     </button>
                   </div>
                 ) : (
-                  <div className="border border-dashed border-white/20 rounded-md p-4 text-center">
+                  <div className="border border-dashed border-white/20 rounded-lg p-6 text-center bg-black/30">
                     <input
                       type="file"
                       id="file-upload"
@@ -170,7 +201,7 @@ export function CreatePost({ onSubmit }: CreatePostProps) {
                       htmlFor="file-upload"
                       className="flex flex-col items-center justify-center cursor-pointer"
                     >
-                      <ImageIcon size={24} className="mb-2 text-white/60" />
+                      <ImageIcon size={24} className="mb-2 text-primary" />
                       <span className="text-white/60">Click to upload an image</span>
                     </label>
                   </div>
@@ -182,7 +213,7 @@ export function CreatePost({ onSubmit }: CreatePostProps) {
               <Button 
                 onClick={handleSubmit}
                 disabled={(activeTab === "text" && !text.trim()) || (activeTab === "image" && !localImagePreview && !text.trim()) || loading}
-                className="w-full"
+                className="w-full bg-primary hover:bg-primary/80"
               >
                 {loading ? "Creating..." : "Create Post"}
               </Button>

@@ -1,7 +1,8 @@
 
 import { Card } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
 import { Search } from "lucide-react";
+import { useState } from "react";
+import { SearchDropdown } from "./SearchDropdown";
 
 const TRENDING_SERVICES = [
   { title: "Web Development", views: "12.5k", category: "Technology", hashtag: "#webdev" },
@@ -17,18 +18,37 @@ const TRENDING_SERVICES = [
 ];
 
 export function TrendingServices() {
+  const [searchQuery, setSearchQuery] = useState("");
+  const [showResults, setShowResults] = useState(false);
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    setSearchQuery(value);
+    setShowResults(!!value);
+  };
+
   return (
     <div className="space-y-6">
-      {/* Replace the search bar with one that matches the top search bar style */}
-      <div className="glass rounded-lg p-1">
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-white/40" />
-          <input
-            type="text"
-            placeholder="Search for services..."
-            className="w-full bg-white/5 border-0 rounded-lg py-2 pl-10 pr-4 text-white placeholder:text-white/40 focus:ring-0 focus:outline-none"
-          />
+      {/* Use the same search bar style as the top */}
+      <div className="relative">
+        <div className="glass rounded-lg p-1">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-white/40" />
+            <input
+              type="text"
+              placeholder="Search for services..."
+              className="w-full bg-white/5 border-0 rounded-lg py-2 pl-10 pr-4 text-white placeholder:text-white/40 focus:ring-0 focus:outline-none"
+              value={searchQuery}
+              onChange={handleChange}
+              onFocus={() => setShowResults(!!searchQuery)}
+            />
+          </div>
         </div>
+        <SearchDropdown 
+          searchQuery={searchQuery} 
+          show={showResults} 
+          onClose={() => setShowResults(false)} 
+        />
       </div>
 
       <Card className="p-6 bg-black/20 border-white/5">

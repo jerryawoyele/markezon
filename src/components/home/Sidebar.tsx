@@ -14,7 +14,7 @@ import { supabase } from "@/integrations/supabase/client";
 
 const SIDEBAR_ITEMS = [
   { icon: HomeIcon, label: "Home", path: "/home" },
-  { icon: Compass, label: "Discover", path: "/explore" },
+  { icon: Compass, label: "Discover", path: "/discover" },
   { icon: Send, label: "Messages", path: "/messages" },
   { icon: Heart, label: "Notifications", path: "/notifications" },
   { icon: User, label: "Profile", path: "/profile" },
@@ -35,19 +35,20 @@ export function Sidebar({ activeTab, setActiveTab }: SidebarProps) {
 
   // Mobile Bottom Navigation
   const mobileNav = (
-    <nav className="fixed bottom-0 left-0 w-full bg-background border-t border-white/10 px-2 py-3 xl:hidden z-50">
+    <nav className="fixed bottom-0 left-0 w-full bg-background border-t border-white/10 px-2 py-3 md:hidden z-50">
       <ul className="flex justify-around">
         {SIDEBAR_ITEMS.map((item) => (
           <li key={item.label}>
             <Button
               variant="ghost"
               className={cn(
-                "flex items-center px-2 py-6",
+                "flex flex-col items-center px-2 py-3",
                 activeTab === item.label && "bg-white/10"
               )}
               onClick={() => handleNavigation(item.label, item.path)}
             >
-              <item.icon className="w-5 h-5" />
+              <item.icon className="w-5 h-5 mb-1" />
+              <span className="text-xs">{item.label}</span>
             </Button>
           </li>
         ))}
@@ -57,7 +58,7 @@ export function Sidebar({ activeTab, setActiveTab }: SidebarProps) {
 
   // Desktop Sidebar
   const desktopNav = (
-    <aside className="hidden xl:flex w-72 fixed left-0 top-0 h-screen border-r border-white/10 bg-background p-4">
+    <aside className="hidden lg:flex w-72 fixed left-0 top-0 h-screen border-r border-white/10 bg-background p-4">
       <div className="flex flex-col h-full w-full">
         <h1 className="text-2xl font-bold mb-8 px-4">Markezon</h1>
         

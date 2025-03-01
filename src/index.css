@@ -13,24 +13,24 @@
     --card-foreground: 0 0% 98%;
     --popover: 240 10% 3.9%;
     --popover-foreground: 0 0% 98%;
-    --primary: 0 0% 98%;
+    --primary: 267 100% 70%; /* Changed to purple */
     --primary-foreground: 240 5.9% 10%;
     --secondary: 240 3.7% 15.9%;
     --secondary-foreground: 0 0% 98%;
     --muted: 240 3.7% 15.9%;
     --muted-foreground: 240 5% 64.9%;
-    --accent: 240 3.7% 15.9%;
+    --accent: 267 100% 70%; /* Changed to purple */
     --accent-foreground: 0 0% 98%;
     --border: 240 3.7% 15.9%;
     --input: 240 3.7% 15.9%;
-    --ring: 240 4.9% 83.9%;
+    --ring: 267 100% 70%; /* Changed to purple */
     --radius: 0.75rem;
   }
 }
 
 @layer base {
   * {
-    @apply border-border selection:bg-white/10 selection:text-white;
+    @apply border-border selection:bg-primary/10 selection:text-white;
   }
   
   body {
@@ -46,5 +46,28 @@
 @layer utilities {
   .glass {
     @apply bg-white/5 backdrop-blur-lg border border-white/10 shadow-[0_8px_32px_0_rgba(0,0,0,0.36)];
+  }
+  
+  /* Add utility classes for the new theme color */
+  .theme-accent {
+    @apply bg-primary text-white;
+  }
+  
+  .theme-border {
+    @apply border-primary/30;
+  }
+  
+  /* Fix for broken images */
+  img {
+    @apply object-cover;
+    object-position: center;
+    background-color: rgba(255, 255, 255, 0.05);
+  }
+  
+  img:before {
+    content: '';
+    display: block;
+    padding-top: 75%;
+    background-color: rgba(255, 255, 255, 0.1);
   }
 }

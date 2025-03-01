@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -71,6 +70,16 @@ export function Post({
   const [showLikesModal, setShowLikesModal] = useState(false);
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
+
+  // Debug image loading issues
+  useEffect(() => {
+    console.log(`Post ${id} image URL:`, image_url);
+    
+    const img = new Image();
+    img.onload = () => console.log(`Post ${id} image loaded successfully`);
+    img.onerror = () => console.error(`Post ${id} image failed to load:`, image_url);
+    img.src = image_url;
+  }, [id, image_url]);
 
   // Fetch likes and comments on mount
   useEffect(() => {

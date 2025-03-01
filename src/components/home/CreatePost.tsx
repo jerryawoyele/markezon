@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -102,7 +101,7 @@ export function CreatePost({ onSubmit }: CreatePostProps) {
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
       <DialogTrigger asChild>
-        <Card className="p-4 bg-black/20 border-white/5 cursor-pointer hover:bg-black/30 transition-colors">
+        <Card className="bg-black/20 border border-white/5 rounded-xl shadow-sm p-6">
           <div className="flex gap-3">
             <Avatar>
               <img

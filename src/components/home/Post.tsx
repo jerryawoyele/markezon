@@ -84,7 +84,7 @@ export function Post({
             user_id,
             post_id,
             created_at,
-            profile:user_id (
+            profile:profiles(
               username,
               avatar_url
             )
@@ -112,7 +112,7 @@ export function Post({
             created_at,
             user_id,
             post_id,
-            profile:user_id (
+            profile:profiles(
               username,
               avatar_url
             )
@@ -128,9 +128,9 @@ export function Post({
         }
       } catch (error) {
         console.error('Error fetching likes and comments:', error);
-        // If we can't fetch real data, use mock counts
-        setLikesCount(Math.floor(Math.random() * 50));
-        setCommentsCount(Math.floor(Math.random() * 20));
+        // If we can't fetch real data, use mock counts for UI experience
+        setLikesCount(0);
+        setCommentsCount(0);
       }
     };
     
@@ -170,7 +170,7 @@ export function Post({
             post_id: id,
             user_id: currentUserId
           })
-          .select('*, profile:user_id (username, avatar_url)');
+          .select('*, profile:profiles(username, avatar_url)');
           
         if (error) throw error;
         
@@ -211,7 +211,7 @@ export function Post({
           user_id: currentUserId,
           content: newComment
         })
-        .select('*, profile:user_id (username, avatar_url)');
+        .select('*, profile:profiles(username, avatar_url)');
         
       if (error) throw error;
       

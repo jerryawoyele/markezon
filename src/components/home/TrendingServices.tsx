@@ -19,12 +19,16 @@ const TRENDING_SERVICES = [
 export function TrendingServices() {
   return (
     <div className="space-y-6">
-      <div className="relative">
-        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-white/40 w-5 h-5" />
-        <Input
-          placeholder="Search services..."
-          className="pl-10"
-        />
+      {/* Replace the search bar with one that matches the top search bar style */}
+      <div className="glass rounded-lg p-1">
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-white/40" />
+          <input
+            type="text"
+            placeholder="Search for services..."
+            className="w-full bg-white/5 border-0 rounded-lg py-2 pl-10 pr-4 text-white placeholder:text-white/40 focus:ring-0 focus:outline-none"
+          />
+        </div>
       </div>
 
       <Card className="p-6 bg-black/20 border-white/5">
@@ -51,7 +55,7 @@ export function TrendingServices() {
         </div>
       </Card>
 
-      <div className="text-center text-sm text-white/60 p-4">
+      <div className="text-center text-sm text-white/60 p-4 mt-0">
         <p>&copy; {new Date().getFullYear()} Markezon</p>
         <p className="mt-1">All rights reserved.</p>
       </div>

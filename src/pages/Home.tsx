@@ -1,187 +1,183 @@
 
 import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
-import { supabase } from "@/integrations/supabase/client";
-import { Sidebar } from "@/components/home/Sidebar";
+import { Post } from "@/components/home/Post";
 import { CreatePost } from "@/components/home/CreatePost";
+import { Sidebar } from "@/components/home/Sidebar";
 import { TrendingServices } from "@/components/home/TrendingServices";
 import { MobileHeader } from "@/components/home/MobileHeader";
-import { useToast } from "@/components/ui/use-toast";
+import { supabase } from "@/integrations/supabase/client";
 import { Card } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Post } from "@/components/home/Post";
+import { Separator } from "@/components/ui/separator";
+import { useToast } from "@/components/ui/use-toast";
+
+interface PostData {
+  id: string;
+  user_id: string;
+  caption: string | null;
+  image_url: string;
+  created_at: string;
+  profiles: {
+    id: string;
+    username: string | null;
+    avatar_url: string | null;
+  };
+}
 
 const Home = () => {
-  const [posts, setPosts] = useState([]);
-  const [activeTab, setActiveTab] = useState("Home");
+  const [posts, setPosts] = useState<PostData[]>([]);
   const [loading, setLoading] = useState(true);
-  const navigate = useNavigate();
   const { toast } = useToast();
 
   useEffect(() => {
-    const checkAuth = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        navigate('/auth');
-      } else {
-        fetchPosts();
-      }
-    };
-
-    checkAuth();
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      if (!session) {
-        navigate('/auth');
-      }
-    });
-
-    return () => subscription.unsubscribe();
-  }, [navigate]);
+    fetchPosts();
+  }, []);
 
   const fetchPosts = async () => {
     try {
-      // Check if the current user has a profile
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-
-      // Check if user has a profile
-      const { data: profileData, error: profileError } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', user.id)
-        .single();
-      
-      if (profileError && profileError.code !== 'PGRST116') {
-        // Create a profile if it doesn't exist (except for not-found errors)
-        await supabase.from('profiles').insert({ id: user.id });
-      }
-
-      const { data, error } = await supabase
-        .from('posts')
-        .select(`
-          *,
-          profiles:user_id (
-            id,
-            username,
-            avatar_url
-          )
-        `)
-        .order('created_at', { ascending: false });
-
-      if (error) throw error;
-      
-      setPosts(data || []);
+      // In a real app, we would fetch posts from Supabase
+      // Let's simulate this with a timeout
+      setTimeout(() => {
+        const mockPosts: PostData[] = [
+          {
+            id: "1",
+            user_id: "user1",
+            caption: "Excited to launch our new web development service! #webdev #coding",
+            image_url: "https://images.unsplash.com/photo-1517694712202-14dd9538aa97?w=800&auto=format&fit=crop",
+            created_at: new Date().toISOString(),
+            profiles: {
+              id: "user1",
+              username: "TechStudio",
+              avatar_url: "https://images.unsplash.com/photo-1599566150163-29194dcaad36?w=100&auto=format&fit=crop"
+            }
+          },
+          {
+            id: "2",
+            user_id: "user2",
+            caption: "Check out this brand identity design we just completed for a local coffee shop. Really proud of how the logo turned out! #design #branding",
+            image_url: "https://images.unsplash.com/photo-1583511655826-05700442976b?w=800&auto=format&fit=crop",
+            created_at: new Date(Date.now() - 86400000).toISOString(), // 1 day ago
+            profiles: {
+              id: "user2",
+              username: "CreativeDesigns",
+              avatar_url: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=100&auto=format&fit=crop"
+            }
+          },
+          {
+            id: "3",
+            user_id: "user3",
+            caption: "Just finished this photography session for a client's product line. Natural light makes all the difference! #photography #productphoto",
+            image_url: "https://images.unsplash.com/photo-1542038784456-1ea8e935640e?w=800&auto=format&fit=crop",
+            created_at: new Date(Date.now() - 172800000).toISOString(), // 2 days ago
+            profiles: {
+              id: "user3",
+              username: "VisualsbyJane",
+              avatar_url: "https://images.unsplash.com/photo-1580489944761-15a19d654956?w=100&auto=format&fit=crop"
+            }
+          }
+        ];
+        
+        setPosts(mockPosts);
+        setLoading(false);
+      }, 1000);
     } catch (error) {
-      console.error('Error fetching posts:', error);
-      toast({
-        title: "Error",
-        description: "Failed to load posts",
-        variant: "destructive"
-      });
-    } finally {
+      console.error("Error fetching posts:", error);
       setLoading(false);
     }
   };
 
-  const handleNewPost = async ({ text, image_url }) => {
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
-        toast({
-          title: "Error",
-          description: "You must be logged in to create a post",
-          variant: "destructive"
-        });
-        return;
+  const handleCreatePost = async (data: { text: string; image_url: string }) => {
+    // In a real app, we would save the post to Supabase
+    // Let's simulate this for now
+    const newPost: PostData = {
+      id: `${Date.now()}`,
+      user_id: "current-user",
+      caption: data.text,
+      image_url: data.image_url || "https://source.unsplash.com/random/800x600/?business",
+      created_at: new Date().toISOString(),
+      profiles: {
+        id: "current-user",
+        username: "YourBusinessName",
+        avatar_url: "https://source.unsplash.com/100x100/?portrait"
       }
+    };
 
-      // Use placeholder image if none provided
-      const finalImageUrl = image_url || 'https://source.unsplash.com/random/600x400/?nature';
-
-      const { error } = await supabase
-        .from('posts')
-        .insert({
-          user_id: user.id,
-          caption: text,
-          image_url: finalImageUrl
-        });
-
-      if (error) throw error;
-
-      toast({
-        title: "Success",
-        description: "Post created successfully",
-      });
-      
-      // Refetch posts to show the new one
-      fetchPosts();
-    } catch (error) {
-      console.error('Error creating post:', error);
-      toast({
-        title: "Error",
-        description: "Failed to create post",
-        variant: "destructive"
-      });
-    }
-  };
-
-  const handleLikePost = async (postId) => {
+    setPosts([newPost, ...posts]);
+    
     toast({
-      title: "Liked",
-      description: "You liked this post",
+      title: "Post created!",
+      description: "Your post has been published successfully."
     });
-    // Add actual like functionality here
   };
 
-  const handleCommentPost = async (postId, comment) => {
+  const handleLike = () => {
+    // In a real app, we would handle likes in Supabase
+    console.log("Post liked");
+  };
+
+  const handleComment = async (postId: string, comment: string) => {
+    // In a real app, we would save the comment to Supabase
+    console.log(`Comment on post ${postId}: ${comment}`);
+    
     toast({
       title: "Comment added",
-      description: "Your comment has been added",
+      description: "Your comment has been added successfully."
     });
-    // Add actual comment functionality here
   };
 
-  const handleSharePost = async (postId) => {
+  const handleShare = () => {
+    // In a real app, we would handle sharing
     toast({
-      title: "Shared",
-      description: "Post link copied to clipboard",
+      title: "Share link copied!",
+      description: "The post link has been copied to your clipboard."
     });
-    // Add actual share functionality here
   };
 
   return (
-    <div className="min-h-screen bg-background flex">
-      <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} />
-
-      <div className="flex-1 xl:ml-72">
-        <MobileHeader />
-        
-        <div className="max-w-4xl mx-auto py-8 px-4 pb-20 xl:pb-8 mt-16 xl:mt-0">
-          <CreatePost onSubmit={handleNewPost} />
-
-          <div className="space-y-6 mt-8">
+    <div className="min-h-screen bg-background">
+      {/* Mobile Header (visible on smaller screens) */}
+      <MobileHeader />
+      
+      <div className="container px-4 mx-auto">
+        <div className="flex flex-col lg:flex-row gap-8 pt-24 xl:pt-8 pb-16">
+          {/* Left Sidebar - hidden on mobile */}
+          <div className="hidden xl:block w-64 flex-shrink-0">
+            <div className="sticky top-8">
+              <Sidebar />
+            </div>
+          </div>
+          
+          {/* Main Content */}
+          <div className="flex-1 max-w-3xl mx-auto w-full space-y-6">
+            <CreatePost onSubmit={handleCreatePost} />
+            
             {loading ? (
-              <div className="space-y-4">
-                {[1, 2, 3].map((n) => (
-                  <Card key={n} className="h-64 bg-black/20 border-white/5 animate-pulse" />
+              <Card className="p-8 text-center text-white/60 bg-black/20 border-white/5">
+                Loading posts...
+              </Card>
+            ) : posts.length > 0 ? (
+              <div className="space-y-6">
+                {posts.map(post => (
+                  <Post 
+                    key={post.id} 
+                    {...post}
+                    onLike={handleLike}
+                    onComment={handleComment}
+                    onShare={handleShare}
+                  />
                 ))}
               </div>
-            ) : posts.length > 0 ? (
-              posts.map((post) => (
-                <Post 
-                  key={post.id} 
-                  {...post} 
-                  onLike={() => handleLikePost(post.id)}
-                  onComment={handleCommentPost}
-                  onShare={() => handleSharePost(post.id)}
-                />
-              ))
             ) : (
-              <div className="text-center py-8 text-white/60">
-                No posts yet. Be the first to create one!
-              </div>
+              <Card className="p-8 text-center text-white/60 bg-black/20 border-white/5">
+                No posts yet. Be the first to post!
+              </Card>
             )}
+          </div>
+          
+          {/* Right Sidebar */}
+          <div className="w-full lg:w-80 lg:flex-shrink-0 space-y-6">
+            <div className="lg:sticky lg:top-8">
+              <TrendingServices />
+            </div>
           </div>
         </div>
       </div>

@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -45,19 +44,16 @@ export default function Discover() {
           )
         `);
       
-      // Add search filter if query exists
       if (searchQuery) {
         query = query.ilike('caption', `%${searchQuery}%`);
       }
       
-      // Add ordering by created_at
       query = query.order('created_at', { ascending: false });
       
       const { data, error } = await query;
 
       if (error) throw error;
       
-      // Transform data to match expected type
       const transformedData = data?.map(post => ({
         ...post,
         profiles: post.profiles || {
@@ -88,7 +84,6 @@ export default function Discover() {
       title: "Post details",
       description: `Viewing post ${postId}`,
     });
-    // In a real app, you might navigate to a detailed post view
   };
 
   const handleUserClick = (userId: string) => {
@@ -102,7 +97,7 @@ export default function Discover() {
       <div className="flex-1 lg:ml-72 pb-20 lg:pb-0">
         <MobileHeader onSearch={setSearchQuery} />
         
-        <div className="max-w-7xl mx-auto py-8 px-4 mt-16 lg:mt-0 min-h-[calc(100vh-64px)] overflow-y-auto">
+        <div className="max-w-7xl mx-auto py-8 px-4 mt-16 lg:mt-0 h-full min-h-[calc(100vh-64px)] overflow-y-auto">
           <div className="max-w-xl mx-auto mb-8">
             <div className="relative">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-white/40 w-5 h-5" />

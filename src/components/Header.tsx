@@ -21,8 +21,8 @@ export function Header() {
   }, []);
 
   useEffect(() => {
-    // Redirect to home if user is authenticated and trying to access auth page
-    if (user && location.pathname === '/auth') {
+    // Redirect to home if user is authenticated and trying to access auth or root page
+    if (user && (location.pathname === '/auth' || location.pathname === '/')) {
       navigate('/home');
     }
   }, [user, location.pathname, navigate]);

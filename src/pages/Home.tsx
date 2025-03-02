@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Post } from "@/components/home/Post";
 import { CreatePost } from "@/components/home/CreatePost";
@@ -9,7 +8,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Card } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/components/ui/use-toast";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 
 interface PostData {
   id: string;
@@ -28,7 +27,12 @@ const Home = () => {
   const [posts, setPosts] = useState<PostData[]>([]);
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
-  const [activeTab, setActiveTab] = useState("Home");
+  const location = useLocation();
+  const [activeTab, setActiveTab] = useState(() => {
+    const path = location.pathname;
+    const item = SIDEBAR_ITEMS.find(item => item.path === path);
+    return item ? item.label : "Home";
+  });
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -212,7 +216,7 @@ const Home = () => {
             {/* This is just a spacer for the fixed sidebar */}
           </div>
           
-          <div className="flex-1 max-w-3xl mx-auto w-full space-y-6 px-4 md:px-6">
+          <div className="flex-1 max-w-3xl mx-auto w-full space-y-6 px-4 md:pl-6 md:pr-6 lg:pl-8">
             <CreatePost onSubmit={handleCreatePost} />
             
             {loading ? (

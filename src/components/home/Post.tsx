@@ -267,11 +267,11 @@ export function Post({
         </div>
         
         {image_url && (
-          <div className="relative">
+          <div className="relative min-h-[200px] min-w-[300px]">
             <img 
               src={image_url} 
               alt={caption || 'Post image'}
-              className="w-full h-auto max-h-[600px] object-contain bg-black/30"
+              className="w-full h-auto max-h-[600px] min-h-[200px] object-contain bg-black/30"
               onError={(e) => {
                 (e.target as HTMLImageElement).src = 'https://source.unsplash.com/800x600/?abstract';
               }}

@@ -130,10 +130,10 @@ export default function Profile() {
     <div className="min-h-screen bg-background flex">
       <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} />
 
-      <div className="flex-1 xl:ml-72">
+      <div className="flex-1 lg:ml-72">
         <MobileHeader />
         
-        <div className="max-w-4xl mx-auto py-8 px-4 pb-20 xl:pb-8 mt-16 xl:mt-0">
+        <div className="max-w-4xl mx-auto py-8 px-4 pb-20 lg:pb-8 mt-16 lg:mt-0">
           <Card className="p-6 bg-black/20 mb-8">
             {!editMode ? (
               <div className="flex flex-col md:flex-row items-center gap-6">

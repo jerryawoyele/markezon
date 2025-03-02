@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -64,7 +63,6 @@ export default function Messages() {
     if (selectedChat && currentUser) {
       fetchMessages(selectedChat);
       
-      // On mobile, when a chat is selected, hide contacts list
       if (isMobile) {
         setShowContactsList(false);
       }
@@ -73,7 +71,6 @@ export default function Messages() {
 
   const fetchContacts = async () => {
     try {
-      // First, check if any profiles exist
       const { data: profiles, error } = await supabase
         .from('profiles')
         .select('*')
@@ -82,7 +79,6 @@ export default function Messages() {
 
       if (error) throw error;
       
-      // Filter contacts based on search query
       let filteredContacts = profiles || [];
       if (searchQuery) {
         filteredContacts = filteredContacts.filter(contact => 
@@ -92,7 +88,6 @@ export default function Messages() {
       
       setContacts(filteredContacts);
       
-      // Select the first contact by default if available and none is selected
       if (profiles && profiles.length > 0 && !selectedChat && !isMobile) {
         setSelectedChat(profiles[0].id);
       }
@@ -121,7 +116,6 @@ export default function Messages() {
       if (error) throw error;
       setMessages(data || []);
       
-      // Mark messages as read
       if (data && data.length > 0) {
         const unreadMessages = data.filter(msg => !msg.read && msg.receiver_id === currentUser);
         if (unreadMessages.length > 0) {
@@ -186,12 +180,11 @@ export default function Messages() {
     <div className="min-h-screen bg-background flex">
       <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} />
 
-      <div className="flex-1 xl:ml-72 pb-20 xl:pb-0">
+      <div className="flex-1 lg:ml-72 pb-20 lg:pb-0">
         <MobileHeader />
         
-        <div className="max-w-7xl mx-auto h-[calc(100vh-8rem)] py-8 px-4 mt-16 xl:mt-0">
-          <Card className="h-full bg-black/20 border-white/5 grid grid-cols-1 md:grid-cols-[300px,1fr]">
-            {/* Chat List - Show on desktop or when no chat is selected on mobile */}
+        <div className="max-w-7xl mx-auto h-[calc(100vh-8rem)] py-8 px-4 mt-16 lg:mt-0">
+          <Card className="h-full min-h-[calc(100vh-10rem)] bg-black/20 border-white/5 grid grid-cols-1 md:grid-cols-[300px,1fr]">
             {(!isMobile || showContactsList) && (
               <div className="border-r border-white/10">
                 <div className="p-4">
@@ -238,7 +231,6 @@ export default function Messages() {
               </div>
             )}
 
-            {/* Messages - Show on desktop or when a chat is selected on mobile */}
             {(!isMobile || !showContactsList) && (
               <div className="flex flex-col h-full">
                 {selectedChat ? (

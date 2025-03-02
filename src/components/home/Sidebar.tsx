@@ -61,7 +61,8 @@ export function Sidebar({ activeTab, setActiveTab }: SidebarProps) {
   const desktopNav = (
     <aside className="hidden md:flex w-64 fixed left-0 top-0 h-screen border-r border-white/10 bg-background p-4">
       <div className="flex flex-col h-full w-full">
-        <h1 className="text-2xl font-bold mb-8 px-4 md:block lg:block xl:block md:hidden">Markezon</h1>
+        <h1 className="text-2xl font-bold mb-8 px-4 md:hidden">Markezon</h1>
+        <div className="h-16 mb-8"></div> {/* Space filler when logo is hidden */}
         
         <nav className="flex-1">
           <ul className="space-y-2">

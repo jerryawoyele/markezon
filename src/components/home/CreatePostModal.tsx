@@ -1,162 +1,82 @@
 
-import { useState, useRef, ChangeEvent } from "react";
+import React, { useState } from "react";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { Label } from "@/components/ui/label";
-import { 
-  Dialog, 
-  DialogContent, 
-  DialogHeader, 
-  DialogTitle, 
-  DialogFooter,
-  DialogClose
-} from "@/components/ui/dialog";
-import { ImageIcon, TextIcon, X } from "lucide-react";
+import { LocalImageUpload } from "./LocalImageUpload";
 
 interface CreatePostModalProps {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  onCreatePost: (caption: string, image: File | null, type: "text" | "image") => void;
+  isOpen: boolean;
+  onClose: () => void;
+  onSubmit: (data: { text: string; image_url: string }) => void;
 }
 
-export function CreatePostModal({ 
-  open, 
-  onOpenChange, 
-  onCreatePost 
-}: CreatePostModalProps) {
-  const [caption, setCaption] = useState("");
-  const [postType, setPostType] = useState<"text" | "image">("text");
-  const [selectedImage, setSelectedImage] = useState<File | null>(null);
-  const [imagePreview, setImagePreview] = useState<string | null>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
+export function CreatePostModal({ isOpen, onClose, onSubmit }: CreatePostModalProps) {
+  const [text, setText] = useState("");
+  const [imageUrl, setImageUrl] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const handleFileChange = (e: ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0] || null;
-    if (file) {
-      setSelectedImage(file);
-      setPostType("image");
-      
-      // Create preview URL
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setImagePreview(reader.result as string);
-      };
-      reader.readAsDataURL(file);
-    }
-  };
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!text.trim() && !imageUrl) return;
 
-  const handleCreatePost = () => {
-    if (!caption.trim() && !selectedImage) return;
-    
-    onCreatePost(caption, selectedImage, postType);
+    setIsSubmitting(true);
+    onSubmit({
+      text,
+      image_url: imageUrl || "",
+    });
+    setIsSubmitting(false);
     resetForm();
-    onOpenChange(false);
+    onClose();
   };
 
   const resetForm = () => {
-    setCaption("");
-    setPostType("text");
-    setSelectedImage(null);
-    setImagePreview(null);
-    if (fileInputRef.current) fileInputRef.current.value = "";
+    setText("");
+    setImageUrl(null);
   };
 
-  const clearImage = () => {
-    setSelectedImage(null);
-    setImagePreview(null);
-    if (fileInputRef.current) fileInputRef.current.value = "";
+  const handleImageSelected = (selectedImageUrl: string | null) => {
+    setImageUrl(selectedImageUrl);
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[500px] bg-black/90 border-white/10">
+    <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
+      <DialogContent className="sm:max-w-[500px]">
         <DialogHeader>
-          <DialogTitle className="text-xl">Create a New Post</DialogTitle>
+          <DialogTitle>Create New Post</DialogTitle>
+          <DialogDescription>
+            Share your thoughts, services, or portfolio with the community
+          </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-6 py-4">
+        <form onSubmit={handleSubmit} className="space-y-6">
           <Textarea
-            placeholder="What's on your mind?"
-            className="min-h-32 resize-none"
-            value={caption}
-            onChange={(e) => setCaption(e.target.value)}
+            placeholder="What would you like to share?"
+            className="min-h-[100px] resize-none"
+            value={text}
+            onChange={(e) => setText(e.target.value)}
           />
+          
+          <LocalImageUpload onImageSelected={handleImageSelected} />
 
-          <RadioGroup value={postType} onValueChange={(value) => setPostType(value as "text" | "image")}>
-            <div className="flex items-center space-x-6">
-              <div className="flex items-center space-x-2">
-                <RadioGroupItem value="text" id="text" />
-                <Label htmlFor="text" className="flex items-center gap-2">
-                  <TextIcon className="w-4 h-4" />
-                  Text Post
-                </Label>
-              </div>
-              <div className="flex items-center space-x-2">
-                <RadioGroupItem value="image" id="image" />
-                <Label htmlFor="image" className="flex items-center gap-2">
-                  <ImageIcon className="w-4 h-4" />
-                  Image Post
-                </Label>
-              </div>
-            </div>
-          </RadioGroup>
-
-          {postType === "image" && (
-            <div className="space-y-4">
-              <div className="flex items-center">
-                <Button 
-                  type="button" 
-                  variant="outline" 
-                  onClick={() => fileInputRef.current?.click()}
-                  className="mr-2"
-                >
-                  {selectedImage ? "Change Image" : "Select Image"}
-                </Button>
-                {selectedImage && (
-                  <Button 
-                    type="button" 
-                    variant="destructive" 
-                    size="icon"
-                    onClick={clearImage}
-                  >
-                    <X className="w-4 h-4" />
-                  </Button>
-                )}
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  className="hidden"
-                  accept="image/*"
-                  onChange={handleFileChange}
-                />
-              </div>
-
-              {imagePreview && (
-                <div className="relative">
-                  <img 
-                    src={imagePreview} 
-                    alt="Preview" 
-                    className="rounded-md max-h-64 object-contain mx-auto"
-                  />
-                </div>
-              )}
-            </div>
-          )}
-        </div>
-
-        <DialogFooter>
-          <DialogClose asChild>
-            <Button variant="outline" type="button">Cancel</Button>
-          </DialogClose>
-          <Button 
-            type="button" 
-            onClick={handleCreatePost}
-            disabled={!caption.trim() && !selectedImage}
-          >
-            Create Post
-          </Button>
-        </DialogFooter>
+          <div className="flex justify-end gap-2">
+            <Button type="button" variant="outline" onClick={onClose}>
+              Cancel
+            </Button>
+            <Button 
+              type="submit" 
+              disabled={isSubmitting || (!text.trim() && !imageUrl)}
+            >
+              {isSubmitting ? "Posting..." : "Post"}
+            </Button>
+          </div>
+        </form>
       </DialogContent>
     </Dialog>
   );

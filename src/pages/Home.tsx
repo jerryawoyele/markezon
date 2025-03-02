@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Post } from "@/components/home/Post";
 import { CreatePost } from "@/components/home/CreatePost";
@@ -243,8 +242,8 @@ const Home = () => {
             )}
           </div>
           
-          <div className="w-full lg:w-80 lg:flex-shrink-0 space-y-6 hidden lg:block px-4">
-            <div className="lg:sticky lg:top-8">
+          <div className="w-full xl:w-80 xl:flex-shrink-0 space-y-6 hidden xl:block px-4">
+            <div className="xl:sticky xl:top-8">
               <TrendingServices />
             </div>
           </div>

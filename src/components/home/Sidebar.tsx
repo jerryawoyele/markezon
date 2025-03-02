@@ -12,7 +12,7 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 
-const SIDEBAR_ITEMS = [
+export const SIDEBAR_ITEMS = [
   { icon: HomeIcon, label: "Home", path: "/home" },
   { icon: Compass, label: "Discover", path: "/discover" },
   { icon: Send, label: "Messages", path: "/messages" },

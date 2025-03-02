@@ -1,7 +1,8 @@
+
 import { useState, useEffect } from "react";
 import { Post } from "@/components/home/Post";
 import { CreatePost } from "@/components/home/CreatePost";
-import { Sidebar } from "@/components/home/Sidebar";
+import { Sidebar, SIDEBAR_ITEMS } from "@/components/home/Sidebar";
 import { TrendingServices } from "@/components/home/TrendingServices";
 import { MobileHeader } from "@/components/home/MobileHeader";
 import { supabase } from "@/integrations/supabase/client";

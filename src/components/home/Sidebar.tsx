@@ -47,8 +47,8 @@ export function Sidebar({ activeTab, setActiveTab }: SidebarProps) {
               )}
               onClick={() => handleNavigation(item.label, item.path)}
             >
-              <item.icon className="w-5 h-5 mb-1" />
-              <span className="text-xs">{item.label}</span>
+              <item.icon className="w-5 h-5" />
+              <span className="text-xs sr-only md:not-sr-only">{item.label}</span>
             </Button>
           </li>
         ))}
@@ -58,9 +58,9 @@ export function Sidebar({ activeTab, setActiveTab }: SidebarProps) {
 
   // Desktop Sidebar
   const desktopNav = (
-    <aside className="hidden md:flex w-72 fixed left-0 top-0 h-screen border-r border-white/10 bg-background p-4">
+    <aside className="hidden md:flex w-64 fixed left-0 top-0 h-screen border-r border-white/10 bg-background p-4">
       <div className="flex flex-col h-full w-full">
-        <h1 className="text-2xl font-bold mb-8 px-4">Markezon</h1>
+        <h1 className="text-2xl font-bold mb-8 px-4 md:block lg:block xl:block">Markezon</h1>
         
         <nav className="flex-1">
           <ul className="space-y-2">
@@ -70,7 +70,7 @@ export function Sidebar({ activeTab, setActiveTab }: SidebarProps) {
                   variant="ghost"
                   className={cn(
                     "w-full justify-start gap-3 py-6 px-4",
-                    activeTab === item.label && "bg-primary/20 text-primary"
+                    activeTab === item.label && "bg-primary/20 text-primary hover:bg-primary/20"
                   )}
                   onClick={() => handleNavigation(item.label, item.path)}
                 >

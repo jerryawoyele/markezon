@@ -71,7 +71,6 @@ export function Post({
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
 
-  // Debug image loading issues
   useEffect(() => {
     console.log(`Post ${id} image URL:`, image_url);
     
@@ -81,11 +80,9 @@ export function Post({
     img.src = image_url;
   }, [id, image_url]);
 
-  // Fetch likes and comments on mount
   useEffect(() => {
     const fetchLikesAndComments = async () => {
       try {
-        // Fetch likes
         const { data: likesData, error: likesError } = await supabase
           .from('likes')
           .select(`
@@ -102,7 +99,6 @@ export function Post({
           
         if (likesError) throw likesError;
         
-        // Check if current user liked the post
         const user = await supabase.auth.getUser();
         const currentUserId = user.data.user?.id;
         
@@ -112,7 +108,6 @@ export function Post({
           setLiked(currentUserId ? likesData.some(like => like.user_id === currentUserId) : false);
         }
         
-        // Fetch comments
         const { data: commentsData, error: commentsError } = await supabase
           .from('comments')
           .select(`
@@ -137,7 +132,6 @@ export function Post({
         }
       } catch (error) {
         console.error('Error fetching likes and comments:', error);
-        // If we can't fetch real data, use mock counts for UI experience
         setLikesCount(0);
         setCommentsCount(0);
       }
@@ -157,7 +151,6 @@ export function Post({
       }
       
       if (liked) {
-        // Unlike the post
         const { error } = await supabase
           .from('likes')
           .delete()
@@ -169,10 +162,8 @@ export function Post({
         setLiked(false);
         setLikesCount(prev => Math.max(0, prev - 1));
         
-        // Update likes array
         setLikes(prev => prev.filter(like => like.user_id !== currentUserId));
       } else {
-        // Like the post
         const { error, data } = await supabase
           .from('likes')
           .insert({
@@ -186,7 +177,6 @@ export function Post({
         setLiked(true);
         setLikesCount(prev => prev + 1);
         
-        // Update likes array
         if (data && data[0]) {
           setLikes(prev => [...prev, data[0] as Like]);
         }
@@ -212,7 +202,6 @@ export function Post({
         return;
       }
       
-      // Save comment to Supabase
       const { data, error } = await supabase
         .from('comments')
         .insert({
@@ -225,7 +214,6 @@ export function Post({
       if (error) throw error;
       
       if (data && data[0]) {
-        // Add the new comment to the comments array
         setComments(prev => [data[0] as Comment, ...prev]);
         setCommentsCount(prev => prev + 1);
       }
@@ -278,13 +266,18 @@ export function Post({
           </button>
         </div>
         
-        <div className="aspect-video">
-          <img 
-            src={image_url} 
-            alt={caption || 'Post image'}
-            className="w-full h-full object-cover"
-          />
-        </div>
+        {image_url && (
+          <div className="relative">
+            <img 
+              src={image_url} 
+              alt={caption || 'Post image'}
+              className="w-full h-auto max-h-[600px] object-contain bg-black/30"
+              onError={(e) => {
+                (e.target as HTMLImageElement).src = 'https://source.unsplash.com/800x600/?abstract';
+              }}
+            />
+          </div>
+        )}
         
         <div className="p-4 space-y-4">
           <div className="flex items-center gap-4">
@@ -372,7 +365,6 @@ export function Post({
         </div>
       </Card>
       
-      {/* Comments Modal */}
       <Dialog open={showCommentsModal} onOpenChange={setShowCommentsModal}>
         <DialogContent className="sm:max-w-[500px] bg-black/90 border-white/10">
           <DialogHeader>
@@ -423,7 +415,6 @@ export function Post({
         </DialogContent>
       </Dialog>
       
-      {/* Likes Modal */}
       <Dialog open={showLikesModal} onOpenChange={setShowLikesModal}>
         <DialogContent className="sm:max-w-[400px] bg-black/90 border-white/10">
           <DialogHeader>

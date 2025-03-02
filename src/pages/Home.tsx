@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { Post } from "@/components/home/Post";
 import { CreatePost } from "@/components/home/CreatePost";
@@ -8,6 +9,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Card } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/components/ui/use-toast";
+import { useNavigate } from "react-router-dom";
 
 interface PostData {
   id: string;
@@ -27,10 +29,18 @@ const Home = () => {
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
   const [activeTab, setActiveTab] = useState("Home");
+  const navigate = useNavigate();
 
   useEffect(() => {
+    // Check if user is authenticated
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (!user) {
+        navigate('/auth');
+      }
+    });
+    
     fetchPosts();
-  }, []);
+  }, [navigate]);
 
   const fetchPosts = async () => {
     try {
@@ -195,15 +205,14 @@ const Home = () => {
     <div className="min-h-screen bg-background">
       <MobileHeader />
       
-      <div className="container px-4 mx-auto">
-        <div className="flex flex-col lg:flex-row gap-8 pt-24 xl:pt-8 pb-16 pb-24 md:pb-16">
+      <div className="container mx-auto">
+        <div className="flex flex-col lg:flex-row gap-8 pt-24 xl:pt-8 pb-16 md:pb-16">
+          {/* Left sidebar spacer for fixed sidebar */}
           <div className="hidden md:block w-64 flex-shrink-0">
-            <div className="sticky top-8">
-              <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} />
-            </div>
+            {/* This is just a spacer for the fixed sidebar */}
           </div>
           
-          <div className="flex-1 max-w-3xl mx-auto w-full space-y-6">
+          <div className="flex-1 max-w-3xl mx-auto w-full space-y-6 px-4 md:px-6">
             <CreatePost onSubmit={handleCreatePost} />
             
             {loading ? (
@@ -229,7 +238,7 @@ const Home = () => {
             )}
           </div>
           
-          <div className="w-full lg:w-80 lg:flex-shrink-0 space-y-6 hidden lg:block">
+          <div className="w-full lg:w-80 lg:flex-shrink-0 space-y-6 hidden lg:block px-4">
             <div className="lg:sticky lg:top-8">
               <TrendingServices />
             </div>

@@ -1,4 +1,3 @@
-
 import { Search, Briefcase, Code, Palette, Camera, Music, Book, Send } from "lucide-react";
 import { ServiceCard } from "@/components/ServiceCard";
 import { CategoryButton } from "@/components/CategoryButton";
@@ -6,9 +5,10 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
-import { Link } from "react-router-dom";
-import { useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
+import { useState, useEffect } from "react";
 import { useToast } from "@/components/ui/use-toast";
+import { supabase } from "@/integrations/supabase/client";
 
 const FEATURED_SERVICES = [
   {
@@ -46,6 +46,15 @@ const CATEGORIES = [
 const Index = () => {
   const [email, setEmail] = useState("");
   const { toast } = useToast();
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (user) {
+        navigate('/home');
+      }
+    });
+  }, [navigate]);
 
   const handleNewsletterSubmit = (e: React.FormEvent) => {
     e.preventDefault();

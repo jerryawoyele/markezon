@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { Post } from "@/components/home/Post";
 import { CreatePost } from "@/components/home/CreatePost";
@@ -207,11 +208,13 @@ const Home = () => {
 
   const handleDeletePost = async (postId: string) => {
     try {
-      // First, we need to delete related records (likes and comments)
-      await supabase.from('likes').delete().eq('post_id', postId);
+      // First, delete related comments
       await supabase.from('comments').delete().eq('post_id', postId);
       
-      // Then delete the post
+      // Then, delete related likes
+      await supabase.from('likes').delete().eq('post_id', postId);
+      
+      // Finally, delete the post
       const { error } = await supabase
         .from('posts')
         .delete()

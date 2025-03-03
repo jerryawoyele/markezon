@@ -7,7 +7,7 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import Index from "./pages/Index";
 import Auth from "./pages/Auth";
 import Home from "./pages/Home";
-import Discover from "./pages/Discover"; // Renamed from Explore
+import Discover from "./pages/Discover"; 
 import Messages from "./pages/Messages";
 import Notifications from "./pages/Notifications";
 import Profile from "./pages/Profile";

@@ -3,7 +3,7 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Avatar } from "@/components/ui/avatar";
-import { PlusCircle, Image } from "lucide-react";
+import { PlusCircle, Image, Upload } from "lucide-react";
 import { 
   Dialog, 
   DialogContent, 
@@ -13,6 +13,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { LocalImageUpload } from "./LocalImageUpload";
 
 interface CreatePostProps {
   onSubmit: (data: { text: string; image_url: string }) => Promise<void>;
@@ -116,25 +117,11 @@ export function CreatePost({ onSubmit }: CreatePostProps) {
             
             {!isTextPost && (
               <div className="space-y-2">
-                <Label htmlFor="image-url">Image URL</Label>
-                <Input
-                  id="image-url"
-                  type="text"
-                  placeholder="https://example.com/image.jpg"
-                  value={imageUrl}
-                  onChange={(e) => handleImageUrlChange(e.target.value)}
+                <Label htmlFor="image-upload">Upload Image</Label>
+                <LocalImageUpload 
+                  onImageSelected={handleImageUrlChange}
+                  previewUrl={imagePreview}
                 />
-                
-                {imagePreview && (
-                  <div className="mt-3 relative aspect-video rounded-md overflow-hidden bg-white/5">
-                    <img
-                      src={imagePreview}
-                      alt="Preview"
-                      className="w-full h-full object-contain"
-                      onError={() => setImagePreview(null)}
-                    />
-                  </div>
-                )}
               </div>
             )}
             

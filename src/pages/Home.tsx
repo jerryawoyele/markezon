@@ -211,13 +211,13 @@ const Home = () => {
       <MobileHeader />
       
       <div className="container mx-auto">
-        <div className="flex flex-col lg:flex-row gap-8 pt-24 md:pt-8 pb-16 md:pb-16">
+        <div className="flex flex-col md:flex-row gap-8 pt-24 md:pt-8 pb-16 md:pb-16">
           {/* Left sidebar spacer for fixed sidebar */}
           <div className="hidden md:block w-64 flex-shrink-0">
             {/* This is just a spacer for the fixed sidebar */}
           </div>
           
-          <div className="flex-1 max-w-3xl mx-auto w-full space-y-6 px-4 md:pl-6 md:pr-6 lg:pl-8">
+          <div className="flex-1 max-w-3xl mx-auto w-full space-y-6 px-4 md:pl-6 md:pr-6 md:pl-8">
             <CreatePost onSubmit={handleCreatePost} />
             
             {loading ? (
@@ -243,8 +243,8 @@ const Home = () => {
             )}
           </div>
           
-          <div className="w-full lg:w-80 lg:flex-shrink-0 space-y-6 hidden lg:block px-4">
-            <div className="lg:sticky lg:top-8">
+          <div className="w-full md:w-80 md:flex-shrink-0 space-y-6 hidden md:block px-4">
+            <div className="md:sticky md:top-8">
               <TrendingServices />
             </div>
           </div>

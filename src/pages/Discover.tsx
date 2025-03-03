@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -94,10 +95,10 @@ export default function Discover() {
     <div className="min-h-screen bg-background flex">
       <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} />
 
-      <div className="flex-1 lg:ml-72 pb-20 lg:pb-0">
+      <div className="flex-1 md:ml-72 pb-20 md:pb-0">
         <MobileHeader onSearch={setSearchQuery} />
         
-        <div className="max-w-7xl mx-auto py-8 px-4 mt-16 lg:mt-0 h-full min-h-[calc(100vh-64px)] overflow-y-auto">
+        <div className="max-w-7xl mx-auto py-8 px-4 mt-16 md:mt-0 h-full min-h-[calc(100vh-64px)] overflow-y-auto">
           <div className="max-w-xl mx-auto mb-8">
             <div className="relative">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-white/40 w-5 h-5" />

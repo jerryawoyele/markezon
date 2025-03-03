@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { Post } from "@/components/home/Post";
 import { CreatePost } from "@/components/home/CreatePost";
@@ -210,7 +211,7 @@ const Home = () => {
       <MobileHeader />
       
       <div className="container mx-auto">
-        <div className="flex flex-col lg:flex-row gap-8 pt-24 xl:pt-8 pb-16 md:pb-16">
+        <div className="flex flex-col lg:flex-row gap-8 pt-24 md:pt-8 pb-16 md:pb-16">
           {/* Left sidebar spacer for fixed sidebar */}
           <div className="hidden md:block w-64 flex-shrink-0">
             {/* This is just a spacer for the fixed sidebar */}
@@ -242,8 +243,8 @@ const Home = () => {
             )}
           </div>
           
-          <div className="w-full xl:w-80 xl:flex-shrink-0 space-y-6 hidden xl:block px-4">
-            <div className="xl:sticky xl:top-8">
+          <div className="w-full lg:w-80 lg:flex-shrink-0 space-y-6 hidden lg:block px-4">
+            <div className="lg:sticky lg:top-8">
               <TrendingServices />
             </div>
           </div>

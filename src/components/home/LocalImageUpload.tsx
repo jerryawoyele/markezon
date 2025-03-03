@@ -6,11 +6,19 @@ import { Image } from "lucide-react";
 
 interface LocalImageUploadProps {
   onImageSelected: (imageUrl: string | null) => void;
+  previewUrl?: string | null;
 }
 
-export function LocalImageUpload({ onImageSelected }: LocalImageUploadProps) {
-  const [selectedImage, setSelectedImage] = useState<string | null>(null);
+export function LocalImageUpload({ onImageSelected, previewUrl }: LocalImageUploadProps) {
+  const [selectedImage, setSelectedImage] = useState<string | null>(previewUrl || null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Update local state when previewUrl changes from parent
+  React.useEffect(() => {
+    if (previewUrl !== undefined) {
+      setSelectedImage(previewUrl);
+    }
+  }, [previewUrl]);
 
   const handleImageChange = (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];

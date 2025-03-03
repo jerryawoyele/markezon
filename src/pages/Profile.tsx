@@ -133,7 +133,7 @@ export default function Profile() {
       <div className="flex-1 lg:ml-72">
         <MobileHeader />
         
-        <div className="max-w-4xl mx-auto py-8 px-4 pb-20 lg:pb-8 mt-16 lg:mt-0">
+        <div className="max-w-4xl mx-auto py-0 md:py-8 px-4 pb-20 lg:pb-8 mt-0 md:mt-16 lg:mt-0">
           <Card className="p-6 bg-black/20 mb-8">
             {!editMode ? (
               <div className="flex flex-col md:flex-row items-center gap-6">

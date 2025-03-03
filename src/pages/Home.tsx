@@ -208,6 +208,11 @@ const Home = () => {
 
   const handleDeletePost = async (postId: string) => {
     try {
+      // First, we need to delete related records (likes and comments)
+      await supabase.from('likes').delete().eq('post_id', postId);
+      await supabase.from('comments').delete().eq('post_id', postId);
+      
+      // Then delete the post
       const { error } = await supabase
         .from('posts')
         .delete()
@@ -231,12 +236,42 @@ const Home = () => {
     }
   };
 
+  const handleEditPost = async (postId: string, newCaption: string) => {
+    try {
+      const { error } = await supabase
+        .from('posts')
+        .update({ caption: newCaption })
+        .eq('id', postId);
+        
+      if (error) throw error;
+      
+      // Update the posts array with the edited post
+      setPosts(posts.map(post => 
+        post.id === postId ? { ...post, caption: newCaption } : post
+      ));
+      
+      toast({
+        title: "Post updated",
+        description: "Your post has been updated successfully."
+      });
+      return true;
+    } catch (error) {
+      console.error("Error updating post:", error);
+      toast({
+        title: "Error updating post",
+        description: "There was an error updating your post. Please try again.",
+        variant: "destructive"
+      });
+      return false;
+    }
+  };
+
   return (
     <div className="min-h-screen bg-background">
       <MobileHeader />
       
       <div className="container mx-auto">
-        <div className="flex flex-col md:flex-row gap-8 pt-24 md:pt-8 pb-16 md:pb-16">
+        <div className="flex flex-col md:flex-row gap-8 pt-24 md:pt-24 lg:pt-8 pb-16 md:pb-16">
           {/* Left sidebar spacer for fixed sidebar */}
           <div className="hidden md:block w-64 flex-shrink-0">
             {/* This is just a spacer for the fixed sidebar */}
@@ -259,6 +294,7 @@ const Home = () => {
                     onComment={handleComment}
                     onShare={handleShare}
                     onDelete={handleDeletePost}
+                    onEdit={handleEditPost}
                     currentUserId={async () => {
                       const { data } = await supabase.auth.getUser();
                       return data.user?.id || null;
@@ -284,6 +320,6 @@ const Home = () => {
       <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} />
     </div>
   );
-};
+}
 
 export default Home;

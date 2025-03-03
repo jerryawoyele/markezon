@@ -14,9 +14,10 @@ export function MobileHeader({ onSearch }: MobileHeaderProps) {
   const [showResults, setShowResults] = useState(false);
   const location = useLocation();
   const isHomePage = location.pathname === "/home";
+  const isMediumScreen = window.innerWidth >= 768 && window.innerWidth < 1024;
 
-  // Only render on home page
-  if (!isHomePage) {
+  // Only render on home page or on medium screens for specific paths
+  if (!isHomePage && !(isMediumScreen && location.pathname === "/home")) {
     return null;
   }
 

@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -183,7 +184,7 @@ export default function Messages() {
       <div className="flex-1 lg:ml-72 pb-20 lg:pb-0">
         <MobileHeader />
         
-        <div className="max-w-7xl mx-auto h-full py-8 px-4 mt-16 lg:mt-0">
+        <div className="max-w-7xl mx-auto h-full py-0 md:py-8 px-4 mt-0 md:mt-16 lg:mt-0">
           <Card className="h-full min-h-[calc(100vh-10rem)] bg-black/20 border-white/5 grid grid-cols-1 md:grid-cols-[300px,1fr]">
             {(!isMobile || showContactsList) && (
               <div className="border-r border-white/10">

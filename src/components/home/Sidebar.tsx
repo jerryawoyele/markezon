@@ -64,7 +64,7 @@ export function Sidebar({ activeTab, setActiveTab }: SidebarProps) {
         <h1 className="text-2xl font-bold px-4 mb-8">Markezon</h1>
         
         <nav className="flex-1">
-          <ul className="space-y-2">
+          <ul className="space-y-2 mt-4">
             {SIDEBAR_ITEMS.map((item) => {
               const isActive = activeTab === item.label || location.pathname === item.path;
               return (

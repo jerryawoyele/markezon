@@ -61,7 +61,7 @@ export function Sidebar({ activeTab, setActiveTab }: SidebarProps) {
   const desktopNav = (
     <aside className="hidden md:flex w-64 fixed left-0 top-0 h-screen border-r border-white/10 bg-background p-4">
       <div className="flex flex-col h-full w-full">
-        <h1 className="text-2xl font-bold px-4 mb-2">Markezon</h1>
+        <h1 className="text-2xl font-bold px-4 mb-8">Markezon</h1>
         
         <nav className="flex-1">
           <ul className="space-y-2">

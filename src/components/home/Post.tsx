@@ -1,12 +1,24 @@
+
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Avatar } from "@/components/ui/avatar";
 import { Input } from "@/components/ui/input";
-import { Heart, MessageCircle, Send } from "lucide-react";
+import { Heart, MessageCircle, Send, MoreVertical, Trash, Edit } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { 
+  Dialog, 
+  DialogContent, 
+  DialogHeader, 
+  DialogTitle 
+} from "@/components/ui/dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 interface Profile {
   id: string;
@@ -47,6 +59,9 @@ interface PostProps {
   onLike?: () => void;
   onComment?: (postId: string, comment: string) => Promise<void>;
   onShare?: () => void;
+  onDelete?: (postId: string) => Promise<void>;
+  onEdit?: (postId: string, newCaption: string) => Promise<void>;
+  currentUserId?: () => Promise<string | null>;
 }
 
 export function Post({ 
@@ -57,7 +72,10 @@ export function Post({
   caption, 
   onLike, 
   onComment, 
-  onShare 
+  onShare,
+  onDelete,
+  onEdit,
+  currentUserId
 }: PostProps) {
   const [showComments, setShowComments] = useState(false);
   const [newComment, setNewComment] = useState("");
@@ -69,7 +87,20 @@ export function Post({
   const [showCommentsModal, setShowCommentsModal] = useState(false);
   const [showLikesModal, setShowLikesModal] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [isOwner, setIsOwner] = useState(false);
+  const [editMode, setEditMode] = useState(false);
+  const [editedCaption, setEditedCaption] = useState(caption || "");
   const navigate = useNavigate();
+
+  useEffect(() => {
+    const checkOwnership = async () => {
+      if (currentUserId) {
+        const userId = await currentUserId();
+        setIsOwner(userId === user_id);
+      }
+    };
+    checkOwnership();
+  }, [currentUserId, user_id]);
 
   useEffect(() => {
     console.log(`Post ${id} image URL:`, image_url);
@@ -236,6 +267,19 @@ export function Post({
     navigate(`/user/${user_id}`);
   };
 
+  const handleDelete = async () => {
+    if (onDelete) await onDelete(id);
+  };
+
+  const handleEdit = async () => {
+    if (editMode && onEdit) {
+      await onEdit(id, editedCaption);
+      setEditMode(false);
+    } else {
+      setEditMode(true);
+    }
+  };
+
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
     return date.toLocaleDateString('en-US', { 
@@ -248,22 +292,50 @@ export function Post({
   return (
     <>
       <Card className="overflow-hidden bg-black/20 border-white/5 max-w-3xl w-full mx-auto">
-        <div className="p-4 flex items-center gap-3">
-          <button onClick={handleProfileClick}>
-            <Avatar>
-              <img 
-                src={profiles?.avatar_url || 'https://source.unsplash.com/100x100/?portrait'} 
-                alt={profiles?.username || 'User'}
-                className="w-full h-full object-cover"
-              />
-            </Avatar>
-          </button>
-          <button 
-            className="font-medium hover:underline"
-            onClick={handleProfileClick}
-          >
-            {profiles?.username || 'Anonymous'}
-          </button>
+        <div className="p-4 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <button onClick={handleProfileClick}>
+              <Avatar>
+                <img 
+                  src={profiles?.avatar_url || 'https://source.unsplash.com/100x100/?portrait'} 
+                  alt={profiles?.username || 'User'}
+                  className="w-full h-full object-cover"
+                />
+              </Avatar>
+            </button>
+            <button 
+              className="font-medium hover:underline"
+              onClick={handleProfileClick}
+            >
+              {profiles?.username || 'Anonymous'}
+            </button>
+          </div>
+          
+          {isOwner && (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="icon">
+                  <MoreVertical className="h-5 w-5" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="bg-black/90 border-white/10">
+                <DropdownMenuItem 
+                  className="flex items-center gap-2 cursor-pointer"
+                  onClick={handleEdit}
+                >
+                  <Edit className="h-4 w-4" />
+                  {editMode ? "Save Edit" : "Edit Post"}
+                </DropdownMenuItem>
+                <DropdownMenuItem 
+                  className="flex items-center gap-2 text-red-500 cursor-pointer"
+                  onClick={handleDelete}
+                >
+                  <Trash className="h-4 w-4" />
+                  Delete Post
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
         </div>
         
         {image_url && (
@@ -307,11 +379,26 @@ export function Post({
             </button>
           </div>
 
-          {caption && (
-            <p className="text-sm">
-              <span className="font-medium mr-2">{profiles?.username || 'Anonymous'}</span>
-              {caption}
-            </p>
+          {editMode ? (
+            <div className="flex gap-2 items-center">
+              <Input 
+                value={editedCaption} 
+                onChange={(e) => setEditedCaption(e.target.value)}
+                className="flex-1" 
+              />
+              <Button size="sm" onClick={handleEdit}>Save</Button>
+              <Button size="sm" variant="ghost" onClick={() => {
+                setEditMode(false);
+                setEditedCaption(caption || "");
+              }}>Cancel</Button>
+            </div>
+          ) : (
+            caption && (
+              <p className="text-sm">
+                <span className="font-medium mr-2">{profiles?.username || 'Anonymous'}</span>
+                {caption}
+              </p>
+            )
           )}
 
           {showComments && (

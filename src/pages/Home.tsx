@@ -206,6 +206,31 @@ const Home = () => {
     });
   };
 
+  const handleDeletePost = async (postId: string) => {
+    try {
+      const { error } = await supabase
+        .from('posts')
+        .delete()
+        .eq('id', postId);
+        
+      if (error) throw error;
+      
+      setPosts(posts.filter(post => post.id !== postId));
+      
+      toast({
+        title: "Post deleted",
+        description: "Your post has been deleted successfully."
+      });
+    } catch (error) {
+      console.error("Error deleting post:", error);
+      toast({
+        title: "Error deleting post",
+        description: "There was an error deleting your post. Please try again.",
+        variant: "destructive"
+      });
+    }
+  };
+
   return (
     <div className="min-h-screen bg-background">
       <MobileHeader />
@@ -233,6 +258,11 @@ const Home = () => {
                     onLike={handleLike}
                     onComment={handleComment}
                     onShare={handleShare}
+                    onDelete={handleDeletePost}
+                    currentUserId={async () => {
+                      const { data } = await supabase.auth.getUser();
+                      return data.user?.id || null;
+                    }}
                   />
                 ))}
               </div>
@@ -243,7 +273,7 @@ const Home = () => {
             )}
           </div>
           
-          <div className="w-full md:w-80 md:flex-shrink-0 space-y-6 hidden md:block px-4">
+          <div className="w-full md:w-80 md:flex-shrink-0 space-y-6 hidden lg:block px-4">
             <div className="md:sticky md:top-8">
               <TrendingServices />
             </div>

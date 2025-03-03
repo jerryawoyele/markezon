@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Post } from "@/components/home/Post";
 import { CreatePost } from "@/components/home/CreatePost";
@@ -236,7 +235,7 @@ const Home = () => {
     }
   };
 
-  const handleEditPost = async (postId: string, newCaption: string) => {
+  const handleEditPost = async (postId: string, newCaption: string): Promise<void> => {
     try {
       const { error } = await supabase
         .from('posts')
@@ -254,7 +253,6 @@ const Home = () => {
         title: "Post updated",
         description: "Your post has been updated successfully."
       });
-      return true;
     } catch (error) {
       console.error("Error updating post:", error);
       toast({
@@ -262,7 +260,6 @@ const Home = () => {
         description: "There was an error updating your post. Please try again.",
         variant: "destructive"
       });
-      return false;
     }
   };
 

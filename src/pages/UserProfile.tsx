@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { Card } from "@/components/ui/card";
@@ -22,6 +23,7 @@ interface Post {
   image_url: string;
   caption: string | null;
   created_at: string;
+  user_id: string;
 }
 
 export default function UserProfile() {
@@ -219,13 +221,14 @@ export default function UserProfile() {
         </div>
       </div>
 
-      {selectedPost && (
+      {selectedPost && profile && (
         <Dialog open={showPostModal} onOpenChange={setShowPostModal}>
-          <DialogContent className="sm:max-w-[650px] bg-black/90 border-white/10 h-[90vh] max-h-[90vh] p-0 overflow-hidden">
+          <DialogContent className="sm:max-w-[650px] bg-black/90 border-white/10 h-[90vh] max-h-[90vh] p-0 overflow-hidden overflow-y-auto">
             <Post 
               {...selectedPost}
+              user_id={selectedPost.user_id}
               showDetailOnClick={false}
-              profiles={profile || { id: userId || '', username: 'User', avatar_url: null }}
+              profiles={profile}
               currentUserId={async () => {
                 const { data } = await supabase.auth.getUser();
                 return data.user?.id || null;

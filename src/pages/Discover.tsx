@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -17,6 +18,7 @@ interface Post {
   created_at: string;
   user_id: string;
   profiles: {
+    id: string;
     username: string | null;
     avatar_url: string | null;
   };
@@ -43,6 +45,7 @@ export default function Discover() {
         .select(`
           *,
           profiles:user_id (
+            id,
             username,
             avatar_url
           )
@@ -61,6 +64,7 @@ export default function Discover() {
       const transformedData = data?.map(post => ({
         ...post,
         profiles: post.profiles || {
+          id: post.user_id, // Ensure id is always present
           username: 'Anonymous',
           avatar_url: null
         }
@@ -174,7 +178,7 @@ export default function Discover() {
 
       {selectedPost && (
         <Dialog open={showPostModal} onOpenChange={setShowPostModal}>
-          <DialogContent className="sm:max-w-[650px] bg-black/90 border-white/10 h-[90vh] max-h-[90vh] p-0 overflow-hidden">
+          <DialogContent className="sm:max-w-[650px] bg-black/90 border-white/10 h-[90vh] max-h-[90vh] p-0 overflow-hidden overflow-y-auto">
             <Post 
               {...selectedPost}
               showDetailOnClick={false}

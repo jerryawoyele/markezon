@@ -317,6 +317,8 @@ export function Post({
   };
 
   const handleImageTap = () => {
+    if (showCommentsModal || showLikesModal || showPostModal) return;
+    
     const now = Date.now();
     const DOUBLE_TAP_DELAY = 300; // ms
     
@@ -383,7 +385,11 @@ export function Post({
       <Card 
         className="overflow-hidden bg-black/20 border-white/5 max-w-3xl w-full mx-auto"
         ref={postCardRef}
-        onClick={() => isDetailClickEnabled && setShowPostModal(true)}
+        onClick={() => {
+          if (!showCommentsModal && !showLikesModal && !showPostModal && isDetailClickEnabled) {
+            setShowPostModal(true);
+          }
+        }}
       >
         <div className="p-4 flex items-center justify-between" onClick={(e) => e.stopPropagation()}>
           <div className="flex items-center gap-3">
@@ -686,7 +692,7 @@ export function Post({
       </Dialog>
       
       <Dialog open={showPostModal} onOpenChange={setShowPostModal}>
-        <DialogContent className="sm:max-w-[650px] bg-black/90 border-white/10 h-[90vh] max-h-[90vh] p-0">
+        <DialogContent className="sm:max-w-[650px] bg-black/90 border-white/10 h-[90vh] max-h-[90vh] p-0 overflow-hidden">
           <div className="flex flex-col h-full overflow-hidden">
             {parsedImages.length > 0 && (
               <div className="relative h-auto max-h-[60%] min-h-[200px] bg-black flex items-center justify-center">

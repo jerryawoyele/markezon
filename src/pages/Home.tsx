@@ -275,13 +275,13 @@ const Home = () => {
     <div className="min-h-screen bg-background">
       <MobileHeader />
       
-      <div className="mx-2">
+      <div>
         <div className={`flex flex-col md:flex-row gap-8 ${getRouteClass()} pb-16 md:pb-16`}>
           <div className="hidden md:block w-64 flex-shrink-0">
             {/* This is just a spacer for the fixed sidebar */}
           </div>
           
-          <div className="flex-1 max-w-3xl mx-2 w-full space-y-6 px-2 md:px-6">
+          <div className="flex-1 max-w-3xl w-full space-y-6 px-2 md:px-6">
             <CreatePost onSubmit={handleCreatePost} />
             
             {loading ? (

@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { Card } from "@/components/ui/card";
@@ -9,6 +8,8 @@ import { MobileHeader } from "@/components/home/MobileHeader";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/components/ui/use-toast";
 import { ArrowLeft } from "lucide-react";
+import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { Post } from "@/components/home/Post";
 
 interface Profile {
   id: string;
@@ -25,11 +26,13 @@ interface Post {
 
 export default function UserProfile() {
   const { userId } = useParams<{ userId: string }>();
-  const [activeTab, setActiveTab] = useState(""); // No active tab for other users
+  const [activeTab, setActiveTab] = useState("");
   const [profile, setProfile] = useState<Profile | null>(null);
   const [posts, setPosts] = useState<Post[]>([]);
   const [loading, setLoading] = useState(true);
   const [following, setFollowing] = useState(false);
+  const [selectedPost, setSelectedPost] = useState<Post | null>(null);
+  const [showPostModal, setShowPostModal] = useState(false);
   const { toast } = useToast();
   const navigate = useNavigate();
 
@@ -89,7 +92,6 @@ export default function UserProfile() {
   };
 
   const handleToggleFollow = () => {
-    // This would typically be implemented with a database call
     setFollowing(!following);
     
     toast({
@@ -104,12 +106,9 @@ export default function UserProfile() {
     navigate(-1);
   };
 
-  const handlePostClick = (postId: string) => {
-    // In a real app, you might navigate to a post detail page
-    toast({
-      title: "Post selected",
-      description: `Viewing details for post ${postId}`,
-    });
+  const handlePostClick = (post: Post) => {
+    setSelectedPost(post);
+    setShowPostModal(true);
   };
 
   if (!profile && !loading) {
@@ -130,10 +129,10 @@ export default function UserProfile() {
     <div className="min-h-screen bg-background flex">
       <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} />
 
-      <div className="flex-1 xl:ml-72">
+      <div className="flex-1 lg:ml-64">
         <MobileHeader />
         
-        <div className="max-w-4xl mx-auto py-8 px-4 pb-20 xl:pb-8 mt-16 xl:mt-0">
+        <div className="max-w-4xl mx-auto py-8 px-4 pb-20 lg:pb-8 mt-16 lg:mt-0">
           <Button
             variant="ghost"
             className="mb-4 flex items-center gap-2"
@@ -188,18 +187,18 @@ export default function UserProfile() {
           </Card>
 
           {loading ? (
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mx-2 md:mx-0">
               {[1, 2, 3, 4, 5, 6].map((n) => (
                 <div key={n} className="aspect-square bg-white/5 animate-pulse rounded-lg" />
               ))}
             </div>
           ) : posts.length > 0 ? (
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mx-2 md:mx-0">
               {posts.map((post) => (
                 <div 
                   key={post.id} 
                   className="aspect-square group relative rounded-lg overflow-hidden cursor-pointer"
-                  onClick={() => handlePostClick(post.id)}
+                  onClick={() => handlePostClick(post)}
                 >
                   <img 
                     src={post.image_url} 
@@ -219,6 +218,22 @@ export default function UserProfile() {
           )}
         </div>
       </div>
+
+      {selectedPost && (
+        <Dialog open={showPostModal} onOpenChange={setShowPostModal}>
+          <DialogContent className="sm:max-w-[650px] bg-black/90 border-white/10 h-[90vh] max-h-[90vh] p-0 overflow-hidden">
+            <Post 
+              {...selectedPost}
+              showDetailOnClick={false}
+              profiles={profile || { id: userId || '', username: 'User', avatar_url: null }}
+              currentUserId={async () => {
+                const { data } = await supabase.auth.getUser();
+                return data.user?.id || null;
+              }}
+            />
+          </DialogContent>
+        </Dialog>
+      )}
     </div>
   );
 }

@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Avatar } from "@/components/ui/avatar";
@@ -72,6 +72,7 @@ interface PostProps {
   onDelete?: (postId: string) => Promise<void>;
   onEdit?: (postId: string, newCaption: string) => Promise<void>;
   currentUserId?: () => Promise<string | null>;
+  showDetailOnClick?: boolean;
 }
 
 export function Post({ 
@@ -86,7 +87,8 @@ export function Post({
   onShare,
   onDelete,
   onEdit,
-  currentUserId
+  currentUserId,
+  showDetailOnClick = false
 }: PostProps) {
   const [showComments, setShowComments] = useState(false);
   const [newComment, setNewComment] = useState("");
@@ -107,6 +109,8 @@ export function Post({
   const [lastTap, setLastTap] = useState<number>(0);
   const navigate = useNavigate();
   const postCardRef = useRef<HTMLDivElement>(null);
+  const location = useLocation();
+  const isDetailClickEnabled = showDetailOnClick || location.pathname.includes('/discover') || location.pathname.includes('/user/');
 
   useEffect(() => {
     const checkOwnership = async () => {
@@ -379,7 +383,7 @@ export function Post({
       <Card 
         className="overflow-hidden bg-black/20 border-white/5 max-w-3xl w-full mx-auto"
         ref={postCardRef}
-        onClick={() => setShowPostModal(true)}
+        onClick={() => isDetailClickEnabled && setShowPostModal(true)}
       >
         <div className="p-4 flex items-center justify-between" onClick={(e) => e.stopPropagation()}>
           <div className="flex items-center gap-3">
@@ -490,7 +494,12 @@ export function Post({
         
         <div className="p-4 space-y-4" onClick={(e) => e.stopPropagation()}>
           <div className="flex items-center gap-4">
-            <Button variant="ghost" size="icon" onClick={handleLike}>
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              onClick={handleLike}
+              className={`${liked ? 'hover:bg-black/80' : 'hover:bg-white/10'}`}
+            >
               <Heart className={`w-5 h-5 ${liked ? 'fill-current text-primary' : ''}`} />
             </Button>
             <Button variant="ghost" size="icon" onClick={() => setShowComments(!showComments)}>
@@ -594,12 +603,12 @@ export function Post({
       </Card>
       
       <Dialog open={showCommentsModal} onOpenChange={setShowCommentsModal}>
-        <DialogContent className="sm:max-w-[500px] bg-black/90 border-white/10 max-h-[80vh] overflow-hidden">
+        <DialogContent className="sm:max-w-[500px] bg-black/90 border-white/10 max-h-[80vh]">
           <DialogHeader>
             <DialogTitle>Comments</DialogTitle>
           </DialogHeader>
           
-          <div className="my-4 space-y-4 overflow-hidden flex flex-col">
+          <div className="my-4 space-y-4 max-h-[60vh] overflow-hidden flex flex-col">
             <div className="flex gap-2">
               <Input
                 placeholder="Add a comment..."
@@ -616,7 +625,7 @@ export function Post({
             {comments.length > 0 ? (
               <div className="space-y-4 overflow-y-auto flex-1 pb-4">
                 {comments.map((comment) => (
-                  <div key={comment.id} className="flex gap-3">
+                  <div key={comment.id} className="flex gap-2">
                     <Avatar className="w-8 h-8">
                       <img 
                         src={comment.profile?.avatar_url || 'https://source.unsplash.com/100x100/?portrait'} 
@@ -624,12 +633,12 @@ export function Post({
                         className="w-full h-full object-cover"
                       />
                     </Avatar>
-                    <div className="bg-white/5 p-3 rounded-lg flex-1">
+                    <div className="bg-white/5 p-2 rounded-lg flex-1">
                       <div className="flex justify-between">
-                        <p className="font-medium">{comment.profile?.username || 'Anonymous'}</p>
+                        <p className="text-sm font-medium">{comment.profile?.username || 'Anonymous'}</p>
                         <span className="text-xs text-white/40">{formatCommentDate(comment.created_at)}</span>
                       </div>
-                      <p className="mt-1">{comment.content}</p>
+                      <p className="text-sm">{comment.content}</p>
                     </div>
                   </div>
                 ))}
@@ -644,14 +653,14 @@ export function Post({
       </Dialog>
       
       <Dialog open={showLikesModal} onOpenChange={setShowLikesModal}>
-        <DialogContent className="sm:max-w-[400px] bg-black/90 border-white/10 max-h-[80vh] overflow-hidden">
+        <DialogContent className="sm:max-w-[400px] bg-black/90 border-white/10 max-h-[80vh]">
           <DialogHeader>
             <DialogTitle>Likes</DialogTitle>
           </DialogHeader>
           
-          <div className="my-4 overflow-hidden flex flex-col h-full">
+          <div className="my-4 max-h-[60vh] overflow-y-auto">
             {likes.length > 0 ? (
-              <div className="space-y-4 overflow-y-auto flex-1">
+              <div className="space-y-4">
                 {likes.map((like) => (
                   <div key={like.id} className="flex items-center gap-3">
                     <Avatar className="w-10 h-10">
@@ -677,7 +686,7 @@ export function Post({
       </Dialog>
       
       <Dialog open={showPostModal} onOpenChange={setShowPostModal}>
-        <DialogContent className="sm:max-w-[650px] bg-black/90 border-white/10 h-[90vh] max-h-[90vh] overflow-hidden p-0">
+        <DialogContent className="sm:max-w-[650px] bg-black/90 border-white/10 h-[90vh] max-h-[90vh] p-0">
           <div className="flex flex-col h-full overflow-hidden">
             {parsedImages.length > 0 && (
               <div className="relative h-auto max-h-[60%] min-h-[200px] bg-black flex items-center justify-center">
@@ -726,7 +735,7 @@ export function Post({
               </div>
             )}
             
-            <div className="p-4 flex flex-col gap-4 flex-1 overflow-hidden">
+            <div className="p-4 flex flex-col gap-4 overflow-y-auto flex-1">
               <div className="flex items-center gap-3">
                 <Avatar>
                   <img 
@@ -749,7 +758,12 @@ export function Post({
               )}
               
               <div className="flex items-center gap-4">
-                <Button variant="ghost" size="icon" onClick={handleLike}>
+                <Button 
+                  variant="ghost" 
+                  size="icon" 
+                  onClick={handleLike}
+                  className={`${liked ? 'hover:bg-black/80' : 'hover:bg-white/10'}`}
+                >
                   <Heart className={`w-5 h-5 ${liked ? 'fill-current text-primary' : ''}`} />
                 </Button>
                 <Button variant="ghost" size="icon">
@@ -764,7 +778,7 @@ export function Post({
                 {likesCount} likes
               </div>
               
-              <div className="flex flex-col gap-2 flex-1 overflow-hidden">
+              <div className="flex flex-col gap-2 overflow-hidden flex-1">
                 <h3 className="font-medium">Comments</h3>
                 
                 <div className="flex gap-2 mb-2">
@@ -781,7 +795,7 @@ export function Post({
                 </div>
                 
                 {comments.length > 0 ? (
-                  <div className="space-y-3 overflow-y-auto flex-1">
+                  <div className="space-y-3 overflow-y-auto flex-1 pb-4">
                     {comments.map((comment) => (
                       <div key={comment.id} className="flex gap-2">
                         <Avatar className="w-8 h-8">

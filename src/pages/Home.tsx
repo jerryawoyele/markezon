@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useRef } from "react";
 import { Post } from "@/components/home/Post";
 import { CreatePost } from "@/components/home/CreatePost";
@@ -302,6 +303,7 @@ const Home = () => {
                       const { data } = await supabase.auth.getUser();
                       return data.user?.id || null;
                     }}
+                    showDetailOnClick={false}
                   />
                 ))}
               </div>

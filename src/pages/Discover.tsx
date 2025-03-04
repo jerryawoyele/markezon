@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -8,6 +7,8 @@ import { MobileHeader } from "@/components/home/MobileHeader";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/components/ui/use-toast";
 import { useNavigate } from "react-router-dom";
+import { Post } from "@/components/home/Post";
+import { Dialog, DialogContent } from "@/components/ui/dialog";
 
 interface Post {
   id: string;
@@ -26,6 +27,8 @@ export default function Discover() {
   const [posts, setPosts] = useState<Post[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
+  const [selectedPost, setSelectedPost] = useState<Post | null>(null);
+  const [showPostModal, setShowPostModal] = useState(false);
   const { toast } = useToast();
   const navigate = useNavigate();
 
@@ -80,11 +83,9 @@ export default function Discover() {
     setSearchQuery(e.target.value);
   };
 
-  const handleCardClick = (postId: string) => {
-    toast({
-      title: "Post details",
-      description: `Viewing post ${postId}`,
-    });
+  const handleCardClick = (post: Post) => {
+    setSelectedPost(post);
+    setShowPostModal(true);
   };
 
   const handleUserClick = (userId: string) => {
@@ -95,10 +96,10 @@ export default function Discover() {
     <div className="min-h-screen bg-background flex">
       <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} />
 
-      <div className="flex-1 lg:ml-72 pb-20 lg:pb-0">
+      <div className="flex-1 lg:ml-64 pb-20 lg:pb-0">
         <MobileHeader onSearch={setSearchQuery} />
         
-        <div className="max-w-7xl mx-auto py-0 md:py-8 px-4 mt-0 md:mt-0 h-full min-h-[calc(100vh-64px)] overflow-y-auto">
+        <div className="max-w-7xl mx-auto py-0 md:py-8 px-4 mt-16 md:mt-16 lg:mt-0 h-full min-h-[calc(100vh-64px)] overflow-y-auto">
           <div className="max-w-xl mx-auto mb-8">
             <div className="relative">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-white/40 w-5 h-5" />
@@ -111,7 +112,7 @@ export default function Discover() {
             </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mx-2 md:mx-0">
             {loading ? (
               Array(6).fill(0).map((_, i) => (
                 <Card 
@@ -130,7 +131,7 @@ export default function Discover() {
                 <Card 
                   key={post.id}
                   className="overflow-hidden bg-black/20 border-white/5 hover:bg-black/30 transition-colors cursor-pointer"
-                  onClick={() => handleCardClick(post.id)}
+                  onClick={() => handleCardClick(post)}
                 >
                   <div className="aspect-video">
                     <img 
@@ -170,6 +171,21 @@ export default function Discover() {
           </div>
         </div>
       </div>
+
+      {selectedPost && (
+        <Dialog open={showPostModal} onOpenChange={setShowPostModal}>
+          <DialogContent className="sm:max-w-[650px] bg-black/90 border-white/10 h-[90vh] max-h-[90vh] p-0 overflow-hidden">
+            <Post 
+              {...selectedPost}
+              showDetailOnClick={false}
+              currentUserId={async () => {
+                const { data } = await supabase.auth.getUser();
+                return data.user?.id || null;
+              }}
+            />
+          </DialogContent>
+        </Dialog>
+      )}
     </div>
   );
 }

@@ -1,5 +1,4 @@
 
-
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
 
 @tailwind base;
@@ -76,7 +75,7 @@
 /* Mobile toast styles */
 @media (max-width: 640px) {
   [role="status"][data-sonner-toast] {
-    margin-top: 3rem !important;
+    margin-top: 4rem !important;
   }
 }
 
@@ -85,3 +84,12 @@
   overflow-y: auto !important;
 }
 
+/* Ensure scrollable dialogs work properly */
+[role="dialog"] [data-state="open"] {
+  overflow: hidden !important;
+}
+
+[role="dialog"] [data-state="open"] > div {
+  overflow-y: auto !important;
+  max-height: 100% !important;
+}

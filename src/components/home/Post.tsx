@@ -498,7 +498,7 @@ export function Post({
               variant="ghost" 
               size="icon" 
               onClick={handleLike}
-              className={`${liked ? 'hover:bg-black/80' : 'hover:bg-white/10'}`}
+              className={liked ? "hover:bg-black/80" : "hover:bg-white/10"}
             >
               <Heart className={`w-5 h-5 ${liked ? 'fill-current text-primary' : ''}`} />
             </Button>

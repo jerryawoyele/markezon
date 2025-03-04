@@ -268,7 +268,7 @@ const Home = () => {
       return 'pt-16 md:pt-6';
     }
     
-    return 'pt-24 md:pt-24 lg:pt-8';
+    return 'pt-24 md:pt-24 max-lg:pt-8';
   };
 
   return (
@@ -281,7 +281,7 @@ const Home = () => {
             {/* This is just a spacer for the fixed sidebar */}
           </div>
           
-          <div className="flex-1 max-w-3xl mx-auto w-full space-y-6 px-2 md:px-6">
+          <div className="flex-1 max-w-3xl mx-2 w-full space-y-6 px-2 md:px-6">
             <CreatePost onSubmit={handleCreatePost} />
             
             {loading ? (

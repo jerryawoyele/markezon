@@ -9,6 +9,8 @@ import { MobileHeader } from "@/components/home/MobileHeader";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/components/ui/use-toast";
 import { Grid, Image as ImageIcon, Settings } from "lucide-react";
+import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { Post } from "@/components/home/Post";
 
 interface Profile {
   id: string;
@@ -21,6 +23,7 @@ interface Post {
   image_url: string;
   caption: string | null;
   created_at: string;
+  user_id: string;
 }
 
 export default function Profile() {
@@ -31,6 +34,8 @@ export default function Profile() {
   const [editMode, setEditMode] = useState(false);
   const [username, setUsername] = useState("");
   const [avatarUrl, setAvatarUrl] = useState("");
+  const [selectedPost, setSelectedPost] = useState<Post | null>(null);
+  const [showPostModal, setShowPostModal] = useState(false);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -118,12 +123,39 @@ export default function Profile() {
     }
   };
 
-  const handlePostClick = (postId: string) => {
-    toast({
-      title: "Post selected",
-      description: `Viewing details for post ${postId}`,
-    });
-    // In a real app, you might navigate to a post detail page or open a modal
+  const handlePostClick = (post: Post) => {
+    setSelectedPost(post);
+    setShowPostModal(true);
+  };
+  
+  const getPostPreviewContent = (image_url: string) => {
+    try {
+      const parsedImages = JSON.parse(image_url);
+      
+      if (Array.isArray(parsedImages) && parsedImages.length > 0) {
+        // Check if it's a text post
+        if (parsedImages[0].startsWith('data:image/svg+xml')) {
+          return parsedImages[0];
+        }
+        // Return the first image for multiple images
+        return parsedImages[0];
+      }
+      
+      return image_url;
+    } catch (e) {
+      return image_url;
+    }
+  };
+  
+  const isTextPost = (image_url: string) => {
+    try {
+      const parsedImages = JSON.parse(image_url);
+      return Array.isArray(parsedImages) && 
+             parsedImages.length > 0 && 
+             parsedImages[0].startsWith('data:image/svg+xml');
+    } catch (e) {
+      return false;
+    }
   };
 
   return (
@@ -133,7 +165,7 @@ export default function Profile() {
       <div className="flex-1 lg:ml-72">
         <MobileHeader />
         
-        <div className="max-w-4xl mx-auto py-0 md:py-8 px-4 pb-20 lg:pb-8 mt-0 md:mt-16 lg:mt-0">
+        <div className="max-w-4xl mx-auto py-0 md:py-8 px-4 pb-20 lg:pb-8 mt-0">
           <Card className="p-6 bg-black/20 mb-8">
             {!editMode ? (
               <div className="flex flex-col md:flex-row items-center gap-6">
@@ -229,14 +261,14 @@ export default function Profile() {
                 <div 
                   key={post.id} 
                   className="aspect-square group relative rounded-lg overflow-hidden cursor-pointer"
-                  onClick={() => handlePostClick(post.id)}
+                  onClick={() => handlePostClick(post)}
                 >
                   <img 
-                    src={post.image_url} 
+                    src={getPostPreviewContent(post.image_url)} 
                     alt={post.caption || 'Post'} 
                     className="w-full h-full object-cover"
                   />
-                  <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                  <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center p-2 text-center">
                     {post.caption}
                   </div>
                 </div>
@@ -251,6 +283,23 @@ export default function Profile() {
           )}
         </div>
       </div>
+      
+      {selectedPost && profile && (
+        <Dialog open={showPostModal} onOpenChange={setShowPostModal}>
+          <DialogContent className="sm:max-w-[650px] bg-black/90 border-white/10 h-[90vh] max-h-[90vh] p-0 overflow-hidden overflow-y-auto">
+            <Post 
+              {...selectedPost}
+              user_id={selectedPost.user_id}
+              showDetailOnClick={false}
+              profiles={profile}
+              currentUserId={async () => {
+                const { data } = await supabase.auth.getUser();
+                return data.user?.id || null;
+              }}
+            />
+          </DialogContent>
+        </Dialog>
+      )}
     </div>
   );
 }

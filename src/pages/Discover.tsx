@@ -96,6 +96,36 @@ export default function Discover() {
     navigate(`/user/${userId}`);
   };
 
+  const getPostPreviewContent = (image_url: string) => {
+    try {
+      const parsedImages = JSON.parse(image_url);
+      
+      if (Array.isArray(parsedImages) && parsedImages.length > 0) {
+        // Check if it's a text post
+        if (parsedImages[0].startsWith('data:image/svg+xml')) {
+          return parsedImages[0];
+        }
+        // Return the first image for multiple images
+        return parsedImages[0];
+      }
+      
+      return image_url;
+    } catch (e) {
+      return image_url;
+    }
+  };
+
+  const isTextPost = (image_url: string) => {
+    try {
+      const parsedImages = JSON.parse(image_url);
+      return Array.isArray(parsedImages) && 
+             parsedImages.length > 0 && 
+             parsedImages[0].startsWith('data:image/svg+xml');
+    } catch (e) {
+      return false;
+    }
+  };
+
   return (
     <div className="min-h-screen bg-background flex">
       <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} />
@@ -139,7 +169,7 @@ export default function Discover() {
                 >
                   <div className="aspect-video">
                     <img 
-                      src={post.image_url} 
+                      src={getPostPreviewContent(post.image_url)} 
                       alt={post.caption || 'Post'}
                       className="w-full h-full object-cover"
                     />

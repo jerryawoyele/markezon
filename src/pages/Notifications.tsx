@@ -115,7 +115,7 @@ export default function Notifications() {
       <div className="flex-1 lg:ml-72">
         <MobileHeader />
         
-        <div className="max-w-3xl mx-auto py-0 md:py-8 px-4 pb-20 lg:pb-8 mt-0 md:mt-16 lg:mt-0">
+        <div className="max-w-3xl mx-auto py-8 px-4 pb-20 lg:pb-8 pt-8">
           <div className="flex justify-between items-center mb-6">
             <h1 className="text-2xl font-bold">Notifications</h1>
             {notifications.some(n => !n.read) && (

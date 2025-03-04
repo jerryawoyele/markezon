@@ -268,14 +268,14 @@ const Home = () => {
       return 'pt-16 md:pt-6';
     }
     
-    return 'pt-24 md:pt-24 max-lg:pt-8';
+    return 'pt-18 md:pt-24 max-lg:pt-8';
   };
 
   return (
     <div className="min-h-screen bg-background">
       <MobileHeader />
       
-      <div className="container mx-auto">
+      <div className="mx-2">
         <div className={`flex flex-col md:flex-row gap-8 ${getRouteClass()} pb-16 md:pb-16`}>
           <div className="hidden md:block w-64 flex-shrink-0">
             {/* This is just a spacer for the fixed sidebar */}

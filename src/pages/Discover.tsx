@@ -10,6 +10,7 @@ import { useToast } from "@/components/ui/use-toast";
 import { useNavigate } from "react-router-dom";
 import { Post } from "@/components/home/Post";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { ScrollArea } from "@/components/ui/scroll-area";
 
 interface Post {
   id: string;
@@ -133,7 +134,7 @@ export default function Discover() {
       <div className="flex-1 lg:ml-64 pb-20 lg:pb-0">
         <MobileHeader onSearch={setSearchQuery} />
         
-        <div className="max-w-7xl mx-auto py-0 md:py-8 px-4 mt-16 md:mt-16 lg:mt-0 h-full min-h-[calc(100vh-64px)] overflow-y-auto">
+        <div className="max-w-7xl mx-auto py-0 md:py-8 px-4 pt-8 h-full min-h-[calc(100vh-64px)] overflow-y-auto">
           <div className="max-w-xl mx-auto mb-8">
             <div className="relative">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-white/40 w-5 h-5" />
@@ -208,15 +209,17 @@ export default function Discover() {
 
       {selectedPost && (
         <Dialog open={showPostModal} onOpenChange={setShowPostModal}>
-          <DialogContent className="sm:max-w-[650px] bg-black/90 border-white/10 h-[90vh] max-h-[90vh] p-0 overflow-hidden overflow-y-auto">
-            <Post 
-              {...selectedPost}
-              showDetailOnClick={false}
-              currentUserId={async () => {
-                const { data } = await supabase.auth.getUser();
-                return data.user?.id || null;
-              }}
-            />
+          <DialogContent className="sm:max-w-[650px] bg-black/90 border-white/10 h-[90vh] max-h-[90vh] p-0">
+            <ScrollArea className="h-full max-h-[90vh]">
+              <Post 
+                {...selectedPost}
+                showDetailOnClick={false}
+                currentUserId={async () => {
+                  const { data } = await supabase.auth.getUser();
+                  return data.user?.id || null;
+                }}
+              />
+            </ScrollArea>
           </DialogContent>
         </Dialog>
       )}

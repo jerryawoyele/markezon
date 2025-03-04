@@ -36,7 +36,7 @@ export function Sidebar({ activeTab, setActiveTab }: SidebarProps) {
 
   // Mobile Bottom Navigation
   const mobileNav = (
-    <nav className="fixed bottom-0 left-0 w-full bg-background border-t border-white/10 px-2 py-3 md:hidden z-50">
+    <nav className="fixed bottom-0 left-0 w-full bg-background border-t border-white/10 px-2 py-3 lg:hidden z-50">
       <ul className="flex justify-around">
         {SIDEBAR_ITEMS.map((item) => (
           <li key={item.label}>
@@ -59,7 +59,7 @@ export function Sidebar({ activeTab, setActiveTab }: SidebarProps) {
 
   // Desktop Sidebar
   const desktopNav = (
-    <aside className="hidden md:flex w-64 fixed left-0 top-0 h-screen border-r border-white/10 bg-background p-4">
+    <aside className="hidden lg:flex w-64 fixed left-0 top-0 h-screen border-r border-white/10 bg-background p-4">
       <div className="flex flex-col h-full w-full">
         <h1 className="text-2xl font-bold px-4 mb-8">Markezon</h1>
         

@@ -11,6 +11,7 @@ import { useToast } from "@/components/ui/use-toast";
 import { Grid, Image as ImageIcon, Settings } from "lucide-react";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Post } from "@/components/home/Post";
+import { ScrollArea } from "@/components/ui/scroll-area";
 
 interface Profile {
   id: string;
@@ -162,10 +163,10 @@ export default function Profile() {
     <div className="min-h-screen bg-background flex">
       <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} />
 
-      <div className="flex-1 lg:ml-72">
+      <div className="flex-1 lg:ml-64">
         <MobileHeader />
         
-        <div className="max-w-4xl mx-auto py-0 md:py-8 px-4 pb-20 lg:pb-8 mt-0">
+        <div className="max-w-4xl mx-auto py-8 px-4 pb-20 lg:pb-8 pt-8">
           <Card className="p-6 bg-black/20 mb-8">
             {!editMode ? (
               <div className="flex flex-col md:flex-row items-center gap-6">
@@ -286,17 +287,19 @@ export default function Profile() {
       
       {selectedPost && profile && (
         <Dialog open={showPostModal} onOpenChange={setShowPostModal}>
-          <DialogContent className="sm:max-w-[650px] bg-black/90 border-white/10 h-[90vh] max-h-[90vh] p-0 overflow-hidden overflow-y-auto">
-            <Post 
-              {...selectedPost}
-              user_id={selectedPost.user_id}
-              showDetailOnClick={false}
-              profiles={profile}
-              currentUserId={async () => {
-                const { data } = await supabase.auth.getUser();
-                return data.user?.id || null;
-              }}
-            />
+          <DialogContent className="sm:max-w-[650px] bg-black/90 border-white/10 h-[90vh] max-h-[90vh] p-0">
+            <ScrollArea className="h-full max-h-[90vh]">
+              <Post 
+                {...selectedPost}
+                user_id={selectedPost.user_id}
+                showDetailOnClick={false}
+                profiles={profile}
+                currentUserId={async () => {
+                  const { data } = await supabase.auth.getUser();
+                  return data.user?.id || null;
+                }}
+              />
+            </ScrollArea>
           </DialogContent>
         </Dialog>
       )}

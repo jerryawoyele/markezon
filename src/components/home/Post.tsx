@@ -1,11 +1,20 @@
-
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Avatar } from "@/components/ui/avatar";
 import { Input } from "@/components/ui/input";
-import { Heart, MessageCircle, Send, MoreVertical, Trash, Edit } from "lucide-react";
+import { Textarea } from "@/components/ui/textarea";
+import { 
+  Heart, 
+  MessageCircle, 
+  Send, 
+  MoreVertical, 
+  Trash, 
+  Edit,
+  ChevronLeft,
+  ChevronRight 
+} from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { 
   Dialog, 
@@ -19,6 +28,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { format, formatDistance } from "date-fns";
 
 interface Profile {
   id: string;
@@ -70,6 +80,7 @@ export function Post({
   profiles, 
   image_url, 
   caption, 
+  created_at,
   onLike, 
   onComment, 
   onShare,
@@ -86,11 +97,16 @@ export function Post({
   const [likes, setLikes] = useState<Like[]>([]);
   const [showCommentsModal, setShowCommentsModal] = useState(false);
   const [showLikesModal, setShowLikesModal] = useState(false);
+  const [showPostModal, setShowPostModal] = useState(false);
   const [loading, setLoading] = useState(false);
   const [isOwner, setIsOwner] = useState(false);
   const [editMode, setEditMode] = useState(false);
   const [editedCaption, setEditedCaption] = useState(caption || "");
+  const [currentImageIndex, setCurrentImageIndex] = useState(0);
+  const [parsedImages, setParsedImages] = useState<string[]>([]);
+  const [lastTap, setLastTap] = useState<number>(0);
   const navigate = useNavigate();
+  const postCardRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const checkOwnership = async () => {
@@ -103,13 +119,17 @@ export function Post({
   }, [currentUserId, user_id]);
 
   useEffect(() => {
-    console.log(`Post ${id} image URL:`, image_url);
-    
-    const img = new Image();
-    img.onload = () => console.log(`Post ${id} image loaded successfully`);
-    img.onerror = () => console.error(`Post ${id} image failed to load:`, image_url);
-    img.src = image_url;
-  }, [id, image_url]);
+    try {
+      const parsedData = JSON.parse(image_url);
+      if (Array.isArray(parsedData)) {
+        setParsedImages(parsedData);
+      } else {
+        setParsedImages([image_url]);
+      }
+    } catch (e) {
+      setParsedImages([image_url]);
+    }
+  }, [image_url]);
 
   useEffect(() => {
     const fetchLikesAndComments = async () => {
@@ -280,19 +300,88 @@ export function Post({
     }
   };
 
-  const formatDate = (dateString: string) => {
+  const handleNextImage = () => {
+    if (currentImageIndex < parsedImages.length - 1) {
+      setCurrentImageIndex(prev => prev + 1);
+    }
+  };
+
+  const handlePrevImage = () => {
+    if (currentImageIndex > 0) {
+      setCurrentImageIndex(prev => prev - 1);
+    }
+  };
+
+  const handleImageTap = () => {
+    const now = Date.now();
+    const DOUBLE_TAP_DELAY = 300; // ms
+    
+    if (now - lastTap < DOUBLE_TAP_DELAY) {
+      handleLike();
+    }
+    
+    setLastTap(now);
+  };
+
+  const formatTimeAgo = (dateString: string) => {
     const date = new Date(dateString);
-    return date.toLocaleDateString('en-US', { 
-      year: 'numeric', 
-      month: 'short', 
-      day: 'numeric' 
-    });
+    const now = new Date();
+    
+    const diffInSeconds = Math.floor((now.getTime() - date.getTime()) / 1000);
+    
+    if (diffInSeconds < 60) {
+      return 'just now';
+    }
+    
+    if (diffInSeconds < 3600) {
+      const minutes = Math.floor(diffInSeconds / 60);
+      return `${minutes}m`;
+    }
+    
+    if (diffInSeconds < 86400) {
+      const hours = Math.floor(diffInSeconds / 3600);
+      return `${hours}h`;
+    }
+    
+    if (diffInSeconds < 604800) {
+      const days = Math.floor(diffInSeconds / 86400);
+      return `${days}d`;
+    }
+    
+    if (date.getFullYear() === now.getFullYear()) {
+      return format(date, 'MMM d');
+    }
+    
+    return format(date, 'MMM d, yyyy');
+  };
+
+  const formatCommentDate = (dateString: string) => {
+    const date = new Date(dateString);
+    const now = new Date();
+    
+    if (date.toDateString() === now.toDateString()) {
+      return format(date, 'h:mm a');
+    }
+    
+    return format(date, 'MMM d, h:mm a');
+  };
+
+  const isTextPost = () => {
+    try {
+      return parsedImages[0]?.startsWith('data:image/svg+xml');
+    } catch (e) {
+      return false;
+    }
   };
 
   return (
     <>
-      <Card className="overflow-hidden bg-black/20 border-white/5 max-w-3xl w-full mx-auto">
-        <div className="p-4 flex items-center justify-between">
+      <Card 
+        className="overflow-hidden bg-black/20 border-white/5 max-w-3xl w-full mx-auto"
+        ref={postCardRef}
+        onClick={() => setShowPostModal(true)}
+      >
+        <div className="p-4 flex items-center justify-between" onClick={(e) => e.stopPropagation()}>
           <div className="flex items-center gap-3">
             <button onClick={handleProfileClick}>
               <Avatar>
@@ -303,17 +392,22 @@ export function Post({
                 />
               </Avatar>
             </button>
-            <button 
-              className="font-medium hover:underline"
-              onClick={handleProfileClick}
-            >
-              {profiles?.username || 'Anonymous'}
-            </button>
+            <div>
+              <button 
+                className="font-medium hover:underline"
+                onClick={handleProfileClick}
+              >
+                {profiles?.username || 'Anonymous'}
+              </button>
+              <div className="text-xs text-white/60">
+                {formatTimeAgo(created_at)}
+              </div>
+            </div>
           </div>
           
           {isOwner && (
             <DropdownMenu>
-              <DropdownMenuTrigger asChild>
+              <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
                 <Button variant="ghost" size="icon">
                   <MoreVertical className="h-5 w-5" />
                 </Button>
@@ -321,14 +415,20 @@ export function Post({
               <DropdownMenuContent align="end" className="bg-black/90 border-white/10">
                 <DropdownMenuItem 
                   className="flex items-center gap-2 cursor-pointer"
-                  onClick={handleEdit}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleEdit();
+                  }}
                 >
                   <Edit className="h-4 w-4" />
                   {editMode ? "Save Edit" : "Edit Post"}
                 </DropdownMenuItem>
                 <DropdownMenuItem 
                   className="flex items-center gap-2 text-red-500 cursor-pointer"
-                  onClick={handleDelete}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleDelete();
+                  }}
                 >
                   <Trash className="h-4 w-4" />
                   Delete Post
@@ -338,23 +438,60 @@ export function Post({
           )}
         </div>
         
-        {image_url && (
-          <div className="relative min-h-[200px] min-w-[300px]">
+        {parsedImages.length > 0 && (
+          <div 
+            className="relative min-h-[200px] min-w-[300px]" 
+            onClick={handleImageTap}
+          >
             <img 
-              src={image_url} 
+              src={parsedImages[currentImageIndex]} 
               alt={caption || 'Post image'}
               className="w-full h-auto max-h-[600px] min-h-[200px] object-contain bg-black/30"
               onError={(e) => {
                 (e.target as HTMLImageElement).src = 'https://source.unsplash.com/800x600/?abstract';
               }}
             />
+            
+            {parsedImages.length > 1 && (
+              <>
+                <button 
+                  className="absolute left-2 top-1/2 transform -translate-y-1/2 bg-black/30 p-1 rounded-full"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handlePrevImage();
+                  }}
+                  disabled={currentImageIndex === 0}
+                >
+                  <ChevronLeft className="h-6 w-6" />
+                </button>
+                <button 
+                  className="absolute right-2 top-1/2 transform -translate-y-1/2 bg-black/30 p-1 rounded-full"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleNextImage();
+                  }}
+                  disabled={currentImageIndex === parsedImages.length - 1}
+                >
+                  <ChevronRight className="h-6 w-6" />
+                </button>
+                
+                <div className="absolute bottom-2 left-1/2 transform -translate-x-1/2 flex gap-1">
+                  {parsedImages.map((_, index) => (
+                    <div 
+                      key={index} 
+                      className={`w-2 h-2 rounded-full ${currentImageIndex === index ? 'bg-primary' : 'bg-white/30'}`}
+                    />
+                  ))}
+                </div>
+              </>
+            )}
           </div>
         )}
         
-        <div className="p-4 space-y-4">
+        <div className="p-4 space-y-4" onClick={(e) => e.stopPropagation()}>
           <div className="flex items-center gap-4">
             <Button variant="ghost" size="icon" onClick={handleLike}>
-              <Heart className={`w-5 h-5 ${liked ? 'fill-current text-red-500' : ''}`} />
+              <Heart className={`w-5 h-5 ${liked ? 'fill-current text-primary' : ''}`} />
             </Button>
             <Button variant="ghost" size="icon" onClick={() => setShowComments(!showComments)}>
               <MessageCircle className="w-5 h-5" />
@@ -379,25 +516,29 @@ export function Post({
             </button>
           </div>
 
-          {editMode ? (
-            <div className="flex gap-2 items-center">
-              <Input 
-                value={editedCaption} 
-                onChange={(e) => setEditedCaption(e.target.value)}
-                className="flex-1" 
-              />
-              <Button size="sm" onClick={handleEdit}>Save</Button>
-              <Button size="sm" variant="ghost" onClick={() => {
-                setEditMode(false);
-                setEditedCaption(caption || "");
-              }}>Cancel</Button>
-            </div>
-          ) : (
-            caption && (
-              <p className="text-sm">
-                <span className="font-medium mr-2">{profiles?.username || 'Anonymous'}</span>
-                {caption}
-              </p>
+          {!isTextPost() && (
+            editMode ? (
+              <div className="flex gap-2 items-center">
+                <Textarea 
+                  value={editedCaption} 
+                  onChange={(e) => setEditedCaption(e.target.value)}
+                  className="flex-1 min-h-[100px]" 
+                />
+                <div className="flex flex-col gap-2">
+                  <Button size="sm" onClick={handleEdit}>Save</Button>
+                  <Button size="sm" variant="ghost" onClick={() => {
+                    setEditMode(false);
+                    setEditedCaption(caption || "");
+                  }}>Cancel</Button>
+                </div>
+              </div>
+            ) : (
+              caption && (
+                <p className="text-sm">
+                  <span className="font-medium mr-2">{profiles?.username || 'Anonymous'}</span>
+                  {caption}
+                </p>
+              )
             )
           )}
 
@@ -418,7 +559,7 @@ export function Post({
               
               {comments.length > 0 && (
                 <div className="space-y-3 max-h-40 overflow-y-auto">
-                  {comments.slice(0, 3).map((comment) => (
+                  {comments.slice(0, 1).map((comment) => (
                     <div key={comment.id} className="flex gap-2">
                       <Avatar className="w-8 h-8">
                         <img 
@@ -430,14 +571,14 @@ export function Post({
                       <div className="bg-white/5 p-2 rounded-lg flex-1">
                         <div className="flex justify-between">
                           <p className="text-sm font-medium">{comment.profile?.username || 'Anonymous'}</p>
-                          <span className="text-xs text-white/40">{formatDate(comment.created_at)}</span>
+                          <span className="text-xs text-white/40">{formatCommentDate(comment.created_at)}</span>
                         </div>
                         <p className="text-sm">{comment.content}</p>
                       </div>
                     </div>
                   ))}
                   
-                  {comments.length > 3 && (
+                  {comments.length > 1 && (
                     <button 
                       className="text-sm text-white/60 hover:text-white"
                       onClick={() => setShowCommentsModal(true)}
@@ -453,12 +594,12 @@ export function Post({
       </Card>
       
       <Dialog open={showCommentsModal} onOpenChange={setShowCommentsModal}>
-        <DialogContent className="sm:max-w-[500px] bg-black/90 border-white/10">
+        <DialogContent className="sm:max-w-[500px] bg-black/90 border-white/10 max-h-[80vh] overflow-hidden">
           <DialogHeader>
             <DialogTitle>Comments</DialogTitle>
           </DialogHeader>
           
-          <div className="my-4 space-y-4">
+          <div className="my-4 space-y-4 overflow-hidden flex flex-col">
             <div className="flex gap-2">
               <Input
                 placeholder="Add a comment..."
@@ -473,7 +614,7 @@ export function Post({
             </div>
             
             {comments.length > 0 ? (
-              <div className="space-y-4 max-h-[60vh] overflow-y-auto">
+              <div className="space-y-4 overflow-y-auto flex-1 pb-4">
                 {comments.map((comment) => (
                   <div key={comment.id} className="flex gap-3">
                     <Avatar className="w-8 h-8">
@@ -486,7 +627,7 @@ export function Post({
                     <div className="bg-white/5 p-3 rounded-lg flex-1">
                       <div className="flex justify-between">
                         <p className="font-medium">{comment.profile?.username || 'Anonymous'}</p>
-                        <span className="text-xs text-white/40">{formatDate(comment.created_at)}</span>
+                        <span className="text-xs text-white/40">{formatCommentDate(comment.created_at)}</span>
                       </div>
                       <p className="mt-1">{comment.content}</p>
                     </div>
@@ -503,14 +644,14 @@ export function Post({
       </Dialog>
       
       <Dialog open={showLikesModal} onOpenChange={setShowLikesModal}>
-        <DialogContent className="sm:max-w-[400px] bg-black/90 border-white/10">
+        <DialogContent className="sm:max-w-[400px] bg-black/90 border-white/10 max-h-[80vh] overflow-hidden">
           <DialogHeader>
             <DialogTitle>Likes</DialogTitle>
           </DialogHeader>
           
-          <div className="my-4">
+          <div className="my-4 overflow-hidden flex flex-col h-full">
             {likes.length > 0 ? (
-              <div className="space-y-4 max-h-[60vh] overflow-y-auto">
+              <div className="space-y-4 overflow-y-auto flex-1">
                 {likes.map((like) => (
                   <div key={like.id} className="flex items-center gap-3">
                     <Avatar className="w-10 h-10">
@@ -531,6 +672,142 @@ export function Post({
                 No likes yet. Be the first to like this post!
               </div>
             )}
+          </div>
+        </DialogContent>
+      </Dialog>
+      
+      <Dialog open={showPostModal} onOpenChange={setShowPostModal}>
+        <DialogContent className="sm:max-w-[650px] bg-black/90 border-white/10 h-[90vh] max-h-[90vh] overflow-hidden p-0">
+          <div className="flex flex-col h-full overflow-hidden">
+            {parsedImages.length > 0 && (
+              <div className="relative h-auto max-h-[60%] min-h-[200px] bg-black flex items-center justify-center">
+                <img 
+                  src={parsedImages[currentImageIndex]} 
+                  alt={caption || 'Post image'}
+                  className="w-full h-auto object-contain"
+                  onError={(e) => {
+                    (e.target as HTMLImageElement).src = 'https://source.unsplash.com/800x600/?abstract';
+                  }}
+                />
+                
+                {parsedImages.length > 1 && (
+                  <>
+                    <button 
+                      className="absolute left-2 top-1/2 transform -translate-y-1/2 bg-black/30 p-1 rounded-full"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handlePrevImage();
+                      }}
+                      disabled={currentImageIndex === 0}
+                    >
+                      <ChevronLeft className="h-6 w-6" />
+                    </button>
+                    <button 
+                      className="absolute right-2 top-1/2 transform -translate-y-1/2 bg-black/30 p-1 rounded-full"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleNextImage();
+                      }}
+                      disabled={currentImageIndex === parsedImages.length - 1}
+                    >
+                      <ChevronRight className="h-6 w-6" />
+                    </button>
+                    
+                    <div className="absolute bottom-2 left-1/2 transform -translate-x-1/2 flex gap-1">
+                      {parsedImages.map((_, index) => (
+                        <div 
+                          key={index} 
+                          className={`w-2 h-2 rounded-full ${currentImageIndex === index ? 'bg-primary' : 'bg-white/30'}`}
+                        />
+                      ))}
+                    </div>
+                  </>
+                )}
+              </div>
+            )}
+            
+            <div className="p-4 flex flex-col gap-4 flex-1 overflow-hidden">
+              <div className="flex items-center gap-3">
+                <Avatar>
+                  <img 
+                    src={profiles?.avatar_url || 'https://source.unsplash.com/100x100/?portrait'} 
+                    alt={profiles?.username || 'User'}
+                    className="w-full h-full object-cover"
+                  />
+                </Avatar>
+                <div>
+                  <div className="font-medium">{profiles?.username || 'Anonymous'}</div>
+                  <div className="text-xs text-white/60">{formatTimeAgo(created_at)}</div>
+                </div>
+              </div>
+              
+              {!isTextPost() && caption && (
+                <p className="text-sm">
+                  <span className="font-medium mr-2">{profiles?.username || 'Anonymous'}</span>
+                  {caption}
+                </p>
+              )}
+              
+              <div className="flex items-center gap-4">
+                <Button variant="ghost" size="icon" onClick={handleLike}>
+                  <Heart className={`w-5 h-5 ${liked ? 'fill-current text-primary' : ''}`} />
+                </Button>
+                <Button variant="ghost" size="icon">
+                  <MessageCircle className="w-5 h-5" />
+                </Button>
+                <Button variant="ghost" size="icon" onClick={handleShare}>
+                  <Send className="w-5 h-5" />
+                </Button>
+              </div>
+              
+              <div className="text-sm font-medium">
+                {likesCount} likes
+              </div>
+              
+              <div className="flex flex-col gap-2 flex-1 overflow-hidden">
+                <h3 className="font-medium">Comments</h3>
+                
+                <div className="flex gap-2 mb-2">
+                  <Input
+                    placeholder="Add a comment..."
+                    value={newComment}
+                    onChange={(e) => setNewComment(e.target.value)}
+                    onKeyPress={(e) => e.key === 'Enter' && handleComment()}
+                    className="flex-1"
+                  />
+                  <Button onClick={handleComment} disabled={loading}>
+                    {loading ? "..." : "Post"}
+                  </Button>
+                </div>
+                
+                {comments.length > 0 ? (
+                  <div className="space-y-3 overflow-y-auto flex-1">
+                    {comments.map((comment) => (
+                      <div key={comment.id} className="flex gap-2">
+                        <Avatar className="w-8 h-8">
+                          <img 
+                            src={comment.profile?.avatar_url || 'https://source.unsplash.com/100x100/?portrait'} 
+                            alt={comment.profile?.username || 'User'}
+                            className="w-full h-full object-cover"
+                          />
+                        </Avatar>
+                        <div className="bg-white/5 p-2 rounded-lg flex-1">
+                          <div className="flex justify-between">
+                            <p className="text-sm font-medium">{comment.profile?.username || 'Anonymous'}</p>
+                            <span className="text-xs text-white/40">{formatCommentDate(comment.created_at)}</span>
+                          </div>
+                          <p className="text-sm">{comment.content}</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-center py-4 text-white/60 text-sm">
+                    No comments yet. Be the first to comment!
+                  </div>
+                )}
+              </div>
+            </div>
           </div>
         </DialogContent>
       </Dialog>

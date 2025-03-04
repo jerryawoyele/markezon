@@ -1,5 +1,4 @@
-
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Post } from "@/components/home/Post";
 import { CreatePost } from "@/components/home/CreatePost";
 import { Sidebar, SIDEBAR_ITEMS } from "@/components/home/Sidebar";
@@ -37,7 +36,6 @@ const Home = () => {
   const navigate = useNavigate();
 
   useEffect(() => {
-    // Check if user is authenticated
     supabase.auth.getUser().then(({ data: { user } }) => {
       if (!user) {
         navigate('/auth');
@@ -123,7 +121,7 @@ const Home = () => {
     }
   };
 
-  const handleCreatePost = async (data: { text: string; image_url: string }) => {
+  const handleCreatePost = async (data: { text: string; image_url: string | string[]; isTextPost: boolean }) => {
     try {
       const user = await supabase.auth.getUser();
       
@@ -136,11 +134,15 @@ const Home = () => {
         return;
       }
       
+      let imageUrls = typeof data.image_url === 'string' ? [data.image_url] : data.image_url;
+      
       const { data: postData, error } = await supabase
         .from('posts')
         .insert({
-          caption: data.text,
-          image_url: data.image_url || "https://source.unsplash.com/random/800x600/?business",
+          caption: data.isTextPost ? null : data.text,
+          image_url: data.isTextPost 
+            ? JSON.stringify([`data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="800" height="400" viewBox="0 0 800 400"><rect width="100%" height="100%" fill="rgb(30,30,30)"/><text x="50%" y="50%" font-family="Arial" font-size="24" fill="white" text-anchor="middle" dominant-baseline="middle">${encodeURIComponent(data.text)}</text></svg>`]) 
+            : JSON.stringify(imageUrls),
           user_id: user.data.user.id
         })
         .select();
@@ -208,13 +210,6 @@ const Home = () => {
 
   const handleDeletePost = async (postId: string) => {
     try {
-      // First, delete related comments
-      await supabase.from('comments').delete().eq('post_id', postId);
-      
-      // Then, delete related likes
-      await supabase.from('likes').delete().eq('post_id', postId);
-      
-      // Finally, delete the post
       const { error } = await supabase
         .from('posts')
         .delete()
@@ -247,7 +242,6 @@ const Home = () => {
         
       if (error) throw error;
       
-      // Update the posts array with the edited post
       setPosts(posts.map(post => 
         post.id === postId ? { ...post, caption: newCaption } : post
       ));
@@ -266,18 +260,27 @@ const Home = () => {
     }
   };
 
+  const getRouteClass = () => {
+    const path = location.pathname;
+    
+    if (path !== '/' && path !== '/index') {
+      return 'pt-16 md:pt-6';
+    }
+    
+    return 'pt-24 md:pt-24 lg:pt-8';
+  };
+
   return (
     <div className="min-h-screen bg-background">
       <MobileHeader />
       
       <div className="container mx-auto">
-        <div className="flex flex-col md:flex-row gap-8 pt-24 md:pt-24 lg:pt-8 pb-16 md:pb-16">
-          {/* Left sidebar spacer for fixed sidebar */}
+        <div className={`flex flex-col md:flex-row gap-8 ${getRouteClass()} pb-16 md:pb-16`}>
           <div className="hidden md:block w-64 flex-shrink-0">
             {/* This is just a spacer for the fixed sidebar */}
           </div>
           
-          <div className="flex-1 max-w-3xl mx-auto w-full space-y-6 px-4 md:pl-6 md:pr-6 md:pl-8">
+          <div className="flex-1 max-w-3xl mx-auto w-full space-y-6 px-2 md:px-6">
             <CreatePost onSubmit={handleCreatePost} />
             
             {loading ? (

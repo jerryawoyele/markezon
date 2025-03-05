@@ -11,8 +11,8 @@ import Home from "./pages/Home";
 import Discover from "./pages/Discover"; 
 import Messages from "./pages/Messages";
 import Notifications from "./pages/Notifications";
-import Profile from "./pages/Profile";
-import UserProfile from "./pages/UserProfile";
+import { Profile } from "./pages/Profile";
+import { UserProfile } from "./pages/UserProfile";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();

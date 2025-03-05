@@ -1,9 +1,8 @@
-
 import { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Post } from "@/components/home/Post";
-import { supabase } from "@/integrations/supabase/client";
+import { supabase, parseImageUrls } from "@/integrations/supabase/client";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -62,7 +61,6 @@ const Profile = () => {
       const { data: { user } } = await supabase.auth.getUser();
       
       if (user) {
-        // Fetch profile
         const { data: profileData } = await supabase
           .from('profiles')
           .select('*')
@@ -79,7 +77,6 @@ const Profile = () => {
           });
         }
         
-        // Fetch posts
         const { data: postsData } = await supabase
           .from('posts')
           .select('*')
@@ -90,7 +87,6 @@ const Profile = () => {
           setPosts(postsData);
         }
         
-        // Mock services data for now
         setServices([
           {
             id: "1",
@@ -137,7 +133,6 @@ const Profile = () => {
       
       let avatar_url = editedProfile.avatar_url;
       
-      // If there's a preview image, upload it
       if (previewImage && previewImage !== profile.avatar_url) {
         const file = await fetch(previewImage).then(r => r.blob());
         const fileExt = previewImage.split(';')[0].split('/')[1];
@@ -247,7 +242,7 @@ const Profile = () => {
                   onClick={() => handlePostClick(index)}
                 >
                   <img 
-                    src={post.image_url ? (JSON.parse(post.image_url)[0] || "") : ""} 
+                    src={post.image_url ? parseImageUrls(post.image_url)[0] : ""} 
                     alt={post.caption || "Post"} 
                     className="w-full h-full object-cover"
                   />
@@ -283,7 +278,6 @@ const Profile = () => {
         </TabsContent>
       </Tabs>
       
-      {/* Post Modal */}
       {showPostModal && profile && (
         <Dialog open={showPostModal} onOpenChange={setShowPostModal}>
           <DialogContent className="sm:max-w-[650px] bg-black/90 border-white/10 h-[90vh] max-h-[90vh] p-0" hideCloseButton>
@@ -308,7 +302,6 @@ const Profile = () => {
         </Dialog>
       )}
       
-      {/* Edit Profile Modal */}
       <Dialog open={showEditProfileModal} onOpenChange={setShowEditProfileModal}>
         <DialogContent className="sm:max-w-[500px] bg-black/90 border-white/10">
           <DialogTitle>Edit Profile</DialogTitle>

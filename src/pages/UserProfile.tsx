@@ -1,10 +1,9 @@
-
 import { useState, useEffect } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Post } from "@/components/home/Post";
-import { supabase } from "@/integrations/supabase/client";
+import { supabase, parseImageUrls } from "@/integrations/supabase/client";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -54,14 +53,11 @@ const UserProfile = () => {
   useEffect(() => {
     const fetchProfileAndPosts = async () => {
       if (userId) {
-        // Get current user
         const { data: { user: currentUser } } = await supabase.auth.getUser();
         
         if (currentUser) {
-          // Check if viewing own profile
           setIsCurrentUser(currentUser.id === userId);
           
-          // Get current user profile
           const { data: currentUserData } = await supabase
             .from('profiles')
             .select('*')
@@ -71,7 +67,6 @@ const UserProfile = () => {
           setCurrentUserProfile(currentUserData);
         }
         
-        // Fetch profile being viewed
         const { data: profileData } = await supabase
           .from('profiles')
           .select('*')
@@ -80,7 +75,6 @@ const UserProfile = () => {
           
         setProfile(profileData);
         
-        // Fetch posts
         const { data: postsData } = await supabase
           .from('posts')
           .select('*')
@@ -90,7 +84,6 @@ const UserProfile = () => {
         if (postsData) {
           setPosts(postsData);
           
-          // If postId is provided, find its index and open the modal
           if (postId) {
             const postIndex = postsData.findIndex(post => post.id === postId);
             if (postIndex >= 0) {
@@ -100,7 +93,6 @@ const UserProfile = () => {
           }
         }
         
-        // Mock services data for now
         setServices([
           {
             id: "1",
@@ -208,7 +200,7 @@ const UserProfile = () => {
                   onClick={() => handlePostClick(index)}
                 >
                   <img 
-                    src={post.image_url ? (JSON.parse(post.image_url)[0] || "") : ""} 
+                    src={post.image_url ? parseImageUrls(post.image_url)[0] : ""} 
                     alt={post.caption || "Post"} 
                     className="w-full h-full object-cover"
                   />
@@ -244,7 +236,6 @@ const UserProfile = () => {
         </TabsContent>
       </Tabs>
       
-      {/* Post Modal */}
       {showPostModal && profile && (
         <Dialog open={showPostModal} onOpenChange={setShowPostModal}>
           <DialogContent className="sm:max-w-[650px] bg-black/90 border-white/10 h-[90vh] max-h-[90vh] p-0" hideCloseButton>

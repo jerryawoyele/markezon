@@ -14,13 +14,19 @@ export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABL
 // Helper function to parse image URLs from database
 export const parseImageUrls = (imageUrl: string): string[] => {
   try {
-    // Check if the URL is a data URL or already an array string
+    // Check if the URL is a data URL
     if (imageUrl.startsWith('data:')) {
       return [imageUrl];
     }
     
-    const parsed = JSON.parse(imageUrl);
-    return Array.isArray(parsed) ? parsed : [imageUrl];
+    // Check if it's already an array string
+    if (imageUrl.startsWith('[') && imageUrl.endsWith(']')) {
+      const parsed = JSON.parse(imageUrl);
+      return Array.isArray(parsed) ? parsed : [imageUrl];
+    }
+    
+    // If it's just a regular URL
+    return [imageUrl];
   } catch (e) {
     return [imageUrl];
   }
@@ -30,7 +36,6 @@ export const parseImageUrls = (imageUrl: string): string[] => {
 const createAvatarsBucket = async () => {
   try {
     const { data, error } = await supabase.storage.getBucket('avatars');
-    
     if (error) {
       console.error("Error checking avatars bucket:", error);
     }

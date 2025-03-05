@@ -35,6 +35,8 @@ export const parseImageUrls = (imageUrl: string): string[] => {
 // Create a storage bucket for avatars if it doesn't exist
 const createAvatarsBucket = async () => {
   try {
+    // Check if the bucket exists, but don't create it here
+    // as it's now created via SQL migrations
     const { data, error } = await supabase.storage.getBucket('avatars');
     if (error) {
       console.error("Error checking avatars bucket:", error);

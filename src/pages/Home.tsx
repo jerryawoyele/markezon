@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -8,11 +9,11 @@ import { MobileHeader } from "@/components/home/MobileHeader";
 import { CreatePost } from "@/components/home/CreatePost";
 import { Sidebar } from "@/components/home/Sidebar";
 import { supabase } from "@/integrations/supabase/client";
-import type { Profile as ProfileType } from "@/types";
+import type { Profile as ProfileType, Post as PostType } from "@/types";
 
 export default function Home() {
   const [activeTab, setActiveTab] = useState("Home");
-  const [posts, setPosts] = useState([]);
+  const [posts, setPosts] = useState<PostType[]>([]);
   const [profiles, setProfiles] = useState<ProfileType[]>([]);
   const [user, setUser] = useState(null);
   const navigate = useNavigate();
@@ -69,6 +70,10 @@ export default function Home() {
     fetchProfiles();
   }, []);
 
+  const handlePostSubmit = (newPost) => {
+    setPosts((prevPosts) => [newPost, ...prevPosts]);
+  };
+
   return (
     <div className="flex min-h-screen w-full">
       <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} />
@@ -76,7 +81,7 @@ export default function Home() {
       <div className="flex-1 container mx-auto pt-18 max-lg:pt-18 pb-20 lg:pl-64">
         <div className="flex flex-col gap-6">
           <MobileHeader />
-          <CreatePost />
+          <CreatePost onSubmit={handlePostSubmit} />
           {posts.map((post) => (
             <Post
               key={post.id}

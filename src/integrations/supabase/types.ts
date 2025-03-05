@@ -205,6 +205,48 @@ export type Database = {
         }
         Relationships: []
       }
+      services: {
+        Row: {
+          business: string | null
+          category: string
+          created_at: string | null
+          description: string
+          features: string[] | null
+          id: string
+          image: string
+          price: string | null
+          title: string
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          business?: string | null
+          category: string
+          created_at?: string | null
+          description: string
+          features?: string[] | null
+          id?: string
+          image: string
+          price?: string | null
+          title: string
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          business?: string | null
+          category?: string
+          created_at?: string | null
+          description?: string
+          features?: string[] | null
+          id?: string
+          image?: string
+          price?: string | null
+          title?: string
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       users: {
         Row: {
           email: string

@@ -282,7 +282,7 @@ const Home = () => {
           </div>
           
           <div className="flex-1 max-w-3xl w-full space-y-6 px-4 md:px-6">
-            <CreatePost onSubmit={handleCreatePost} />
+            <CreatePost onSubmit={handleCreatePost} className="max-lg:mt-18" />
             
             {loading ? (
               <Card className="p-8 text-center text-white/60 bg-black/20 border-white/5">

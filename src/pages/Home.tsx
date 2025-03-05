@@ -265,10 +265,10 @@ const Home = () => {
     const path = location.pathname;
     
     if (path !== '/' && path !== '/index') {
-      return 'pt-16 md:pt-6';
+      return 'pt-18 md:pt-18 lg:pt-6';
     }
     
-    return 'pt-18 md:pt-24 max-lg:pt-8';
+    return 'pt-18 max-lg:pt-18';
   };
 
   return (
@@ -277,11 +277,11 @@ const Home = () => {
       
       <div>
         <div className={`flex flex-col md:flex-row gap-8 ${getRouteClass()} pb-16 md:pb-16`}>
-          <div className="hidden md:block w-64 flex-shrink-0">
+          <div className="hidden lg:block w-64 flex-shrink-0">
             {/* This is just a spacer for the fixed sidebar */}
           </div>
           
-          <div className="flex-1 max-w-3xl w-full space-y-6 px-2 md:px-6">
+          <div className="flex-1 max-w-3xl w-full space-y-6 px-4 md:px-6">
             <CreatePost onSubmit={handleCreatePost} />
             
             {loading ? (

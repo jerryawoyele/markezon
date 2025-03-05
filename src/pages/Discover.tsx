@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -32,6 +31,7 @@ export default function Discover() {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedPost, setSelectedPost] = useState<Post | null>(null);
   const [showPostModal, setShowPostModal] = useState(false);
+  const [selectedPostIndex, setSelectedPostIndex] = useState(0);
   const { toast } = useToast();
   const navigate = useNavigate();
 
@@ -88,8 +88,9 @@ export default function Discover() {
     setSearchQuery(e.target.value);
   };
 
-  const handleCardClick = (post: Post) => {
+  const handleCardClick = (post: Post, index: number) => {
     setSelectedPost(post);
+    setSelectedPostIndex(index);
     setShowPostModal(true);
   };
 
@@ -162,11 +163,11 @@ export default function Discover() {
                 </Card>
               ))
             ) : posts.length > 0 ? (
-              posts.map((post) => (
+              posts.map((post, index) => (
                 <Card 
                   key={post.id}
                   className="overflow-hidden bg-black/20 border-white/5 hover:bg-black/30 transition-colors cursor-pointer"
-                  onClick={() => handleCardClick(post)}
+                  onClick={() => handleCardClick(post, index)}
                 >
                   <div className="aspect-video">
                     <img 
@@ -207,18 +208,22 @@ export default function Discover() {
         </div>
       </div>
 
-      {selectedPost && (
+      {showPostModal && (
         <Dialog open={showPostModal} onOpenChange={setShowPostModal}>
-          <DialogContent className="sm:max-w-[650px] bg-black/90 border-white/10 h-[90vh] max-h-[90vh] p-0">
-            <ScrollArea className="h-full max-h-[90vh]">
-              <Post 
-                {...selectedPost}
-                showDetailOnClick={false}
-                currentUserId={async () => {
-                  const { data } = await supabase.auth.getUser();
-                  return data.user?.id || null;
-                }}
-              />
+          <DialogContent className="sm:max-w-[650px] bg-black/90 border-white/10 h-[90vh] max-h-[90vh] p-0" hideCloseButton>
+            <ScrollArea className="h-full max-h-[90vh] px-4 py-2">
+              {posts.slice(selectedPostIndex).map((post) => (
+                <div key={post.id} className="mb-6">
+                  <Post 
+                    {...post}
+                    showDetailOnClick={false}
+                    currentUserId={async () => {
+                      const { data } = await supabase.auth.getUser();
+                      return data.user?.id || null;
+                    }}
+                  />
+                </div>
+              ))}
             </ScrollArea>
           </DialogContent>
         </Dialog>

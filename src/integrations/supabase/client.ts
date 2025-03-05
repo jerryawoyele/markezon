@@ -20,3 +20,25 @@ export const parseImageUrls = (imageUrl: string): string[] => {
     return [imageUrl];
   }
 };
+
+// Create a storage bucket for avatars if it doesn't exist
+const createAvatarsBucket = async () => {
+  const { data, error } = await supabase.storage.getBucket('avatars');
+  
+  if (error) {
+    if (error.message.includes('does not exist')) {
+      const { error: createError } = await supabase.storage.createBucket('avatars', {
+        public: true
+      });
+      
+      if (createError) {
+        console.error("Error creating avatars bucket:", createError);
+      }
+    } else {
+      console.error("Error checking avatars bucket:", error);
+    }
+  }
+};
+
+// Initialize storage bucket
+createAvatarsBucket();

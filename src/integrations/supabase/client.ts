@@ -32,6 +32,14 @@ export const parseImageUrls = (imageUrl: string): string[] => {
   }
 };
 
+// Default avatar URL for users without avatars
+export const DEFAULT_AVATAR_URL = "/placeholder.svg";
+
+// Get user avatar with fallback to default
+export const getUserAvatar = (avatarUrl: string | null): string => {
+  return avatarUrl || DEFAULT_AVATAR_URL;
+};
+
 // Create a storage bucket for avatars if it doesn't exist
 const createAvatarsBucket = async () => {
   try {
@@ -39,10 +47,10 @@ const createAvatarsBucket = async () => {
     // as it's now created via SQL migrations
     const { data, error } = await supabase.storage.getBucket('avatars');
     if (error) {
-      console.error("Error checking avatars bucket:", error);
+      console.warn("Avatars bucket not found, using default avatars");
     }
   } catch (error) {
-    console.error("Error with avatars bucket:", error);
+    console.warn("Using default avatars:", error);
   }
 };
 

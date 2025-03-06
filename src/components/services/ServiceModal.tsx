@@ -37,7 +37,7 @@ export function ServiceModal({ service, isOpen, onClose }: ServiceModalProps) {
 
           <div className="my-4 h-64 overflow-hidden rounded-md">
             <img 
-              src={service.image} 
+              src={service.image || '/placeholder.svg'} 
               alt={service.title} 
               className="w-full h-full object-cover"
             />

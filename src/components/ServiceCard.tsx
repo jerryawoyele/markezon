@@ -19,7 +19,7 @@ export function ServiceCard({ service, onClick }: ServiceCardProps) {
       onClick={onClick}
     >
       <img
-        src={service.image}
+        src={service.image || '/placeholder.svg'}
         alt={service.title}
         className="w-full h-48 object-cover rounded-t-md"
       />

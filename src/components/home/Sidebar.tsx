@@ -1,4 +1,5 @@
 
+import { useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { 
   Home as HomeIcon, 
@@ -9,6 +10,14 @@ import {
   LogOut
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { 
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter
+} from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -26,12 +35,23 @@ interface SidebarProps {
 }
 
 export function Sidebar({ activeTab, setActiveTab }: SidebarProps) {
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   const navigate = useNavigate();
   const location = useLocation();
 
   const handleNavigation = (label: string, path: string) => {
     setActiveTab(label);
     navigate(path);
+  };
+
+  const handleLogoutClick = () => {
+    setShowLogoutConfirm(true);
+  };
+
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    setShowLogoutConfirm(false);
+    navigate('/auth');
   };
 
   // Mobile Bottom Navigation
@@ -89,10 +109,7 @@ export function Sidebar({ activeTab, setActiveTab }: SidebarProps) {
         <Button
           variant="ghost"
           className="justify-start gap-3 py-6 px-4 hover:bg-primary hover:text-white"
-          onClick={async () => {
-            await supabase.auth.signOut();
-            navigate('/auth');
-          }}
+          onClick={handleLogoutClick}
         >
           <LogOut className="w-5 h-5" />
           <span>Logout</span>
@@ -105,6 +122,26 @@ export function Sidebar({ activeTab, setActiveTab }: SidebarProps) {
     <>
       {desktopNav}
       {mobileNav}
+      
+      {/* Logout Confirmation Dialog */}
+      <Dialog open={showLogoutConfirm} onOpenChange={setShowLogoutConfirm}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Confirm Logout</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to log out? You will need to sign in again to access your account.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowLogoutConfirm(false)}>
+              Cancel
+            </Button>
+            <Button variant="destructive" onClick={handleLogout}>
+              Logout
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </>
   );
 }

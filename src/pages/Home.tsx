@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -80,7 +79,6 @@ export default function Home() {
     fetchProfiles();
   }, []);
 
-  // Make this function return a Promise to match the expected type
   const handlePostSubmit = async (data: { text: string; image_url: string | string[]; isTextPost: boolean }) => {
     try {
       const { data: userData } = await supabase.auth.getUser();
@@ -136,14 +134,14 @@ export default function Home() {
       
       <div className="flex-1 container mx-auto pt-4 max-lg:pt-18 pb-20 lg:pl-64">
         <div className="flex flex-col md:flex-row gap-6">
-          <div className="flex-1 flex flex-col gap-6">
+          <div className="flex-1 flex flex-col gap-6 px-4">
             <MobileHeader />
-            <CreatePost onSubmit={handlePostSubmit} className="mx-4 lg:mx-6" />
+            <CreatePost onSubmit={handlePostSubmit} className="mx-0 lg:mx-0" />
             {posts.map((post) => (
               <Post
                 key={post.id}
                 {...post}
-                profiles={post.profiles}
+                profiles={post.profiles as ProfileType}
                 currentUserId={async () => {
                   const { data } = await supabase.auth.getUser();
                   return data.user?.id || null;

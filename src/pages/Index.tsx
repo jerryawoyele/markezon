@@ -5,8 +5,9 @@ import { Header } from "@/components/Header";
 import { ServiceCard } from "@/components/ServiceCard";
 import { Footer } from "@/components/Footer";
 import { supabase } from "@/integrations/supabase/client";
+import { ServiceType } from "@/types";
 
-const featuredServices = [
+const featuredServices: ServiceType[] = [
   {
     id: "1",
     user_id: "123",
@@ -52,7 +53,6 @@ export default function Index() {
   }, []);
 
   useEffect(() => {
-    // Redirect to home if user is authenticated and trying to access auth or root page
     if (user) {
       navigate('/home');
     }

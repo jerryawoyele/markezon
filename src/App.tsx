@@ -32,6 +32,8 @@ const App = () => (
           <Route path="/messages" element={<Messages />} />
           <Route path="/notifications" element={<Notifications />} />
           <Route path="/profile" element={<Profile />} />
+          <Route path="/@:username" element={<UserProfile />} />
+          <Route path="/@:username/:postId" element={<UserProfile />} />
           <Route path="/user/:userId" element={<UserProfile />} />
           <Route path="/user/:userId/:postId" element={<UserProfile />} />
           <Route path="*" element={<NotFound />} />

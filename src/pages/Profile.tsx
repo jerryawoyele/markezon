@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Dialog, DialogContent, DialogTitle, DialogHeader, DialogFooter, DialogDescription } from "@/components/ui/dialog";
@@ -9,7 +8,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Pencil, User, Plus } from "lucide-react";
+import { Pencil, User, Plus, Users } from "lucide-react";
 import { ServiceCard } from "@/components/ServiceCard";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
@@ -22,6 +21,12 @@ interface Profile {
   username: string | null;
   avatar_url: string | null;
   bio: string | null;
+  about_business?: string | null;
+  followers_count?: number;
+  following_count?: number;
+  posts_count?: number;
+  reviews_count?: number;
+  reviews_rating?: number;
 }
 
 interface PostType {
@@ -51,6 +56,7 @@ const Profile = () => {
   const [selectedPostIndex, setSelectedPostIndex] = useState(0);
   const [activeTab, setActiveTab] = useState("about");
   const [showEditProfileModal, setShowEditProfileModal] = useState(false);
+  const [showEditAboutModal, setShowEditAboutModal] = useState(false);
   const [editedProfile, setEditedProfile] = useState<{
     username: string;
     bio: string;
@@ -60,6 +66,7 @@ const Profile = () => {
     bio: "",
     avatar_url: null
   });
+  const [editedAbout, setEditedAbout] = useState("");
   const [previewImage, setPreviewImage] = useState<string | null>(null);
   const [showServiceModal, setShowServiceModal] = useState(false);
   const [selectedService, setSelectedService] = useState<ServiceType | null>(null);
@@ -102,7 +109,13 @@ const Profile = () => {
             bio: profileData.bio || "",
             avatar_url: profileData.avatar_url
           });
+          setEditedAbout(profileData.about_business || "");
         }
+        
+        const { count: postsCount } = await supabase
+          .from('posts')
+          .select('*', { count: 'exact', head: true })
+          .eq('user_id', user.id);
         
         const { data: postsData } = await supabase
           .from('posts')
@@ -114,7 +127,6 @@ const Profile = () => {
           setPosts(postsData);
         }
         
-        // Fetch real services from the database
         const { data: servicesData } = await supabase
           .from('services')
           .select('*')
@@ -124,7 +136,6 @@ const Profile = () => {
         if (servicesData && servicesData.length > 0) {
           setServices(servicesData);
         } else {
-          // Fallback to sample data if no services found
           setServices([
             {
               id: "1",
@@ -245,6 +256,41 @@ const Profile = () => {
     }
   };
 
+  const handleAboutUpdate = async () => {
+    try {
+      if (!profile) return;
+      
+      const { error } = await supabase
+        .from('profiles')
+        .update({
+          about_business: editedAbout,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', profile.id);
+        
+      if (error) throw error;
+      
+      setProfile({
+        ...profile,
+        about_business: editedAbout
+      });
+      
+      setShowEditAboutModal(false);
+      
+      toast({
+        title: "About section updated",
+        description: "Your business information has been updated successfully.",
+      });
+    } catch (error) {
+      console.error("Error updating about section:", error);
+      toast({
+        title: "Error",
+        description: "Failed to update business information. Please try again.",
+        variant: "destructive"
+      });
+    }
+  };
+
   const handleAddService = async () => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
@@ -258,63 +304,21 @@ const Profile = () => {
         return;
       }
       
-      // Process features from comma-separated string to array
-      const featuresArray = newService.features
-        .split(',')
-        .map(feature => feature.trim())
-        .filter(feature => feature.length > 0);
-      
-      let imageUrl = newService.image;
-      
-      // If image is a data URL, upload it to storage
-      if (imageUrl.startsWith('data:')) {
-        const file = await fetch(imageUrl).then(r => r.blob());
-        const fileExt = imageUrl.split(';')[0].split('/')[1];
-        const fileName = `service_${Date.now()}.${fileExt}`;
-        
-        const { data, error } = await supabase.storage
-          .from('services')
-          .upload(fileName, file);
-          
-        if (error) {
-          // If services bucket doesn't exist, use avatars bucket as fallback
-          const { data: avatarData, error: avatarError } = await supabase.storage
-            .from('avatars')
-            .upload(fileName, file);
-            
-          if (avatarError) throw avatarError;
-          
-          const { data: { publicUrl } } = supabase.storage
-            .from('avatars')
-            .getPublicUrl(fileName);
-            
-          imageUrl = publicUrl;
-        } else {
-          const { data: { publicUrl } } = supabase.storage
-            .from('services')
-            .getPublicUrl(fileName);
-            
-          imageUrl = publicUrl;
-        }
-      }
-      
-      // Check if services table exists
       const { error: tableCheckError } = await supabase
         .from('services')
         .select('id')
         .limit(1);
       
       if (tableCheckError) {
-        // Use local state if table doesn't exist
         const newServiceObj = {
           id: Date.now().toString(),
           title: newService.title,
           description: newService.description,
           category: newService.category,
-          image: imageUrl,
+          image: newService.image,
           business: profile?.username || "My Business",
           price: newService.price,
-          features: featuresArray,
+          features: newService.features,
           user_id: user.id
         };
         
@@ -325,18 +329,17 @@ const Profile = () => {
           description: "Your service has been added successfully to the local state since the services table doesn't exist yet.",
         });
       } else {
-        // Insert into database if table exists
         const { data, error } = await supabase
           .from('services')
           .insert({
             title: newService.title,
             description: newService.description,
             category: newService.category,
-            image: imageUrl,
+            image: newService.image,
             user_id: user.id,
             business: profile?.username || "My Business",
             price: newService.price,
-            features: featuresArray
+            features: newService.features
           })
           .select();
           
@@ -352,7 +355,6 @@ const Profile = () => {
         });
       }
       
-      // Reset form and close modal
       setNewService({
         title: "",
         description: "",
@@ -378,7 +380,7 @@ const Profile = () => {
       <Sidebar activeTab={activeItem} setActiveTab={setActiveItem} />
       
       <div className="flex-1 container mx-auto pt-18 max-lg:pt-18 pb-20 lg:pl-64">
-        <div className="bg-black/20 rounded-lg p-6 mb-6">
+        <div className="bg-black/20 rounded-lg p-6 mb-6 mx-4">
           <div className="flex flex-col md:flex-row items-center md:items-start gap-6">
             <Avatar className="w-24 h-24 border-2 border-primary">
               <AvatarImage src={profile?.avatar_url || ""} alt={profile?.username || "User"} />
@@ -403,6 +405,25 @@ const Profile = () => {
                 </Button>
               </div>
               
+              <div className="flex mt-4 mb-4 space-x-6">
+                <div className="text-center">
+                  <p className="font-bold">{profile?.posts_count || posts.length || 0}</p>
+                  <p className="text-white/60 text-sm">Posts</p>
+                </div>
+                <div className="text-center">
+                  <p className="font-bold">{profile?.followers_count || 0}</p>
+                  <p className="text-white/60 text-sm">Followers</p>
+                </div>
+                <div className="text-center">
+                  <p className="font-bold">{profile?.following_count || 0}</p>
+                  <p className="text-white/60 text-sm">Following</p>
+                </div>
+                <div className="text-center">
+                  <p className="font-bold">{profile?.reviews_rating || 0} ���</p>
+                  <p className="text-white/60 text-sm">{profile?.reviews_count || 0} Reviews</p>
+                </div>
+              </div>
+              
               <p className="mt-4 text-white/80">{profile?.bio || "No bio yet."}</p>
             </div>
           </div>
@@ -412,7 +433,7 @@ const Profile = () => {
           defaultValue="about" 
           value={activeTab} 
           onValueChange={setActiveTab}
-          className="w-full"
+          className="w-full mx-4"
         >
           <TabsList className="grid grid-cols-3 mb-6">
             <TabsTrigger value="about">About</TabsTrigger>
@@ -422,12 +443,21 @@ const Profile = () => {
           
           <TabsContent value="about" className="space-y-4">
             <Card className="bg-black/20 border-white/5">
-              <CardHeader>
-                <CardTitle>About</CardTitle>
-                <CardDescription>Information about your business or personal brand</CardDescription>
+              <CardHeader className="flex flex-row items-center justify-between">
+                <div>
+                  <CardTitle>About Business</CardTitle>
+                  <CardDescription>Information about your business or personal brand</CardDescription>
+                </div>
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={() => setShowEditAboutModal(true)}
+                >
+                  <Pencil className="w-4 h-4 mr-2" /> Edit
+                </Button>
               </CardHeader>
               <CardContent>
-                <p>{profile?.bio || "No information available yet. Edit your profile to add details about yourself or your business."}</p>
+                <p>{profile?.about_business || "No business information available yet. Click Edit to add details about your business or brand."}</p>
               </CardContent>
             </Card>
           </TabsContent>
@@ -569,7 +599,33 @@ const Profile = () => {
           </DialogContent>
         </Dialog>
 
-        {/* Service Details Modal */}
+        <Dialog open={showEditAboutModal} onOpenChange={setShowEditAboutModal}>
+          <DialogContent className="sm:max-w-[500px] bg-black/90 border-white/10">
+            <DialogTitle>Edit Business Information</DialogTitle>
+            <div className="space-y-4">
+              <div>
+                <Label htmlFor="about" className="block mb-2">About your business</Label>
+                <Textarea 
+                  id="about" 
+                  value={editedAbout} 
+                  onChange={e => setEditedAbout(e.target.value)}
+                  placeholder="Write something about your business or professional services"
+                  rows={6}
+                />
+              </div>
+              
+              <div className="flex justify-end gap-2">
+                <Button variant="outline" onClick={() => setShowEditAboutModal(false)}>
+                  Cancel
+                </Button>
+                <Button onClick={handleAboutUpdate}>
+                  Save Changes
+                </Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
+
         <Dialog open={showServiceModal} onOpenChange={setShowServiceModal}>
           <DialogContent className="sm:max-w-[600px] bg-black/90 border-white/10">
             <DialogHeader>
@@ -622,7 +678,6 @@ const Profile = () => {
           </DialogContent>
         </Dialog>
 
-        {/* Add Service Modal */}
         <Dialog open={showAddServiceModal} onOpenChange={setShowAddServiceModal}>
           <DialogContent className="sm:max-w-[600px] bg-black/90 border-white/10">
             <DialogHeader>

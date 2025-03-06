@@ -8,6 +8,7 @@ import { Post } from "@/components/home/Post";
 import { MobileHeader } from "@/components/home/MobileHeader";
 import { CreatePost } from "@/components/home/CreatePost";
 import { Sidebar } from "@/components/home/Sidebar";
+import { TrendingServices } from "@/components/home/TrendingServices";
 import { supabase } from "@/integrations/supabase/client";
 import type { Profile as ProfileType, Post as PostType } from "@/types";
 
@@ -124,20 +125,26 @@ export default function Home() {
       <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} />
       
       <div className="flex-1 container mx-auto pt-18 max-lg:pt-18 pb-20 lg:pl-64">
-        <div className="flex flex-col gap-6">
-          <MobileHeader />
-          <CreatePost onSubmit={handlePostSubmit} />
-          {posts.map((post) => (
-            <Post
-              key={post.id}
-              {...post}
-              profiles={post.profiles}
-              currentUserId={async () => {
-                const { data } = await supabase.auth.getUser();
-                return data.user?.id || null;
-              }}
-            />
-          ))}
+        <div className="flex flex-col md:flex-row gap-6">
+          <div className="flex-1 flex flex-col gap-6">
+            <MobileHeader />
+            <CreatePost onSubmit={handlePostSubmit} className="mx-2" />
+            {posts.map((post) => (
+              <Post
+                key={post.id}
+                {...post}
+                profiles={post.profiles}
+                currentUserId={async () => {
+                  const { data } = await supabase.auth.getUser();
+                  return data.user?.id || null;
+                }}
+              />
+            ))}
+          </div>
+          
+          <div className="hidden lg:block w-80">
+            <TrendingServices />
+          </div>
         </div>
       </div>
     </div>

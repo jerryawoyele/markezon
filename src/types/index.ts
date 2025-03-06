@@ -5,6 +5,12 @@ export interface Profile {
   avatar_url: string | null;
   bio: string | null;
   updated_at: string | null;
+  about_business?: string | null;
+  followers_count?: number;
+  following_count?: number;
+  posts_count?: number;
+  reviews_count?: number;
+  reviews_rating?: number;
 }
 
 export interface Post {

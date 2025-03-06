@@ -1,4 +1,3 @@
-
 import { useState, useRef, ChangeEvent } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -19,9 +18,10 @@ import { LocalImageUpload } from "./LocalImageUpload";
 
 interface CreatePostProps {
   onSubmit: (data: { text: string; image_url: string | string[]; isTextPost: boolean }) => Promise<void>;
+  className?: string;
 }
 
-export function CreatePost({ onSubmit }: CreatePostProps) {
+export function CreatePost({ onSubmit, className = "" }: CreatePostProps) {
   const [open, setOpen] = useState(false);
   const [text, setText] = useState("");
   const [imageUrls, setImageUrls] = useState<string[]>([]);
@@ -87,7 +87,7 @@ export function CreatePost({ onSubmit }: CreatePostProps) {
 
   return (
     <>
-      <Card className="p-6 bg-black/20 border-white/5">
+      <Card className={`p-6 bg-black/20 border-white/5 ${className}`}>
         <div className="flex items-center gap-3">
           <Avatar>
             <img

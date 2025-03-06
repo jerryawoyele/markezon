@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
 import { Dialog, DialogContent, DialogTitle, DialogDescription, DialogFooter, DialogHeader } from "@/components/ui/dialog";
@@ -9,7 +8,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { User, ArrowLeft, Plus } from "lucide-react";
+import { User, ArrowLeft, Plus, Users } from "lucide-react";
 import { ServiceCard } from "@/components/ServiceCard";
 import { useToast } from "@/components/ui/use-toast";
 import { Sidebar, SIDEBAR_ITEMS } from "@/components/home/Sidebar";
@@ -22,6 +21,12 @@ interface Profile {
   username: string | null;
   avatar_url: string | null;
   bio: string | null;
+  about_business?: string | null;
+  followers_count?: number;
+  following_count?: number;
+  posts_count?: number;
+  reviews_count?: number;
+  reviews_rating?: number;
 }
 
 interface PostType {
@@ -44,7 +49,7 @@ interface ServiceType {
 }
 
 const UserProfile = () => {
-  const { userId, postId } = useParams<{ userId: string; postId?: string }>();
+  const { userId, username, postId } = useParams<{ userId?: string; username?: string; postId?: string }>();
   const [profile, setProfile] = useState<Profile | null>(null);
   const [currentUserProfile, setCurrentUserProfile] = useState<Profile | null>(null);
   const [posts, setPosts] = useState<PostType[]>([]);
@@ -62,86 +67,106 @@ const UserProfile = () => {
 
   useEffect(() => {
     const fetchProfileAndPosts = async () => {
-      if (userId) {
-        const { data: { user: currentUser } } = await supabase.auth.getUser();
-        
-        if (currentUser) {
-          setIsCurrentUser(currentUser.id === userId);
-          
-          const { data: currentUserData } = await supabase
-            .from('profiles')
-            .select('*')
-            .eq('id', currentUser.id)
-            .single();
-            
-          setCurrentUserProfile(currentUserData);
-        }
-        
-        const { data: profileData } = await supabase
+      let profileQuery;
+      
+      if (username) {
+        profileQuery = supabase
+          .from('profiles')
+          .select('*')
+          .eq('username', username)
+          .single();
+      } else if (userId) {
+        profileQuery = supabase
           .from('profiles')
           .select('*')
           .eq('id', userId)
           .single();
-          
-        setProfile(profileData);
+      } else {
+        return;
+      }
+      
+      const { data: { user: currentUser } } = await supabase.auth.getUser();
+      
+      const { data: profileData } = await profileQuery;
+      
+      if (!profileData) {
+        navigate('/notfound');
+        return;
+      }
+      
+      setProfile(profileData);
+      
+      if (currentUser) {
+        setIsCurrentUser(currentUser.id === profileData.id);
         
-        const { data: postsData } = await supabase
-          .from('posts')
+        const { data: currentUserData } = await supabase
+          .from('profiles')
           .select('*')
-          .eq('user_id', userId)
-          .order('created_at', { ascending: false });
+          .eq('id', currentUser.id)
+          .single();
           
-        if (postsData) {
-          setPosts(postsData);
-          
-          if (postId) {
-            const postIndex = postsData.findIndex(post => post.id === postId);
-            if (postIndex >= 0) {
-              setSelectedPostIndex(postIndex);
-              setShowPostModal(true);
-            }
+        setCurrentUserProfile(currentUserData);
+      }
+      
+      const { count: postsCount } = await supabase
+        .from('posts')
+        .select('*', { count: 'exact', head: true })
+        .eq('user_id', profileData.id);
+
+      const { data: postsData } = await supabase
+        .from('posts')
+        .select('*')
+        .eq('user_id', profileData.id)
+        .order('created_at', { ascending: false });
+        
+      if (postsData) {
+        setPosts(postsData);
+        
+        if (postId) {
+          const postIndex = postsData.findIndex(post => post.id === postId);
+          if (postIndex >= 0) {
+            setSelectedPostIndex(postIndex);
+            setShowPostModal(true);
           }
         }
+      }
+      
+      const { data: servicesData } = await supabase
+        .from('services')
+        .select('*')
+        .eq('user_id', profileData.id)
+        .order('created_at', { ascending: false });
         
-        // Fetch real services from the database
-        const { data: servicesData } = await supabase
-          .from('services')
-          .select('*')
-          .eq('user_id', userId)
-          .order('created_at', { ascending: false });
-          
-        if (servicesData && servicesData.length > 0) {
-          setServices(servicesData);
-        } else {
-          // Fallback to sample data if no services found
-          setServices([
-            {
-              id: "1",
-              title: "Web Development",
-              description: "Full-stack web development services using modern technologies",
-              category: "Development",
-              image: "https://images.unsplash.com/photo-1593720213428-28a5b9e94613?w=800&auto=format&fit=crop",
-              business: profileData?.username || "Business",
-              price: "$50/hr",
-              features: ["React", "Node.js", "Responsive Design"]
-            },
-            {
-              id: "2",
-              title: "UI/UX Design",
-              description: "Creating beautiful and functional user interfaces",
-              category: "Design",
-              image: "https://images.unsplash.com/photo-1561070791-2526d30994b5?w=800&auto=format&fit=crop",
-              business: profileData?.username || "Business",
-              price: "$45/hr",
-              features: ["Wireframing", "Prototyping", "User Testing"]
-            }
-          ]);
-        }
+      if (servicesData && servicesData.length > 0) {
+        setServices(servicesData);
+      } else {
+        setServices([
+          {
+            id: "1",
+            title: "Web Development",
+            description: "Full-stack web development services using modern technologies",
+            category: "Development",
+            image: "https://images.unsplash.com/photo-1593720213428-28a5b9e94613?w=800&auto=format&fit=crop",
+            business: profileData?.username || "Business",
+            price: "$50/hr",
+            features: ["React", "Node.js", "Responsive Design"]
+          },
+          {
+            id: "2",
+            title: "UI/UX Design",
+            description: "Creating beautiful and functional user interfaces",
+            category: "Design",
+            image: "https://images.unsplash.com/photo-1561070791-2526d30994b5?w=800&auto=format&fit=crop",
+            business: profileData?.username || "Business",
+            price: "$45/hr",
+            features: ["Wireframing", "Prototyping", "User Testing"]
+          }
+        ]);
       }
     };
     
     fetchProfileAndPosts();
-  }, [userId, postId]);
+  }, [userId, username, postId, navigate]);
 
   const handlePostClick = (index: number) => {
     setSelectedPostIndex(index);
@@ -172,14 +197,14 @@ const UserProfile = () => {
       <Sidebar activeTab={activeItem} setActiveTab={setActiveItem} />
       
       <div className="flex-1 container mx-auto pt-18 max-lg:pt-18 pb-20 lg:pl-64">
-        <div className="flex items-center mb-4">
+        <div className="flex items-center mb-4 mx-4">
           <Button variant="ghost" onClick={handleGoBack} className="mr-2">
             <ArrowLeft className="w-5 h-5" />
           </Button>
           <h1 className="text-xl font-semibold">User Profile</h1>
         </div>
         
-        <div className="bg-black/20 rounded-lg p-6 mb-6">
+        <div className="bg-black/20 rounded-lg p-6 mb-6 mx-4">
           <div className="flex flex-col md:flex-row items-center md:items-start gap-6">
             <Avatar className="w-24 h-24 border-2 border-primary">
               <AvatarImage src={profile?.avatar_url || ""} alt={profile?.username || "User"} />
@@ -206,7 +231,26 @@ const UserProfile = () => {
                 )}
               </div>
               
-              <p className="mt-4 text-white/80">{profile?.bio || "No bio available."}</p>
+              <div className="flex mt-4 mb-4 space-x-6">
+                <div className="text-center">
+                  <p className="font-bold">{profile?.posts_count || posts.length || 0}</p>
+                  <p className="text-white/60 text-sm">Posts</p>
+                </div>
+                <div className="text-center">
+                  <p className="font-bold">{profile?.followers_count || 0}</p>
+                  <p className="text-white/60 text-sm">Followers</p>
+                </div>
+                <div className="text-center">
+                  <p className="font-bold">{profile?.following_count || 0}</p>
+                  <p className="text-white/60 text-sm">Following</p>
+                </div>
+                <div className="text-center">
+                  <p className="font-bold">{profile?.reviews_rating || 0} ★</p>
+                  <p className="text-white/60 text-sm">{profile?.reviews_count || 0} Reviews</p>
+                </div>
+              </div>
+              
+              <p className="text-white/80">{profile?.bio || "No bio available."}</p>
             </div>
           </div>
         </div>
@@ -215,7 +259,7 @@ const UserProfile = () => {
           defaultValue="about" 
           value={activeTab} 
           onValueChange={setActiveTab}
-          className="w-full"
+          className="w-full mx-4"
         >
           <TabsList className="grid grid-cols-3 mb-6">
             <TabsTrigger value="about">About</TabsTrigger>
@@ -230,7 +274,7 @@ const UserProfile = () => {
                 <CardDescription>Information about this business or personal brand</CardDescription>
               </CardHeader>
               <CardContent>
-                <p>{profile?.bio || "No information available."}</p>
+                <p>{profile?.about_business || profile?.bio || "No information available."}</p>
               </CardContent>
             </Card>
           </TabsContent>
@@ -300,7 +344,6 @@ const UserProfile = () => {
           </Dialog>
         )}
 
-        {/* Service Details Modal */}
         <Dialog open={showServiceModal} onOpenChange={setShowServiceModal}>
           <DialogContent className="sm:max-w-[600px] bg-black/90 border-white/10">
             <DialogHeader>

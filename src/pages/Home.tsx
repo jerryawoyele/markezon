@@ -35,8 +35,11 @@ export default function Home() {
         .select(`
           *,
           profiles (
+            id,
             username,
-            avatar_url
+            avatar_url,
+            bio,
+            updated_at
           )
         `)
         .order('created_at', { ascending: false });
@@ -47,7 +50,8 @@ export default function Home() {
       }
 
       if (postsData) {
-        setPosts(postsData);
+        // Now the returned data shape matches our type definition
+        setPosts(postsData as PostType[]);
       }
     };
 
@@ -70,8 +74,49 @@ export default function Home() {
     fetchProfiles();
   }, []);
 
-  const handlePostSubmit = (newPost) => {
-    setPosts((prevPosts) => [newPost, ...prevPosts]);
+  // Make this function return a Promise to match the expected type
+  const handlePostSubmit = async (data: { text: string; image_url: string | string[]; isTextPost: boolean }) => {
+    try {
+      const { data: userData } = await supabase.auth.getUser();
+      const userId = userData?.user?.id;
+
+      if (!userId) {
+        console.error("User not authenticated");
+        return;
+      }
+
+      // Create the new post in the database
+      const { data: newPostData, error } = await supabase
+        .from('posts')
+        .insert({
+          caption: data.text,
+          image_url: Array.isArray(data.image_url) ? JSON.stringify(data.image_url) : data.image_url,
+          user_id: userId
+        })
+        .select(`
+          *,
+          profiles (
+            id,
+            username,
+            avatar_url,
+            bio,
+            updated_at
+          )
+        `)
+        .single();
+
+      if (error) {
+        console.error("Error creating post:", error);
+        return;
+      }
+
+      if (newPostData) {
+        // Add the new post to the state
+        setPosts(prevPosts => [newPostData as PostType, ...prevPosts]);
+      }
+    } catch (error) {
+      console.error("Error in handlePostSubmit:", error);
+    }
   };
 
   return (

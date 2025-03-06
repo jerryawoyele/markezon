@@ -44,7 +44,6 @@ export default function Home() {
             about_business,
             followers_count,
             following_count,
-            posts_count,
             reviews_count,
             reviews_rating
           )
@@ -57,8 +56,8 @@ export default function Home() {
       }
 
       if (postsData) {
-        // Now the returned data shape matches our type definition
-        setPosts(postsData as PostType[]);
+        // Need to cast the data to resolve the type error
+        setPosts(postsData as unknown as PostType[]);
       }
     };
 
@@ -111,7 +110,6 @@ export default function Home() {
             about_business,
             followers_count,
             following_count,
-            posts_count,
             reviews_count,
             reviews_rating
           )
@@ -124,8 +122,8 @@ export default function Home() {
       }
 
       if (newPostData) {
-        // Add the new post to the state
-        setPosts(prevPosts => [newPostData as PostType, ...prevPosts]);
+        // Cast to resolve the type error
+        setPosts(prevPosts => [(newPostData as unknown as PostType), ...prevPosts]);
       }
     } catch (error) {
       console.error("Error in handlePostSubmit:", error);
@@ -136,7 +134,7 @@ export default function Home() {
     <div className="flex min-h-screen w-full">
       <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} />
       
-      <div className="flex-1 container mx-auto pt-18 max-lg:pt-18 pb-20 lg:pl-64">
+      <div className="flex-1 container mx-auto pt-4 max-lg:pt-18 pb-20 lg:pl-64">
         <div className="flex flex-col md:flex-row gap-6">
           <div className="flex-1 flex flex-col gap-6">
             <MobileHeader />
@@ -150,6 +148,7 @@ export default function Home() {
                   const { data } = await supabase.auth.getUser();
                   return data.user?.id || null;
                 }}
+                className="px-4"
               />
             ))}
           </div>

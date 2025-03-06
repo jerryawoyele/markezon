@@ -1,27 +1,29 @@
+
 import { Card, CardContent } from "@/components/ui/card";
+import { ServiceType } from "@/types";
 
 interface ServiceCardProps {
-  title: string;
-  description: string;
-  category: string;
-  image: string;
-  business: string;
+  service: ServiceType;
+  onClick?: () => void;
 }
 
-export function ServiceCard({ title, description, category, image, business }: ServiceCardProps) {
+export function ServiceCard({ service, onClick }: ServiceCardProps) {
   return (
-    <Card className="bg-black/20 border-white/5">
+    <Card 
+      className="bg-black/20 border-white/5 cursor-pointer transition-all hover:bg-black/30"
+      onClick={onClick}
+    >
       <img
-        src={image}
-        alt={title}
+        src={service.image}
+        alt={service.title}
         className="w-full h-48 object-cover rounded-t-md"
       />
       <CardContent className="p-4">
-        <h3 className="text-lg font-semibold mb-2">{title}</h3>
-        <p className="text-sm text-white/60 mb-4">{description}</p>
+        <h3 className="text-lg font-semibold mb-2">{service.title}</h3>
+        <p className="text-sm text-white/60 mb-4">{service.description}</p>
         <div className="flex items-center justify-between">
-          <span className="text-xs text-white/60">{category}</span>
-          <span className="text-xs text-white/60">Offered by: {business}</span>
+          <span className="text-xs text-white/60">{service.category}</span>
+          <span className="text-xs text-white/60">Offered by: {service.business || "Anonymous"}</span>
         </div>
       </CardContent>
     </Card>

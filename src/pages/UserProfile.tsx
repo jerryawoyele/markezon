@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -48,9 +47,7 @@ export function UserProfile() {
       try {
         setLoading(true);
         
-        // Check if we have a username or userId
         if (username) {
-          // Fetch by username
           const { data, error } = await supabase
             .from('profiles')
             .select('*')
@@ -60,7 +57,6 @@ export function UserProfile() {
           if (error) throw error;
           setProfile(data);
         } else if (userId) {
-          // Fetch by user ID
           const { data, error } = await supabase
             .from('profiles')
             .select('*')
@@ -97,7 +93,6 @@ export function UserProfile() {
       if (!profile) return;
       
       try {
-        // Fetch posts
         const { data: posts, error: postsError } = await supabase
           .from('posts')
           .select(`
@@ -110,7 +105,6 @@ export function UserProfile() {
         if (postsError) throw postsError;
         setUserPosts(posts as PostType[]);
         
-        // Fetch services
         const { data: services, error: servicesError } = await supabase
           .from('services')
           .select('*')
@@ -119,7 +113,6 @@ export function UserProfile() {
         if (servicesError) throw servicesError;
         setServices(services);
         
-        // If there's a specific post ID in the URL, switch to posts tab
         if (postId) {
           setActiveProfileTab("posts");
         }
@@ -252,7 +245,10 @@ export function UserProfile() {
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                   {services.map((service) => (
                     <div key={service.id} onClick={() => handleServiceClick(service)}>
-                      <ServiceCard service={service} />
+                      <ServiceCard 
+                        service={service} 
+                        onClick={() => handleServiceClick(service)}
+                      />
                     </div>
                   ))}
                 </div>

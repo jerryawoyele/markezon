@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -34,7 +33,6 @@ export function Profile() {
   const [services, setServices] = useState<ServiceType[]>([]);
   const [showAddServiceModal, setShowAddServiceModal] = useState(false);
   
-  // Form fields
   const [username, setUsername] = useState("");
   const [bio, setBio] = useState("");
   const [aboutBusiness, setAboutBusiness] = useState("");
@@ -129,7 +127,6 @@ export function Profile() {
     try {
       setUploading(true);
       
-      // First, get the current user
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) {
         toast({
@@ -140,7 +137,6 @@ export function Profile() {
         return;
       }
       
-      // Upload avatar if changed
       let avatar_url = avatarUrl;
       if (avatar) {
         const fileExt = avatar.name.split('.').pop();
@@ -161,7 +157,6 @@ export function Profile() {
         avatar_url = publicUrl;
       }
       
-      // Update profile
       const updates = {
         username,
         bio,
@@ -184,7 +179,6 @@ export function Profile() {
         description: "Profile updated successfully!",
       });
       
-      // Update local profile state
       if (profile) {
         setProfile({
           ...profile,
@@ -208,7 +202,6 @@ export function Profile() {
 
   const handleUpdateAboutBusiness = async () => {
     try {
-      // First, get the current user
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) {
         toast({
@@ -219,7 +212,6 @@ export function Profile() {
         return;
       }
       
-      // Update about business
       const updates = {
         about_business: aboutBusiness,
         updated_at: new Date().toISOString(),
@@ -239,7 +231,6 @@ export function Profile() {
         description: "Business info updated successfully!",
       });
       
-      // Update local profile state
       if (profile) {
         setProfile({
           ...profile,
@@ -263,50 +254,17 @@ export function Profile() {
     }
     const file = e.target.files[0];
     setAvatar(file);
-    // Create object URL for preview
     const objectUrl = URL.createObjectURL(file);
     setAvatarUrl(objectUrl);
   };
   
-  const handleAddService = async (serviceData: {
-    title: string;
-    description: string;
-    category: string;
-    image: string;
-    business?: string;
-    price?: string;
-    features?: string[];
-  }) => {
+  const handleAddService = async (serviceData: ServiceType) => {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
-        toast({
-          title: "Error",
-          description: "No user logged in",
-          variant: "destructive",
-        });
-        return;
-      }
-      
-      const newService = {
-        ...serviceData,
-        user_id: user.id,
-      };
-      
-      const { data, error } = await supabase
-        .from('services')
-        .insert(newService)
-        .select();
-        
-      if (error) throw error;
-      
-      if (data) {
-        setServices(prev => [...prev, data[0] as ServiceType]);
-        toast({
-          title: "Success",
-          description: "Service added successfully!",
-        });
-      }
+      setServices(prev => [...prev, serviceData]);
+      toast({
+        title: "Success",
+        description: "Service added successfully!",
+      });
       
       setShowAddServiceModal(false);
     } catch (error) {
@@ -530,7 +488,10 @@ export function Profile() {
               {services.length > 0 ? (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                   {services.map((service) => (
-                    <ServiceCard key={service.id} service={service} />
+                    <ServiceCard 
+                      key={service.id} 
+                      service={service} 
+                    />
                   ))}
                 </div>
               ) : (
@@ -547,7 +508,7 @@ export function Profile() {
       <AddServiceModal 
         isOpen={showAddServiceModal}
         onClose={() => setShowAddServiceModal(false)}
-        onAddService={handleAddService}
+        onServiceAdded={handleAddService}
       />
     </div>
   );

@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { 
   Select,
   SelectContent,
@@ -122,7 +123,7 @@ export function AddServiceModal({ isOpen, onClose, onServiceAdded }: AddServiceM
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-2xl max-h-[90vh]">
         <DialogHeader>
           <DialogTitle>Add New Service</DialogTitle>
           <DialogDescription>
@@ -130,131 +131,133 @@ export function AddServiceModal({ isOpen, onClose, onServiceAdded }: AddServiceM
           </DialogDescription>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="title">Title *</Label>
-            <Input 
-              id="title"
-              name="title"
-              value={formData.title}
-              onChange={handleInputChange}
-              placeholder="Service title"
-              required
-            />
-          </div>
+        <ScrollArea className="max-h-[calc(90vh-180px)] overflow-y-auto pr-4">
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="title">Title *</Label>
+              <Input 
+                id="title"
+                name="title"
+                value={formData.title}
+                onChange={handleInputChange}
+                placeholder="Service title"
+                required
+              />
+            </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="description">Description *</Label>
-            <Textarea 
-              id="description"
-              name="description"
-              value={formData.description}
-              onChange={handleInputChange}
-              placeholder="Describe your service"
-              required
-              rows={4}
-            />
-          </div>
+            <div className="space-y-2">
+              <Label htmlFor="description">Description *</Label>
+              <Textarea 
+                id="description"
+                name="description"
+                value={formData.description}
+                onChange={handleInputChange}
+                placeholder="Describe your service"
+                required
+                rows={4}
+              />
+            </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="category">Category *</Label>
-            <Select 
-              value={formData.category} 
-              onValueChange={handleSelectChange}
-              required
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Select a category" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="Design">Design</SelectItem>
-                <SelectItem value="Development">Development</SelectItem>
-                <SelectItem value="Marketing">Marketing</SelectItem>
-                <SelectItem value="Writing">Writing</SelectItem>
-                <SelectItem value="Education">Education</SelectItem>
-                <SelectItem value="Consulting">Consulting</SelectItem>
-                <SelectItem value="Other">Other</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
+            <div className="space-y-2">
+              <Label htmlFor="category">Category *</Label>
+              <Select 
+                value={formData.category} 
+                onValueChange={handleSelectChange}
+                required
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select a category" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Design">Design</SelectItem>
+                  <SelectItem value="Development">Development</SelectItem>
+                  <SelectItem value="Marketing">Marketing</SelectItem>
+                  <SelectItem value="Writing">Writing</SelectItem>
+                  <SelectItem value="Education">Education</SelectItem>
+                  <SelectItem value="Consulting">Consulting</SelectItem>
+                  <SelectItem value="Other">Other</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="image">Image URL *</Label>
-            <Input 
-              id="image"
-              name="image"
-              value={formData.image}
-              onChange={handleInputChange}
-              placeholder="Image URL for your service"
-              required
-            />
-            <p className="text-xs text-gray-500">
-              Provide a URL to an image that represents your service. Use services like Unsplash for free images.
-            </p>
-          </div>
+            <div className="space-y-2">
+              <Label htmlFor="image">Image URL *</Label>
+              <Input 
+                id="image"
+                name="image"
+                value={formData.image}
+                onChange={handleInputChange}
+                placeholder="Image URL for your service"
+                required
+              />
+              <p className="text-xs text-gray-500">
+                Provide a URL to an image that represents your service. Use services like Unsplash for free images.
+              </p>
+            </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="business">Business Name</Label>
-            <Input 
-              id="business"
-              name="business"
-              value={formData.business}
-              onChange={handleInputChange}
-              placeholder="Your business name (optional)"
-            />
-          </div>
+            <div className="space-y-2">
+              <Label htmlFor="business">Business Name</Label>
+              <Input 
+                id="business"
+                name="business"
+                value={formData.business}
+                onChange={handleInputChange}
+                placeholder="Your business name (optional)"
+              />
+            </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="price">Pricing</Label>
-            <Input 
-              id="price"
-              name="price"
-              value={formData.price}
-              onChange={handleInputChange}
-              placeholder="e.g. $100/hour or Starting from $500"
-            />
-          </div>
+            <div className="space-y-2">
+              <Label htmlFor="price">Pricing</Label>
+              <Input 
+                id="price"
+                name="price"
+                value={formData.price}
+                onChange={handleInputChange}
+                placeholder="e.g. $100/hour or Starting from $500"
+              />
+            </div>
 
-          <div className="space-y-2">
-            <Label>Features</Label>
-            {formData.features.map((feature, index) => (
-              <div key={index} className="flex gap-2 items-center">
-                <Input 
-                  value={feature}
-                  onChange={(e) => handleFeatureChange(index, e.target.value)}
-                  placeholder={`Feature ${index + 1}`}
-                />
-                {formData.features.length > 1 && (
-                  <Button 
-                    type="button" 
-                    variant="destructive" 
-                    size="icon"
-                    onClick={() => removeFeature(index)}
-                  >
-                    ✕
-                  </Button>
-                )}
-              </div>
-            ))}
-            <Button 
-              type="button" 
-              variant="outline" 
-              size="sm"
-              onClick={addFeature}
-            >
-              Add Feature
-            </Button>
-          </div>
+            <div className="space-y-2">
+              <Label>Features</Label>
+              {formData.features.map((feature, index) => (
+                <div key={index} className="flex gap-2 items-center">
+                  <Input 
+                    value={feature}
+                    onChange={(e) => handleFeatureChange(index, e.target.value)}
+                    placeholder={`Feature ${index + 1}`}
+                  />
+                  {formData.features.length > 1 && (
+                    <Button 
+                      type="button" 
+                      variant="destructive" 
+                      size="icon"
+                      onClick={() => removeFeature(index)}
+                    >
+                      ✕
+                    </Button>
+                  )}
+                </div>
+              ))}
+              <Button 
+                type="button" 
+                variant="outline" 
+                size="sm"
+                onClick={addFeature}
+              >
+                Add Feature
+              </Button>
+            </div>
 
-          <DialogFooter className="pt-4">
-            <Button type="button" variant="outline" onClick={onClose}>
-              Cancel
-            </Button>
-            <Button type="submit" disabled={isLoading}>
-              {isLoading ? 'Saving...' : 'Save Service'}
-            </Button>
-          </DialogFooter>
-        </form>
+            <DialogFooter className="pt-4">
+              <Button type="button" variant="outline" onClick={onClose}>
+                Cancel
+              </Button>
+              <Button type="submit" disabled={isLoading}>
+                {isLoading ? 'Saving...' : 'Save Service'}
+              </Button>
+            </DialogFooter>
+          </form>
+        </ScrollArea>
       </DialogContent>
     </Dialog>
   );

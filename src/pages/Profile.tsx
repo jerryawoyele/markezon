@@ -491,6 +491,7 @@ export function Profile() {
                     <ServiceCard 
                       key={service.id} 
                       service={service} 
+                      onClick={() => {}}
                     />
                   ))}
                 </div>

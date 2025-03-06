@@ -23,8 +23,8 @@ export function ServiceModal({ service, isOpen, onClose }: ServiceModalProps) {
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-3xl max-h-[90vh]">
-        <ScrollArea className="max-h-[calc(90vh-120px)] overflow-y-auto pr-4">
+      <DialogContent className="max-w-3xl max-h-[90vh] overflow-hidden">
+        <ScrollArea className="max-h-[calc(90vh-120px)] pr-4">
           <DialogHeader>
             <DialogTitle className="text-2xl font-bold">{service.title}</DialogTitle>
             <div className="flex items-center gap-2 mt-2">

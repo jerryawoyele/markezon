@@ -138,7 +138,7 @@ export default function Home() {
         <div className="flex flex-col md:flex-row gap-6">
           <div className="flex-1 flex flex-col gap-6">
             <MobileHeader />
-            <CreatePost onSubmit={handlePostSubmit} className="mx-4 lg:mx-2" />
+            <CreatePost onSubmit={handlePostSubmit} className="mx-4 lg:mx-6" />
             {posts.map((post) => (
               <Post
                 key={post.id}
@@ -148,7 +148,6 @@ export default function Home() {
                   const { data } = await supabase.auth.getUser();
                   return data.user?.id || null;
                 }}
-                className="px-4"
               />
             ))}
           </div>

@@ -8,6 +8,11 @@ interface ServiceCardProps {
 }
 
 export function ServiceCard({ service, onClick }: ServiceCardProps) {
+  // Add a guard clause to prevent rendering if service is undefined
+  if (!service) {
+    return null;
+  }
+  
   return (
     <Card 
       className="bg-black/20 border-white/5 cursor-pointer transition-all hover:bg-black/30"

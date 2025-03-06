@@ -244,12 +244,11 @@ export function UserProfile() {
               {services.length > 0 ? (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                   {services.map((service) => (
-                    <div key={service.id} onClick={() => handleServiceClick(service)}>
-                      <ServiceCard 
-                        service={service} 
-                        onClick={() => handleServiceClick(service)}
-                      />
-                    </div>
+                    <ServiceCard 
+                      key={service.id} 
+                      service={service} 
+                      onClick={() => handleServiceClick(service)}
+                    />
                   ))}
                 </div>
               ) : (

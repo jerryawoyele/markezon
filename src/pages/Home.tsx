@@ -40,7 +40,13 @@ export default function Home() {
             username,
             avatar_url,
             bio,
-            updated_at
+            updated_at,
+            about_business,
+            followers_count,
+            following_count,
+            posts_count,
+            reviews_count,
+            reviews_rating
           )
         `)
         .order('created_at', { ascending: false });
@@ -101,7 +107,13 @@ export default function Home() {
             username,
             avatar_url,
             bio,
-            updated_at
+            updated_at,
+            about_business,
+            followers_count,
+            following_count,
+            posts_count,
+            reviews_count,
+            reviews_rating
           )
         `)
         .single();
@@ -128,7 +140,7 @@ export default function Home() {
         <div className="flex flex-col md:flex-row gap-6">
           <div className="flex-1 flex flex-col gap-6">
             <MobileHeader />
-            <CreatePost onSubmit={handlePostSubmit} className="mx-2" />
+            <CreatePost onSubmit={handlePostSubmit} className="mx-4 lg:mx-2" />
             {posts.map((post) => (
               <Post
                 key={post.id}
@@ -142,7 +154,7 @@ export default function Home() {
             ))}
           </div>
           
-          <div className="hidden lg:block w-80">
+          <div className="hidden lg:block w-80 mr-4">
             <TrendingServices />
           </div>
         </div>

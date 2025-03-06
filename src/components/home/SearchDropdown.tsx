@@ -12,6 +12,7 @@ interface SearchResult {
   title: string;
   subtitle?: string;
   image_url?: string;
+  username?: string;
 }
 
 interface SearchDropdownProps {
@@ -92,7 +93,8 @@ export function SearchDropdown({ searchQuery, show, onClose }: SearchDropdownPro
         id: user.id,
         type: "user",
         title: user.username || "Anonymous",
-        image_url: user.avatar_url || undefined
+        image_url: user.avatar_url || undefined,
+        username: user.username || undefined
       })) || [];
 
       setResults([...userResults, ...postResults]);
@@ -110,8 +112,12 @@ export function SearchDropdown({ searchQuery, show, onClose }: SearchDropdownPro
       // For now just show notification since we don't have a post detail page yet
       alert(`Viewing post: ${result.title}`);
     } else {
-      // Navigate to user profile
-      navigate(`/user/${result.id}`);
+      // Navigate to user profile - use new @username format if username is available
+      if (result.username) {
+        navigate(`/@${result.username}`);
+      } else {
+        navigate(`/user/${result.id}`);
+      }
     }
   };
 

@@ -183,23 +183,38 @@ export type Database = {
       }
       profiles: {
         Row: {
+          about_business: string | null
           avatar_url: string | null
           bio: string | null
+          followers_count: number | null
+          following_count: number | null
           id: string
+          reviews_count: number | null
+          reviews_rating: number | null
           updated_at: string | null
           username: string | null
         }
         Insert: {
+          about_business?: string | null
           avatar_url?: string | null
           bio?: string | null
+          followers_count?: number | null
+          following_count?: number | null
           id: string
+          reviews_count?: number | null
+          reviews_rating?: number | null
           updated_at?: string | null
           username?: string | null
         }
         Update: {
+          about_business?: string | null
           avatar_url?: string | null
           bio?: string | null
+          followers_count?: number | null
+          following_count?: number | null
           id?: string
+          reviews_count?: number | null
+          reviews_rating?: number | null
           updated_at?: string | null
           username?: string | null
         }

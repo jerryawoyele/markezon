@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
@@ -105,20 +104,24 @@ export function SearchDropdown({ searchQuery, show, onClose }: SearchDropdownPro
     }
   };
 
-  const handleResultClick = (result: SearchResult) => {
+  const handleResultClick = (result: SearchResult, e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    
+    // Close the dropdown first
     onClose();
-    if (result.type === "post") {
-      // Navigate to post detail
-      // For now just show notification since we don't have a post detail page yet
-      alert(`Viewing post: ${result.title}`);
-    } else {
-      // Navigate to user profile - use new @username format if username is available
-      if (result.username) {
-        navigate(`/@${result.username}`);
+    
+    // Then navigate after a slight delay to ensure clean UI transition
+    setTimeout(() => {
+      if (result.type === "post") {
+        // Navigate to post detail, when post detail page becomes available
+        // For now, just navigate to the user's profile who created the post
+        navigate(`/user/${result.id}`);
       } else {
+        // Always use the /user/:id format for consistency
         navigate(`/user/${result.id}`);
       }
-    }
+    }, 50);
   };
 
   if (!show) return null;
@@ -138,8 +141,8 @@ export function SearchDropdown({ searchQuery, show, onClose }: SearchDropdownPro
           {results.map((result) => (
             <button
               key={`${result.type}-${result.id}`}
-              className="w-full text-left px-4 py-2 hover:bg-white/5 flex items-center gap-3 transition-colors"
-              onClick={() => handleResultClick(result)}
+              className="w-full text-left px-4 py-2 hover:bg-white/10 active:bg-white/20 flex items-center gap-3 transition-colors"
+              onClick={(e) => handleResultClick(result, e)}
             >
               {result.type === "user" ? (
                 <Avatar>

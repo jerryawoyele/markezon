@@ -1,4 +1,3 @@
-
 export interface Profile {
   id: string;
   username: string | null;
@@ -41,7 +40,7 @@ export interface Like {
 
 export interface ServiceType {
   id: string;
-  user_id: string;
+  owner_id: string;
   title: string;
   description: string;
   category: string;

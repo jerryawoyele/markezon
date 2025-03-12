@@ -13,14 +13,17 @@ import {
   Trash, 
   Edit,
   ChevronLeft,
-  ChevronRight 
+  ChevronRight,
+  LoaderCircle,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { 
   Dialog, 
   DialogContent, 
   DialogHeader, 
-  DialogTitle 
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
 } from "@/components/ui/dialog";
 import {
   DropdownMenu,
@@ -29,11 +32,22 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { format, formatDistance } from "date-fns";
+import ProfileImage from "@/components/ProfileImage";
+import { useToast } from "@/components/ui/use-toast";
+import { AuthRequiredModal } from "@/components/auth/AuthRequiredModal";
+import { Badge } from "@/components/ui/badge";
+import { LikesModal } from "../profile/LikesModal";
+import { createNotification } from "@/utils/notification-helper";
 
 interface Profile {
   id: string;
   username: string | null;
   avatar_url: string | null;
+  auth_metadata?: {
+    full_name?: string;
+    avatar_url?: string;
+    name?: string;
+  };
 }
 
 interface Comment {
@@ -73,6 +87,7 @@ interface PostProps {
   onEdit?: (postId: string, newCaption: string) => Promise<void>;
   currentUserId?: () => Promise<string | null>;
   showDetailOnClick?: boolean;
+  isAuthenticated?: boolean;
 }
 
 export function Post({ 
@@ -88,7 +103,8 @@ export function Post({
   onDelete,
   onEdit,
   currentUserId,
-  showDetailOnClick = false
+  showDetailOnClick = false,
+  isAuthenticated = true
 }: PostProps) {
   const [showComments, setShowComments] = useState(false);
   const [newComment, setNewComment] = useState("");
@@ -107,10 +123,17 @@ export function Post({
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [parsedImages, setParsedImages] = useState<string[]>([]);
   const [lastTap, setLastTap] = useState<number>(0);
+  const [showAuthModal, setShowAuthModal] = useState(false);
+  const [dropdownOpen, setDropdownOpen] = useState(false);
   const navigate = useNavigate();
   const postCardRef = useRef<HTMLDivElement>(null);
   const location = useLocation();
   const isDetailClickEnabled = showDetailOnClick || location.pathname.includes('/discover') || location.pathname.includes('/user/');
+  const commentInputRef = useRef<HTMLInputElement>(null);
+  const { toast } = useToast();
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [currentUserObj, setCurrentUserObj] = useState<{ id: string } | null>(null);
+  const [commentLikes, setCommentLikes] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
     const checkOwnership = async () => {
@@ -195,55 +218,180 @@ export function Post({
     fetchLikesAndComments();
   }, [id]);
 
-  const handleLike = async () => {
+  useEffect(() => {
+    const getCurrentUser = async () => {
+      const { data } = await supabase.auth.getUser();
+      if (data.user) {
+        setCurrentUserObj({ id: data.user.id });
+      }
+    };
+    
+    getCurrentUser();
+  }, []);
+
+  useEffect(() => {
     try {
-      const user = await supabase.auth.getUser();
-      const currentUserId = user.data.user?.id;
+      const savedLikes = localStorage.getItem('commentLikes');
+      if (savedLikes) {
+        setCommentLikes(JSON.parse(savedLikes));
+      }
+    } catch (err) {
+      console.error('Error loading comment likes from localStorage:', err);
+    }
+  }, []);
+
+  const handleLikeComment = async (commentId: string) => {
+    if (!isAuthenticated) {
+      setShowAuthModal(true);
+      return;
+    }
+    
+    // Just toggle the like state in the UI
+    setCommentLikes(prev => {
+      const newState = {
+        ...prev,
+        [commentId]: !prev[commentId]
+      };
       
-      if (!currentUserId) {
-        alert('You need to be logged in to like posts');
-        return;
+      // Store in localStorage to persist across page refreshes
+      try {
+        localStorage.setItem('commentLikes', JSON.stringify(newState));
+      } catch (err) {
+        console.error('Error saving comment likes to localStorage:', err);
       }
       
+      return newState;
+    });
+    
+    // Show a toast notification
+    const isLiked = !commentLikes[commentId];
+    
+    toast({
+      title: isLiked ? "Comment liked" : "Comment unliked",
+      description: isLiked 
+        ? "You've liked this comment" 
+        : "You've removed your like from this comment"
+    });
+  };
+
+  const handleDeleteComment = async (commentId: string) => {
+    if (!isAuthenticated || !currentUserObj) {
+      setShowAuthModal(true);
+      return;
+    }
+    
+    const comment = comments.find(c => c.id === commentId);
+    
+    if (!comment || comment.user_id !== currentUserObj.id) {
+      toast({
+        title: "Permission denied",
+        description: "You can only delete your own comments",
+        variant: "destructive"
+      });
+      return;
+    }
+    
+    setComments(prev => prev.filter(c => c.id !== commentId));
+    setCommentsCount(prev => prev - 1);
+    
+    toast({
+      title: "Comment deleted",
+      description: "Your comment has been removed"
+    });
+    
+    try {
+      await supabase
+        .from('comments')
+        .delete()
+        .eq('id', commentId);
+    } catch (error) {
+      console.error("Error deleting comment:", error);
+    }
+  };
+
+  const checkAuth = (callback: Function) => {
+    if (!isAuthenticated) {
+      setShowAuthModal(true);
+      return false;
+    }
+    return callback();
+  };
+
+  const handleLike = async () => {
+    if (!isAuthenticated) {
+      setShowAuthModal(true);
+      return;
+    }
+    
+    try {
+      setLiked(!liked);
+      
       if (liked) {
-        const { error } = await supabase
-          .from('likes')
-          .delete()
-          .eq('post_id', id)
-          .eq('user_id', currentUserId);
-          
-        if (error) throw error;
-        
-        setLiked(false);
         setLikesCount(prev => Math.max(0, prev - 1));
-        
-        setLikes(prev => prev.filter(like => like.user_id !== currentUserId));
       } else {
-        const { error, data } = await supabase
-          .from('likes')
-          .insert({
-            post_id: id,
-            user_id: currentUserId
-          })
-          .select('*, profile:profiles(username, avatar_url)');
-          
-        if (error) throw error;
-        
-        setLiked(true);
         setLikesCount(prev => prev + 1);
-        
-        if (data && data[0]) {
-          setLikes(prev => [...prev, data[0] as Like]);
-        }
       }
       
       if (onLike) onLike();
+      
+      if (!currentUserId) return;
+      
+      const userId = await currentUserId();
+      if (!userId) return;
+      
+      if (!liked) {
+        const { error } = await supabase
+          .from('likes')
+          .insert({ post_id: id, user_id: userId });
+          
+        if (error) throw error;
+        
+        // Create notification for post owner if the liker isn't the post owner
+        if (userId !== user_id) {
+          // Get current user's username
+          const { data: userData } = await supabase
+            .from('profiles')
+            .select('username')
+            .eq('id', userId)
+            .single();
+            
+          const username = userData?.username || 'Someone';
+          
+          // Create like notification
+          await createNotification({
+            userId: user_id,
+            actorId: userId,
+            actorName: username,
+            type: 'like',
+            entityId: id,
+            message: `${username} liked your post`
+          });
+        }
+      } else {
+        const { error } = await supabase
+          .from('likes')
+          .delete()
+          .match({ post_id: id, user_id: userId });
+          
+        if (error) throw error;
+      }
     } catch (error) {
-      console.error('Error liking post:', error);
+      console.error("Error liking post:", error);
+      setLiked(liked);
+      if (liked) {
+        setLikesCount(prev => prev + 1);
+      } else {
+        setLikesCount(prev => Math.max(0, prev - 1));
+      }
     }
   };
 
   const handleComment = async () => {
+    if (!isAuthenticated) {
+      setShowAuthModal(true);
+      return;
+    }
+    
     if (!newComment.trim()) return;
     
     setLoading(true);
@@ -252,47 +400,146 @@ export function Post({
       const currentUserId = user.data.user?.id;
       
       if (!currentUserId) {
-        alert('You need to be logged in to comment');
-        setLoading(false);
+        setShowAuthModal(true);
         return;
       }
       
+      // Create the comment
       const { data, error } = await supabase
         .from('comments')
         .insert({
+          content: newComment,
           post_id: id,
           user_id: currentUserId,
-          content: newComment
         })
-        .select('*, profile:profiles(username, avatar_url)');
-        
+        .select('*, profile:profiles(username, avatar_url)')
+        .single();
+      
       if (error) throw error;
       
-      if (data && data[0]) {
-        setComments(prev => [data[0] as Comment, ...prev]);
-        setCommentsCount(prev => prev + 1);
-      }
-      
+      // Add the new comment to the state
+      setComments([data as Comment, ...comments]);
+      setCommentsCount(prev => prev + 1);
       setNewComment("");
       
-      if (onComment) await onComment(id, newComment);
+      // Call the onComment callback if provided
+      if (onComment) {
+        await onComment(id, newComment);
+      }
+      
+      // Create notification for post owner if the commenter isn't the post owner
+      if (currentUserId !== user_id) {
+        // Get current user's username
+        const { data: userData } = await supabase
+          .from('profiles')
+          .select('username')
+          .eq('id', currentUserId)
+          .single();
+          
+        const username = userData?.username || 'Someone';
+        
+        // Create comment notification
+        await createNotification({
+          userId: user_id,
+          actorId: currentUserId,
+          actorName: username,
+          type: 'comment',
+          entityId: id,
+          message: `${username} commented on your post: "${newComment.slice(0, 30)}${newComment.length > 30 ? '...' : ''}"`
+        });
+      }
     } catch (error) {
-      console.error('Error posting comment:', error);
+      console.error("Error adding comment:", error);
+      toast({
+        title: "Error",
+        description: "Failed to add comment. Please try again.",
+        variant: "destructive",
+      });
     } finally {
       setLoading(false);
     }
   };
 
   const handleShare = () => {
+    if (!isAuthenticated) {
+      setShowAuthModal(true);
+      return;
+    }
+    
+    const postUrl = `${window.location.origin}/user/${user_id}/${id}`;
+    
+    if (navigator.share) {
+      navigator.share({
+        title: caption || 'Check out this post',
+        url: postUrl
+      }).catch(error => console.log('Error sharing:', error));
+    } else {
+      navigator.clipboard.writeText(postUrl)
+        .then(() => {
+          toast({
+            title: "Link Copied!",
+            description: "Post link copied to clipboard",
+          });
+        })
+        .catch(err => {
+          console.error('Failed to copy: ', err);
+          toast({
+            title: "Error",
+            description: "Failed to copy link",
+            variant: "destructive",
+          });
+        });
+    }
+    
     if (onShare) onShare();
   };
 
-  const handleProfileClick = () => {
+  const handleProfileClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
     navigate(`/user/${user_id}`);
   };
 
   const handleDelete = async () => {
-    if (onDelete) await onDelete(id);
+    if (!showDeleteConfirm) {
+      setShowDeleteConfirm(true);
+      return;
+    }
+    
+    setLoading(true);
+    try {
+      if (!onDelete) {
+        await supabase.from('likes').delete().eq('post_id', id);
+        await supabase.from('comments').delete().eq('post_id', id);
+        
+        const { error } = await supabase.from('posts').delete().eq('id', id);
+        
+        if (error) throw error;
+        
+        toast({
+          title: "Post deleted",
+          description: "Your post has been deleted successfully."
+        });
+        
+        setShowPostModal(false);
+        
+        if (postCardRef.current) {
+          postCardRef.current.style.display = 'none';
+        }
+      } else {
+        await onDelete(id);
+      }
+      
+      setShowDeleteConfirm(false);
+    } catch (error) {
+      console.error("Error deleting post:", error);
+      toast({
+        title: "Delete failed",
+        description: "There was an error deleting your post. Please try again.",
+        variant: "destructive"
+      });
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleEdit = async () => {
@@ -320,7 +567,7 @@ export function Post({
     if (showCommentsModal || showLikesModal || showPostModal) return;
     
     const now = Date.now();
-    const DOUBLE_TAP_DELAY = 300; // ms
+    const DOUBLE_TAP_DELAY = 300;
     
     if (now - lastTap < DOUBLE_TAP_DELAY) {
       handleLike();
@@ -373,192 +620,201 @@ export function Post({
   };
 
   const isTextPost = () => {
-    try {
-      return parsedImages[0]?.startsWith('data:image/svg+xml');
-    } catch (e) {
-      return false;
+    return !image_url || image_url === 'text' || image_url === caption;
+  };
+
+  const handleCardClick = () => {
+    if (showDetailOnClick) {
+      setShowPostModal(true);
     }
+  };
+
+  const openCommentsModal = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    
+    if (!isAuthenticated) {
+      setShowAuthModal(true);
+      return;
+    }
+    
+    setShowCommentsModal(true);
+    
+    setTimeout(() => {
+      commentInputRef.current?.focus();
+    }, 100);
   };
 
   return (
     <>
-      <Card 
-        className="overflow-hidden bg-black/20 border-white/5 max-w-3xl w-full mx-auto"
-        ref={postCardRef}
-        onClick={() => {
-          if (!showCommentsModal && !showLikesModal && !showPostModal && isDetailClickEnabled) {
-            setShowPostModal(true);
-          }
-        }}
-      >
-        <div className="p-4 flex items-center justify-between" onClick={(e) => e.stopPropagation()}>
-          <div className="flex items-center gap-3">
-            <button onClick={handleProfileClick}>
-              <Avatar>
-                <img 
-                  src={profiles?.avatar_url || 'https://source.unsplash.com/100x100/?portrait'} 
-                  alt={profiles?.username || 'User'}
-                  className="w-full h-full object-cover"
-                />
-              </Avatar>
-            </button>
-            <div>
-              <button 
-                className="font-medium hover:underline"
-                onClick={handleProfileClick}
+      <div className="max-w-2xl mx-auto w-full">
+        <Card 
+          className="bg-black/20 hover:bg-black/30 border-white/5 transition-colors duration-200 overflow-hidden"
+          onClick={handleCardClick}
+        >
+          <div className="p-4 flex items-start gap-3" onClick={(e) => e.stopPropagation()}>
+            <ProfileImage 
+              src={profiles?.avatar_url || profiles?.auth_metadata?.avatar_url} 
+              alt={profiles?.username || profiles?.auth_metadata?.full_name || "User"}
+              className="w-10 h-10 rounded-full shrink-0 cursor-pointer"
+              onClick={handleProfileClick}
+            />
+            <div className="flex-1">
+              <div className="flex flex-col items-start gap-2">
+                <h3 
+                  className="font-medium text-sm cursor-pointer hover:underline" 
+                  onClick={handleProfileClick}
+                >
+                  {profiles?.username || 
+                    profiles?.auth_metadata?.full_name || 
+                    profiles?.auth_metadata?.name || 
+                    "User"}
+                </h3>
+                <span className="text-muted-foreground text-xs">
+                  {formatTimeAgo(created_at || new Date().toISOString())}
+                </span>
+              </div>
+            </div>
+            
+            {/* Post Options Menu - Only visible for post owner */}
+            {isOwner && (
+              <div className="ml-auto">
+                <DropdownMenu open={dropdownOpen} onOpenChange={setDropdownOpen}>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="ghost" size="icon" className="h-8 w-8 p-0">
+                      <MoreVertical className="h-4 w-4" />
+                      <span className="sr-only">Post options</span>
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem onClick={() => {
+                      setDropdownOpen(false);
+                      setEditMode(true);
+                      setShowPostModal(true);
+                    }}>
+                      <Edit className="mr-2 h-4 w-4" />
+                      <span>Edit Post</span>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem 
+                      onClick={() => {
+                        setDropdownOpen(false);
+                        setShowDeleteConfirm(true);
+                      }} 
+                      className="text-red-500 focus:text-red-500"
+                    >
+                      <Trash className="mr-2 h-4 w-4" />
+                      <span>Delete Post</span>
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
+            )}
+          </div>
+          
+          {isTextPost() ? (
+            <div className="p-6 bg-gradient-to-br from-gray-900 to-black flex items-center justify-center min-h-[200px]">
+              <p className="text-lg md:text-xl font-medium text-center line-clamp-5">{caption}</p>
+            </div>
+          ) : (
+            <div className="relative aspect-square overflow-hidden bg-black">
+              <img 
+                src={parsedImages[0]} 
+                alt={caption || 'Post image'}
+                className="w-full h-full object-cover"
+                onError={(e) => {
+                  (e.target as HTMLImageElement).src = 'https://source.unsplash.com/800x600/?abstract';
+                }}
+              />
+              
+              {parsedImages.length > 1 && (
+                  <div className="absolute bottom-2 left-1/2 transform -translate-x-1/2 flex gap-1">
+                    {parsedImages.map((_, index) => (
+                      <div 
+                        key={index} 
+                      className={`w-2 h-2 rounded-full ${index === 0 ? 'bg-primary' : 'bg-white/30'}`}
+                      />
+                    ))}
+                  </div>
+              )}
+            </div>
+          )}
+          
+          <div className="p-4">
+            {!isTextPost() && caption && (
+              <p className="mb-3 text-sm">
+                <span className="font-medium mr-1">
+                  {profiles?.username || profiles?.auth_metadata?.full_name || 'User'}:
+                </span>
+                {caption}
+              </p>
+            )}
+            
+            <div className="flex items-center gap-4">
+              <Button 
+                variant="ghost" 
+                size="icon" 
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleLike();
+                }}
+                className={`${liked ? 'hover:bg-black/80' : 'hover:bg-white/10'}`}
               >
-                {profiles?.username || 'Anonymous'}
+                <Heart className={`w-5 h-5 ${liked ? 'fill-current text-primary' : ''}`} />
+              </Button>
+              <Button 
+                variant="ghost" 
+                size="icon" 
+                onClick={openCommentsModal}
+              >
+                <MessageCircle className="w-5 h-5" />
+              </Button>
+              <Button 
+                variant="ghost" 
+                size="icon" 
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleShare();
+                }}
+              >
+                <Send className="w-5 h-5" />
+              </Button>
+            </div>
+            
+            <div className="mt-2 text-sm">
+              <button 
+                className="font-medium hover:underline" 
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setShowLikesModal(true);
+                }}
+              >
+                {likesCount} likes
               </button>
-              <div className="text-xs text-white/60">
-                {formatTimeAgo(created_at)}
+              <div className="text-white/60">
+                {commentsCount > 0 ? (
+              <button 
+                className="hover:underline"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setShowCommentsModal(true);
+                  }}
+              >
+                  View all {commentsCount} comments
+              </button>
+                ) : (
+                  <span>No comments yet</span>
+                )}
               </div>
             </div>
           </div>
-          
-          {isOwner && (
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
-                <Button variant="ghost" size="icon">
-                  <MoreVertical className="h-5 w-5" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="bg-black/90 border-white/10">
-                <DropdownMenuItem 
-                  className="flex items-center gap-2 cursor-pointer"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleEdit();
-                  }}
-                >
-                  <Edit className="h-4 w-4" />
-                  {editMode ? "Save Edit" : "Edit Post"}
-                </DropdownMenuItem>
-                <DropdownMenuItem 
-                  className="flex items-center gap-2 text-red-500 cursor-pointer"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleDelete();
-                  }}
-                >
-                  <Trash className="h-4 w-4" />
-                  Delete Post
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          )}
-        </div>
+        </Card>
         
-        {parsedImages.length > 0 && (
-          <div 
-            className="relative min-h-[200px] min-w-[300px]" 
-            onClick={handleImageTap}
-          >
-            <img 
-              src={parsedImages[currentImageIndex]} 
-              alt={caption || 'Post image'}
-              className="w-full h-auto max-h-[600px] min-h-[200px] object-contain bg-black/30"
-              onError={(e) => {
-                (e.target as HTMLImageElement).src = 'https://source.unsplash.com/800x600/?abstract';
-              }}
-            />
+        <Dialog open={showCommentsModal} onOpenChange={setShowCommentsModal}>
+          <DialogContent className="sm:max-w-[500px] bg-black/90 border-white/10 max-h-[80vh]">
+            <DialogHeader>
+              <DialogTitle>Comments</DialogTitle>
+            </DialogHeader>
             
-            {parsedImages.length > 1 && (
-              <>
-                <button 
-                  className="absolute left-2 top-1/2 transform -translate-y-1/2 bg-black/30 p-1 rounded-full"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handlePrevImage();
-                  }}
-                  disabled={currentImageIndex === 0}
-                >
-                  <ChevronLeft className="h-6 w-6" />
-                </button>
-                <button 
-                  className="absolute right-2 top-1/2 transform -translate-y-1/2 bg-black/30 p-1 rounded-full"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleNextImage();
-                  }}
-                  disabled={currentImageIndex === parsedImages.length - 1}
-                >
-                  <ChevronRight className="h-6 w-6" />
-                </button>
-                
-                <div className="absolute bottom-2 left-1/2 transform -translate-x-1/2 flex gap-1">
-                  {parsedImages.map((_, index) => (
-                    <div 
-                      key={index} 
-                      className={`w-2 h-2 rounded-full ${currentImageIndex === index ? 'bg-primary' : 'bg-white/30'}`}
-                    />
-                  ))}
-                </div>
-              </>
-            )}
-          </div>
-        )}
-        
-        <div className="p-4 space-y-4" onClick={(e) => e.stopPropagation()}>
-          <div className="flex items-center gap-4">
-            <Button 
-              variant="ghost" 
-              size="icon" 
-              onClick={handleLike}
-              className={liked ? "hover:bg-black/80" : "hover:bg-white/10"}
-            >
-              <Heart className={`w-5 h-5 ${liked ? 'fill-current text-primary' : ''}`} />
-            </Button>
-            <Button variant="ghost" size="icon" onClick={() => setShowComments(!showComments)}>
-              <MessageCircle className="w-5 h-5" />
-            </Button>
-            <Button variant="ghost" size="icon" onClick={handleShare}>
-              <Send className="w-5 h-5" />
-            </Button>
-          </div>
-          
-          <div className="flex space-x-4 text-sm">
-            <button 
-              className="font-medium hover:underline" 
-              onClick={() => setShowLikesModal(true)}
-            >
-              {likesCount} likes
-            </button>
-            <button 
-              className="hover:underline"
-              onClick={() => setShowCommentsModal(true)}
-            >
-              {commentsCount} comments
-            </button>
-          </div>
-
-          {!isTextPost() && (
-            editMode ? (
-              <div className="flex gap-2 items-center">
-                <Textarea 
-                  value={editedCaption} 
-                  onChange={(e) => setEditedCaption(e.target.value)}
-                  className="flex-1 min-h-[100px]" 
-                />
-                <div className="flex flex-col gap-2">
-                  <Button size="sm" onClick={handleEdit}>Save</Button>
-                  <Button size="sm" variant="ghost" onClick={() => {
-                    setEditMode(false);
-                    setEditedCaption(caption || "");
-                  }}>Cancel</Button>
-                </div>
-              </div>
-            ) : (
-              caption && (
-                <p className="text-sm">
-                  <span className="font-medium mr-2">{profiles?.username || 'Anonymous'}</span>
-                  {caption}
-                </p>
-              )
-            )
-          )}
-
-          {showComments && (
-            <div className="space-y-4">
+            <div className="my-4 space-y-4 max-h-[60vh] overflow-hidden flex flex-col">
               <div className="flex gap-2">
                 <Input
                   placeholder="Add a comment..."
@@ -566,269 +822,343 @@ export function Post({
                   onChange={(e) => setNewComment(e.target.value)}
                   onKeyPress={(e) => e.key === 'Enter' && handleComment()}
                   className="flex-1"
+                  ref={commentInputRef}
                 />
                 <Button onClick={handleComment} disabled={loading}>
                   {loading ? "Posting..." : "Post"}
                 </Button>
               </div>
               
-              {comments.length > 0 && (
-                <div className="space-y-3 max-h-40 overflow-y-auto">
-                  {comments.slice(0, 1).map((comment) => (
+              {comments.length > 0 ? (
+                <div className="space-y-4 overflow-y-auto flex-1 pb-4">
+                  {comments.map((comment) => (
                     <div key={comment.id} className="flex gap-2">
-                      <Avatar className="w-8 h-8">
-                        <img 
-                          src={comment.profile?.avatar_url || 'https://source.unsplash.com/100x100/?portrait'} 
-                          alt={comment.profile?.username || 'User'}
-                          className="w-full h-full object-cover"
-                        />
-                      </Avatar>
+                      <ProfileImage 
+                        src={comment.profile?.avatar_url || 'https://source.unsplash.com/100x100/?portrait'} 
+                        alt={comment.profile?.username || 'User'}
+                        className="w-8 h-8 rounded-full"
+                      />
                       <div className="bg-white/5 p-2 rounded-lg flex-1">
                         <div className="flex justify-between">
-                          <p className="text-sm font-medium">{comment.profile?.username || 'Anonymous'}</p>
+                          <p className="text-sm font-medium">
+                            {comment.profile?.username || 'User'}
+                          </p>
                           <span className="text-xs text-white/40">{formatCommentDate(comment.created_at)}</span>
                         </div>
                         <p className="text-sm">{comment.content}</p>
+                        <div className="flex items-center mt-2 gap-4">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className={`h-7 w-7 rounded-full ${
+                              commentLikes[comment.id] ? 'bg-red-500/10' : ''
+                            }`}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleLikeComment(comment.id);
+                            }}
+                          >
+                            <Heart 
+                              className={`h-3 w-3 ${
+                                commentLikes[comment.id] ? 'fill-red-500 text-red-500' : 'text-white/60'
+                              }`} 
+                            />
+                          </Button>
+                          
+                          {isAuthenticated && currentUserObj && comment.user_id === currentUserObj.id && (
+                            <button 
+                              className="flex items-center gap-1 text-xs text-white/60 hover:text-white/80" 
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleDeleteComment(comment.id);
+                              }}
+                            >
+                              <Trash className="h-3 w-3" />
+                              <span>Delete</span>
+                            </button>
+                          )}
+                        </div>
                       </div>
                     </div>
                   ))}
-                  
-                  {comments.length > 1 && (
-                    <button 
-                      className="text-sm text-white/60 hover:text-white"
-                      onClick={() => setShowCommentsModal(true)}
-                    >
-                      View all {comments.length} comments
-                    </button>
-                  )}
+                </div>
+              ) : (
+                <div className="text-center py-8 text-white/60">
+                  No comments yet. Be the first to comment!
                 </div>
               )}
             </div>
-          )}
-        </div>
-      </Card>
-      
-      <Dialog open={showCommentsModal} onOpenChange={setShowCommentsModal}>
-        <DialogContent className="sm:max-w-[500px] bg-black/90 border-white/10 max-h-[80vh]">
-          <DialogHeader>
-            <DialogTitle>Comments</DialogTitle>
-          </DialogHeader>
-          
-          <div className="my-4 space-y-4 max-h-[60vh] overflow-hidden flex flex-col">
-            <div className="flex gap-2">
-              <Input
-                placeholder="Add a comment..."
-                value={newComment}
-                onChange={(e) => setNewComment(e.target.value)}
-                onKeyPress={(e) => e.key === 'Enter' && handleComment()}
-                className="flex-1"
-              />
-              <Button onClick={handleComment} disabled={loading}>
-                {loading ? "Posting..." : "Post"}
-              </Button>
-            </div>
+          </DialogContent>
+        </Dialog>
+        
+        <Dialog open={showLikesModal} onOpenChange={setShowLikesModal}>
+          <DialogContent className="sm:max-w-[400px] bg-black/90 border-white/10 max-h-[80vh]">
+            <DialogHeader>
+              <DialogTitle>Likes</DialogTitle>
+            </DialogHeader>
             
-            {comments.length > 0 ? (
-              <div className="space-y-4 overflow-y-auto flex-1 pb-4">
-                {comments.map((comment) => (
-                  <div key={comment.id} className="flex gap-2">
-                    <Avatar className="w-8 h-8">
-                      <img 
-                        src={comment.profile?.avatar_url || 'https://source.unsplash.com/100x100/?portrait'} 
-                        alt={comment.profile?.username || 'User'}
-                        className="w-full h-full object-cover"
-                      />
-                    </Avatar>
-                    <div className="bg-white/5 p-2 rounded-lg flex-1">
-                      <div className="flex justify-between">
-                        <p className="text-sm font-medium">{comment.profile?.username || 'Anonymous'}</p>
-                        <span className="text-xs text-white/40">{formatCommentDate(comment.created_at)}</span>
-                      </div>
-                      <p className="text-sm">{comment.content}</p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="text-center py-8 text-white/60">
-                No comments yet. Be the first to comment!
-              </div>
-            )}
-          </div>
-        </DialogContent>
-      </Dialog>
-      
-      <Dialog open={showLikesModal} onOpenChange={setShowLikesModal}>
-        <DialogContent className="sm:max-w-[400px] bg-black/90 border-white/10 max-h-[80vh]">
-          <DialogHeader>
-            <DialogTitle>Likes</DialogTitle>
-          </DialogHeader>
-          
-          <div className="my-4 max-h-[60vh] overflow-y-auto">
-            {likes.length > 0 ? (
-              <div className="space-y-4">
-                {likes.map((like) => (
-                  <div key={like.id} className="flex items-center gap-3">
-                    <Avatar className="w-10 h-10">
-                      <img 
-                        src={like.profile?.avatar_url || 'https://source.unsplash.com/100x100/?portrait'} 
-                        alt={like.profile?.username || 'User'}
-                        className="w-full h-full object-cover"
-                      />
-                    </Avatar>
-                    <div>
-                      <p className="font-medium">{like.profile?.username || 'Anonymous'}</p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="text-center py-8 text-white/60">
-                No likes yet. Be the first to like this post!
-              </div>
-            )}
-          </div>
-        </DialogContent>
-      </Dialog>
-      
-      <Dialog open={showPostModal} onOpenChange={setShowPostModal}>
-        <DialogContent className="sm:max-w-[650px] bg-black/90 border-white/10 h-[90vh] max-h-[90vh] p-0 overflow-hidden">
-          <div className="flex flex-col h-full overflow-hidden">
-            {parsedImages.length > 0 && (
-              <div className="relative h-auto max-h-[60%] min-h-[200px] bg-black flex items-center justify-center">
-                <img 
-                  src={parsedImages[currentImageIndex]} 
-                  alt={caption || 'Post image'}
-                  className="w-full h-auto object-contain"
-                  onError={(e) => {
-                    (e.target as HTMLImageElement).src = 'https://source.unsplash.com/800x600/?abstract';
-                  }}
-                />
-                
-                {parsedImages.length > 1 && (
-                  <>
-                    <button 
-                      className="absolute left-2 top-1/2 transform -translate-y-1/2 bg-black/30 p-1 rounded-full"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handlePrevImage();
-                      }}
-                      disabled={currentImageIndex === 0}
-                    >
-                      <ChevronLeft className="h-6 w-6" />
-                    </button>
-                    <button 
-                      className="absolute right-2 top-1/2 transform -translate-y-1/2 bg-black/30 p-1 rounded-full"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleNextImage();
-                      }}
-                      disabled={currentImageIndex === parsedImages.length - 1}
-                    >
-                      <ChevronRight className="h-6 w-6" />
-                    </button>
-                    
-                    <div className="absolute bottom-2 left-1/2 transform -translate-x-1/2 flex gap-1">
-                      {parsedImages.map((_, index) => (
-                        <div 
-                          key={index} 
-                          className={`w-2 h-2 rounded-full ${currentImageIndex === index ? 'bg-primary' : 'bg-white/30'}`}
+            <div className="my-4 max-h-[60vh] overflow-y-auto">
+              {likes.length > 0 ? (
+                <div className="space-y-4">
+                  {likes.map((like) => (
+                    <div key={like.id} className="flex items-center gap-3">
+                      <ProfileImage 
+                        src={like.profile?.avatar_url || null} 
+                          alt={like.profile?.username || 'User'}
+                        className="w-10 h-10 rounded-full"
                         />
-                      ))}
-                    </div>
-                  </>
-                )}
-              </div>
-            )}
-            
-            <div className="p-4 flex flex-col gap-4 overflow-y-auto flex-1">
-              <div className="flex items-center gap-3">
-                <Avatar>
-                  <img 
-                    src={profiles?.avatar_url || 'https://source.unsplash.com/100x100/?portrait'} 
-                    alt={profiles?.username || 'User'}
-                    className="w-full h-full object-cover"
-                  />
-                </Avatar>
-                <div>
-                  <div className="font-medium">{profiles?.username || 'Anonymous'}</div>
-                  <div className="text-xs text-white/60">{formatTimeAgo(created_at)}</div>
-                </div>
-              </div>
-              
-              {!isTextPost() && caption && (
-                <p className="text-sm">
-                  <span className="font-medium mr-2">{profiles?.username || 'Anonymous'}</span>
-                  {caption}
-                </p>
-              )}
-              
-              <div className="flex items-center gap-4">
-                <Button 
-                  variant="ghost" 
-                  size="icon" 
-                  onClick={handleLike}
-                  className={`${liked ? 'hover:bg-black/80' : 'hover:bg-white/10'}`}
-                >
-                  <Heart className={`w-5 h-5 ${liked ? 'fill-current text-primary' : ''}`} />
-                </Button>
-                <Button variant="ghost" size="icon">
-                  <MessageCircle className="w-5 h-5" />
-                </Button>
-                <Button variant="ghost" size="icon" onClick={handleShare}>
-                  <Send className="w-5 h-5" />
-                </Button>
-              </div>
-              
-              <div className="text-sm font-medium">
-                {likesCount} likes
-              </div>
-              
-              <div className="flex flex-col gap-2 overflow-hidden flex-1">
-                <h3 className="font-medium">Comments</h3>
-                
-                <div className="flex gap-2 mb-2">
-                  <Input
-                    placeholder="Add a comment..."
-                    value={newComment}
-                    onChange={(e) => setNewComment(e.target.value)}
-                    onKeyPress={(e) => e.key === 'Enter' && handleComment()}
-                    className="flex-1"
-                  />
-                  <Button onClick={handleComment} disabled={loading}>
-                    {loading ? "..." : "Post"}
-                  </Button>
-                </div>
-                
-                {comments.length > 0 ? (
-                  <div className="space-y-3 overflow-y-auto flex-1 pb-4">
-                    {comments.map((comment) => (
-                      <div key={comment.id} className="flex gap-2">
-                        <Avatar className="w-8 h-8">
-                          <img 
-                            src={comment.profile?.avatar_url || 'https://source.unsplash.com/100x100/?portrait'} 
-                            alt={comment.profile?.username || 'User'}
-                            className="w-full h-full object-cover"
-                          />
-                        </Avatar>
-                        <div className="bg-white/5 p-2 rounded-lg flex-1">
-                          <div className="flex justify-between">
-                            <p className="text-sm font-medium">{comment.profile?.username || 'Anonymous'}</p>
-                            <span className="text-xs text-white/40">{formatCommentDate(comment.created_at)}</span>
-                          </div>
-                          <p className="text-sm">{comment.content}</p>
-                        </div>
+                      <div>
+                        <p className="font-medium">{like.profile?.username || 'User'}</p>
                       </div>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="text-center py-4 text-white/60 text-sm">
-                    No comments yet. Be the first to comment!
-                  </div>
-                )}
-              </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-8 text-white/60">
+                  No likes yet. Be the first to like this post!
+                </div>
+              )}
             </div>
-          </div>
+          </DialogContent>
+        </Dialog>
+        
+        <Dialog open={showPostModal} onOpenChange={setShowPostModal}>
+          <DialogContent className="sm:max-w-[650px] bg-black/90 border-white/10 h-[90vh] max-h-[90vh] p-0 overflow-hidden">
+            <div className="flex flex-col h-full overflow-hidden">
+              {editMode ? (
+                <div className="flex flex-col h-full overflow-hidden">
+                  <DialogHeader className="p-4 border-b border-white/10">
+                    <DialogTitle>Edit Post</DialogTitle>
+                    <DialogDescription>
+                      Make changes to your post caption below.
+                    </DialogDescription>
+                  </DialogHeader>
+                  
+                  <div className="flex-1 p-4 overflow-y-auto">
+                    {!isTextPost() && parsedImages.length > 0 && (
+                      <div className="mb-6">
+                        <img 
+                          src={parsedImages[0]} 
+                          alt="Post preview" 
+                          className="w-full max-h-[200px] object-cover rounded-lg"
+                        />
+                      </div>
+                    )}
+                    
+                    <Textarea
+                      value={editedCaption}
+                      onChange={(e) => setEditedCaption(e.target.value)}
+                      placeholder="Edit your caption..."
+                      className="min-h-[150px] bg-gray-800 text-white border-gray-700 resize-none"
+                      autoFocus
+                    />
+                  </div>
+                  
+                  <div className="p-4 border-t border-white/10 flex justify-end gap-2">
+                    <Button 
+                      variant="ghost" 
+                      onClick={() => {
+                        setEditedCaption(caption || "");
+                        setEditMode(false);
+                      }}
+                    >
+                      Cancel
+                    </Button>
+                    <Button 
+                      onClick={async () => {
+                        if (onEdit) {
+                          await onEdit(id, editedCaption);
+                          setEditMode(false);
+                          setShowPostModal(false);
+                          toast({
+                            title: "Post updated",
+                            description: "Your post has been updated successfully."
+                          });
+                        }
+                      }}
+                    >
+                      Save Changes
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                <>
+                  {isTextPost() ? (
+                    <div className="relative h-auto max-h-[60%] min-h-[200px] bg-black/40 flex items-center justify-center p-8">
+                      <p className="text-xl font-medium text-center">{caption}</p>
+                    </div>
+                  ) : parsedImages.length > 0 && (
+                    <div className="relative h-auto max-h-[60%] min-h-[200px] bg-black flex items-center justify-center">
+                      <img 
+                        src={parsedImages[currentImageIndex]} 
+                        alt={caption || 'Post image'}
+                        className="w-full h-auto object-contain"
+                        onError={(e) => {
+                          (e.target as HTMLImageElement).src = 'https://source.unsplash.com/800x600/?abstract';
+                        }}
+                      />
+                      
+                      {parsedImages.length > 1 && (
+                        <>
+                          <button 
+                            className="absolute left-2 top-1/2 transform -translate-y-1/2 bg-black/30 p-1 rounded-full"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handlePrevImage();
+                            }}
+                            disabled={currentImageIndex === 0}
+                          >
+                            <ChevronLeft className="h-6 w-6" />
+                          </button>
+                          <button 
+                            className="absolute right-2 top-1/2 transform -translate-y-1/2 bg-black/30 p-1 rounded-full"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleNextImage();
+                            }}
+                            disabled={currentImageIndex === parsedImages.length - 1}
+                          >
+                            <ChevronRight className="h-6 w-6" />
+                          </button>
+                          
+                          <div className="absolute bottom-2 left-1/2 transform -translate-x-1/2 flex gap-1">
+                            {parsedImages.map((_, index) => (
+                              <div 
+                                key={index} 
+                                className={`w-2 h-2 rounded-full ${currentImageIndex === index ? 'bg-primary' : 'bg-white/30'}`}
+                              />
+                            ))}
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  )}
+
+                  <div className="p-4 overflow-y-auto flex-1">
+                    <div className="flex items-center gap-3 mb-4">
+                      <ProfileImage 
+                        src={profiles?.avatar_url || profiles?.auth_metadata?.avatar_url} 
+                        alt={profiles?.username || "User"}
+                        className="w-8 h-8 rounded-full"
+                        onClick={handleProfileClick}
+                      />
+                      <div>
+                        <h3 
+                          className="font-medium text-sm hover:underline cursor-pointer"
+                          onClick={handleProfileClick}
+                        >
+                          {profiles?.username || 
+                            profiles?.auth_metadata?.full_name || 
+                            profiles?.auth_metadata?.name || 
+                            "User"}
+                        </h3>
+                        <span className="text-muted-foreground text-xs">
+                          {formatTimeAgo(created_at || new Date().toISOString())}
+                        </span>
+                      </div>
+                      
+                      {isOwner && (
+                        <div className="ml-auto">
+                          <DropdownMenu open={dropdownOpen} onOpenChange={setDropdownOpen}>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="icon" className="h-8 w-8 p-0">
+                                <MoreVertical className="h-4 w-4" />
+                                <span className="sr-only">Post options</span>
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem onClick={() => {
+                                setDropdownOpen(false);
+                                setEditMode(true);
+                              }}>
+                                <Edit className="mr-2 h-4 w-4" />
+                                <span>Edit Post</span>
+                              </DropdownMenuItem>
+                              <DropdownMenuItem 
+                                onClick={() => {
+                                  setDropdownOpen(false);
+                                  setShowDeleteConfirm(true);
+                                }} 
+                                className="text-red-500 focus:text-red-500"
+                              >
+                                <Trash className="mr-2 h-4 w-4" />
+                                <span>Delete Post</span>
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </div>
+                      )}
+                    </div>
+
+                    {!isTextPost() && (
+                      <div className="mb-4">
+                        <p className="text-sm">{caption}</p>
+                      </div>
+                    )}
+
+                    <div className="flex items-center gap-4 mt-6">
+                      <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        className="flex items-center gap-2"
+                        onClick={handleLike}
+                      >
+                        <Heart className={`h-5 w-5 ${liked ? 'fill-red-500 text-red-500' : ''}`} />
+                        <span>{likesCount || 0}</span>
+                      </Button>
+                      
+                      <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        className="flex items-center gap-2"
+                        onClick={openCommentsModal}
+                      >
+                        <MessageCircle className="h-5 w-5" />
+                        <span>{commentsCount || 0}</span>
+                      </Button>
+                    </div>
+                  </div>
+                </>
+              )}
+            </div>
+          </DialogContent>
+        </Dialog>
+      </div>
+      
+      <AuthRequiredModal 
+        isOpen={showAuthModal}
+        setIsOpen={setShowAuthModal}
+        message="You need to sign in to interact with posts."
+      />
+
+      <Dialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Confirm Delete</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to delete this post? This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setShowDeleteConfirm(false)}
+              disabled={loading}
+            >
+              Cancel
+            </Button>
+            <Button 
+              variant="destructive" 
+              onClick={handleDelete}
+              disabled={loading}
+            >
+              {loading ? (
+                <><LoaderCircle className="mr-2 h-4 w-4 animate-spin" /> Deleting</>
+              ) : (
+                'Delete'
+              )}
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </>

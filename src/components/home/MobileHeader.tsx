@@ -1,9 +1,8 @@
-
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Input } from "@/components/ui/input";
-import { Search } from "lucide-react";
-import { SearchDropdown } from "./SearchDropdown";
-import { useLocation } from "react-router-dom";
+import { Search, X } from "lucide-react";
+import { SearchUsers } from "./SearchUsers";
+import { useLocation, useNavigate } from "react-router-dom";
 
 interface MobileHeaderProps {
   onSearch?: (query: string) => void;
@@ -13,13 +12,39 @@ export function MobileHeader({ onSearch }: MobileHeaderProps) {
   const [searchQuery, setSearchQuery] = useState("");
   const [showResults, setShowResults] = useState(false);
   const location = useLocation();
+  const navigate = useNavigate();
   const isHomePage = location.pathname === "/home";
   const isMediumScreen = window.innerWidth >= 768 && window.innerWidth < 1024;
+
+  // Handle clicks outside to close search results
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      // If click was not on search bar or results, close results
+      if (!target.closest('.search-container') && showResults) {
+        setShowResults(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [showResults]);
 
   // Only render on home page or on medium screens for specific paths
   if (!isHomePage && !(isMediumScreen && location.pathname === "/home")) {
     return null;
   }
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    setSearchQuery(value);
+    setShowResults(value.length > 0);
+    if (onSearch) {
+      onSearch(value);
+    }
+  };
 
   const handleSearch = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter' && onSearch) {
@@ -27,31 +52,53 @@ export function MobileHeader({ onSearch }: MobileHeaderProps) {
     }
   };
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = e.target.value;
-    setSearchQuery(value);
-    if (onSearch) onSearch(value);
-    setShowResults(!!value);
+  const clearSearch = () => {
+    setSearchQuery("");
+    setShowResults(false);
+    if (onSearch) {
+      onSearch("");
+    }
+  };
+
+  const handleSearchClose = () => {
+    setShowResults(false);
   };
 
   return (
-    <div className="fixed top-0 left-0 right-0 flex items-center justify-between gap-4 p-4 border-b border-white/10 bg-background/95 backdrop-blur-sm md:flex lg:hidden z-50 h-16">
-      <h1 className="text-xl font-bold">Markezon</h1>
-      <div className="relative flex-1 max-w-xs">
-        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-white/40 w-4 h-4" />
-        <Input
-          placeholder="Search services..."
-          className="pl-9 bg-white/5 border-white/10"
-          value={searchQuery}
-          onChange={handleChange}
-          onKeyPress={handleSearch}
-          onFocus={() => setShowResults(!!searchQuery)}
-        />
-        <SearchDropdown 
-          searchQuery={searchQuery} 
-          show={showResults} 
-          onClose={() => setShowResults(false)} 
-        />
+    <div className="flex items-center justify-between bg-black/80 backdrop-blur-md border-b border-white/10 p-4 lg:hidden fixed top-0 left-0 right-0 z-50">
+      <h1 
+        className="text-xl font-bold bg-gradient-to-r from-purple-500 to-blue-500 bg-clip-text text-transparent cursor-pointer"
+        onClick={() => navigate('/home')}
+      >
+        Markezon
+      </h1>
+      <div className="relative flex-1 max-w-xs search-container">
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-white/40 w-4 h-4" />
+          <Input
+            placeholder="Search services..."
+            className="pl-9 pr-8 bg-white/5 border-white/10 focus:border-white/30 transition-colors"
+            value={searchQuery}
+            onChange={handleChange}
+            onKeyPress={handleSearch}
+            onFocus={() => setShowResults(true)}
+          />
+          {searchQuery && (
+            <button 
+              className="absolute right-3 top-1/2 transform -translate-y-1/2 text-white/40 hover:text-white/70 transition-colors"
+              onClick={clearSearch}
+            >
+              <X className="w-4 h-4" />
+            </button>
+          )}
+        </div>
+        <div className="w-full absolute left-0 right-0 z-50">
+          <SearchUsers 
+            searchQuery={searchQuery} 
+            show={showResults} 
+            onClose={handleSearchClose} 
+          />
+        </div>
       </div>
     </div>
   );

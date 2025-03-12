@@ -1,10 +1,9 @@
-
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
-import { OfflineAlert } from "@/components/ui/offline-alert";
+import { OfflineAlert } from "@/components/OfflineAlert";
 import Index from "./pages/Index";
 import Auth from "./pages/Auth";
 import Home from "./pages/Home";
@@ -14,33 +13,65 @@ import Notifications from "./pages/Notifications";
 import { Profile } from "./pages/Profile";
 import { UserProfile } from "./pages/UserProfile";
 import NotFound from "./pages/NotFound";
+import AuthCallback from './pages/AuthCallback';
+import { UsernameSetup } from "./components/onboarding/UsernameSetup";
+import { useEffect, useState } from "react";
+import Services from "./pages/Services";
+import Bookings from "./pages/Bookings";
 
 const queryClient = new QueryClient();
 
-const App = () => (
-  <QueryClientProvider client={queryClient}>
-    <TooltipProvider>
-      <Toaster />
-      <Sonner />
-      <BrowserRouter>
-        <OfflineAlert />
-        <Routes>
-          <Route path="/" element={<Index />} />
-          <Route path="/auth" element={<Auth />} />
-          <Route path="/home" element={<Home />} />
-          <Route path="/discover" element={<Discover />} />
-          <Route path="/messages" element={<Messages />} />
-          <Route path="/notifications" element={<Notifications />} />
-          <Route path="/profile" element={<Profile />} />
-          <Route path="/@:username" element={<UserProfile />} />
-          <Route path="/@:username/:postId" element={<UserProfile />} />
-          <Route path="/user/:userId" element={<UserProfile />} />
-          <Route path="/user/:userId/:postId" element={<UserProfile />} />
-          <Route path="*" element={<NotFound />} />
-        </Routes>
-      </BrowserRouter>
-    </TooltipProvider>
-  </QueryClientProvider>
-);
+const App = () => {
+  const [isOnline, setIsOnline] = useState(navigator.onLine);
+
+  useEffect(() => {
+    const handleOnline = () => setIsOnline(true);
+    const handleOffline = () => setIsOnline(false);
+
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
+
+  // If offline, only show the offline alert
+  if (!isOnline) {
+    return <OfflineAlert />;
+  }
+
+  return (
+    <QueryClientProvider client={queryClient}>
+      <TooltipProvider>
+        <Toaster />
+        <Sonner />
+        <BrowserRouter>
+          <Routes>
+            <Route path="/" element={<Index />} />
+            <Route path="/auth" element={<Auth />} />
+            <Route path="/home" element={<Home />} />
+            <Route path="/discover" element={<Discover />} />
+            <Route path="/messages" element={<Messages />} />
+            <Route path="/notifications" element={<Notifications />} />
+            <Route path="/profile" element={<Profile />} />
+            <Route path="/@:username" element={<UserProfile />} />
+            <Route path="/@:username/:postId" element={<UserProfile />} />
+            <Route path="/user/:userId" element={<UserProfile />} />
+            <Route path="/user/:userId/:postId" element={<UserProfile />} />
+            <Route path="/userprofile/:userId" element={<UserProfile />} />
+            <Route path="/userprofile/:userId/:postId" element={<UserProfile />} />
+            <Route path="/auth-callback" element={<AuthCallback />} />
+            <Route path="/setup-username" element={<UsernameSetup />} />
+            <Route path="/services" element={<Services />} />
+            <Route path="/bookings" element={<Bookings />} />
+            <Route path="*" element={<NotFound />} />
+          </Routes>
+        </BrowserRouter>
+      </TooltipProvider>
+    </QueryClientProvider>
+  );
+};
 
 export default App;

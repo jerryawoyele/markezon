@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { 
   Dialog, 
@@ -11,6 +10,10 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { ServiceType } from "@/types";
+import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "@/components/ui/use-toast";
+import { createNotification } from '@/utils/notification-helper';
+import { useNavigate } from 'react-router-dom';
 
 interface ServiceModalProps {
   service: ServiceType | null;
@@ -20,6 +23,99 @@ interface ServiceModalProps {
 
 export function ServiceModal({ service, isOpen, onClose }: ServiceModalProps) {
   if (!service) return null;
+  
+  const [isBooking, setIsBooking] = useState(false);
+  const { toast } = useToast();
+  const navigate = useNavigate();
+  
+  const handleBookService = async () => {
+    try {
+      setIsBooking(true);
+      
+      // Get current user's session
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      if (!session) {
+        toast({
+          variant: "destructive",
+          title: "Not logged in",
+          description: "Please log in to book this service.",
+        });
+        return;
+      }
+      
+      const currentUserId = session.user.id;
+      
+      // Don't allow booking your own service
+      if (currentUserId === service.owner_id) {
+        toast({
+          variant: "destructive",
+          title: "Cannot book your own service",
+          description: "You cannot book a service that you offer.",
+        });
+        return;
+      }
+      
+      // Create a booking record in the database
+      const bookingData = {
+        service_id: service.id,
+        customer_id: currentUserId,
+        provider_id: service.owner_id,
+        status: 'pending',
+        created_at: new Date().toISOString(),
+      };
+      
+      const { data: bookingResult, error: bookingError } = await supabase
+        .from('bookings')
+        .insert(bookingData)
+        .select()
+        .single();
+        
+      if (bookingError) {
+        throw bookingError;
+      }
+      
+      // Get current user's profile info for notification
+      const { data: profileData, error: profileError } = await supabase
+        .from('profiles')
+        .select('username')
+        .eq('id', currentUserId)
+        .single();
+        
+      if (!profileError && profileData) {
+        // Create notification for the service provider
+        await createNotification({
+          userId: service.owner_id,
+          actorId: currentUserId,
+          actorName: profileData.username || 'Someone',
+          type: 'booking',
+          entityId: bookingResult.id,
+          message: `${profileData.username} booked your service: "${service.title}"`
+        });
+      }
+      
+      toast({
+        title: "Service Booked",
+        description: "Your booking request has been sent to the service provider.",
+      });
+      
+      // Close the modal
+      onClose();
+      
+      // Navigate to bookings page
+      navigate('/bookings');
+      
+    } catch (error) {
+      console.error("Error booking service:", error);
+      toast({
+        variant: "destructive",
+        title: "Booking failed",
+        description: "There was an error booking this service. Please try again.",
+      });
+    } finally {
+      setIsBooking(false);
+    }
+  };
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
@@ -63,15 +159,21 @@ export function ServiceModal({ service, isOpen, onClose }: ServiceModalProps) {
             {service.price && (
               <div>
                 <h3 className="text-xl font-semibold mb-2">Pricing</h3>
-                <p className="text-lg font-medium">{service.price}</p>
+                <p className="text-lg font-medium">${typeof service.price === 'string' ? service.price : service.price?.toFixed(2)}</p>
               </div>
             )}
           </div>
         </ScrollArea>
 
         <DialogFooter className="mt-6">
-          <Button onClick={onClose}>Close</Button>
-          <Button variant="default">Contact Provider</Button>
+          <Button onClick={onClose} variant="outline">Close</Button>
+          <Button 
+            variant="default" 
+            onClick={handleBookService}
+            disabled={isBooking}
+          >
+            {isBooking ? "Processing..." : "Book Service"}
+          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

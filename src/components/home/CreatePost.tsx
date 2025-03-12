@@ -1,8 +1,8 @@
-import { useState, useRef, ChangeEvent } from "react";
+import { useState, useRef, ChangeEvent, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Avatar } from "@/components/ui/avatar";
-import { PlusCircle, Image, Upload, X } from "lucide-react";
+import { PlusCircle, Image, Upload, X, FileImage, Loader2 } from "lucide-react";
 import { 
   Dialog, 
   DialogContent, 
@@ -15,6 +15,10 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { LocalImageUpload } from "./LocalImageUpload";
+import { useToast } from "@/components/ui/use-toast";
+import { supabase } from "@/integrations/supabase/client";
+import { v4 as uuidv4 } from "uuid";
+import ProfileImage from "@/components/ProfileImage";
 
 interface CreatePostProps {
   onSubmit: (data: { text: string; image_url: string | string[]; isTextPost: boolean }) => Promise<void>;
@@ -22,22 +26,56 @@ interface CreatePostProps {
 }
 
 export function CreatePost({ onSubmit, className = "" }: CreatePostProps) {
+  const { toast } = useToast();
   const [open, setOpen] = useState(false);
   const [text, setText] = useState("");
   const [imageUrls, setImageUrls] = useState<string[]>([]);
   const [imagePreviews, setImagePreviews] = useState<string[]>([]);
   const [isTextPost, setIsTextPost] = useState(true);
   const [loading, setLoading] = useState(false);
+  const [user, setUser] = useState<any>(null);
+  const [userProfile, setUserProfile] = useState<any>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    async function getUser() {
+      const { data } = await supabase.auth.getUser();
+      if (data.user) {
+        setUser(data.user);
+        
+        // Get user profile data
+        const { data: profileData } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', data.user.id)
+          .single();
+          
+        if (profileData) {
+          setUserProfile(profileData);
+        }
+      }
+    }
+    
+    getUser();
+  }, []);
 
   const handleSubmit = async () => {
     if (!text.trim() && imageUrls.length === 0) return;
     
     setLoading(true);
     try {
+      let imageUrl = null;
+      if (!isTextPost) {
+        if (imageUrls.length > 0) {
+          imageUrl = imageUrls[0];
+        }
+      } else {
+        imageUrl = text.trim();
+      }
+
       await onSubmit({
         text: text.trim(),
-        image_url: isTextPost ? text.trim() : imageUrls,
+        image_url: imageUrl,
         isTextPost
       });
       
@@ -47,6 +85,11 @@ export function CreatePost({ onSubmit, className = "" }: CreatePostProps) {
       setOpen(false);
     } catch (error) {
       console.error("Error submitting post:", error);
+      toast({
+        title: "Error",
+        description: "Failed to create post. Please try again.",
+        variant: "destructive",
+      });
     } finally {
       setLoading(false);
     }
@@ -89,13 +132,11 @@ export function CreatePost({ onSubmit, className = "" }: CreatePostProps) {
     <>
       <Card className={`p-6 bg-black/20 border-white/5 ${className}`}>
         <div className="flex items-center gap-3">
-          <Avatar>
-            <img
-              src="https://source.unsplash.com/100x100/?portrait"
-              alt="User avatar"
-              className="w-full h-full object-cover"
-            />
-          </Avatar>
+          <ProfileImage 
+            src={userProfile?.avatar_url || user?.user_metadata?.avatar_url}
+            alt={userProfile?.username || user?.user_metadata?.full_name || "User"}
+            className="w-10 h-10 rounded-full"
+          />
           <button
             className="flex-1 bg-white/5 hover:bg-white/10 rounded-full px-4 py-3 text-left text-white/60 cursor-pointer"
             onClick={() => setOpen(true)}
@@ -219,7 +260,12 @@ export function CreatePost({ onSubmit, className = "" }: CreatePostProps) {
               onClick={handleSubmit}
               disabled={loading || (isTextPost ? !text.trim() : (!text.trim() && imageUrls.length === 0))}
             >
-              {loading ? "Creating..." : "Create Post"}
+              {loading ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Posting...
+                </>
+              ) : "Post"}
             </Button>
           </div>
         </DialogContent>

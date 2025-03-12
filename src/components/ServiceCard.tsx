@@ -1,6 +1,6 @@
-
 import { Card, CardContent } from "@/components/ui/card";
 import { ServiceType } from "@/types";
+import { getUserAvatar } from "@/integrations/supabase/client";
 
 interface ServiceCardProps {
   service: ServiceType;
@@ -19,9 +19,12 @@ export function ServiceCard({ service, onClick }: ServiceCardProps) {
       onClick={onClick}
     >
       <img
-        src={service.image || '/placeholder.svg'}
+        src={service.image && typeof service.image === 'string' ? (service.image.startsWith("/") ? service.image : `/${service.image}`) : '/placeholder.svg'}
         alt={service.title}
-        className="w-full h-48 object-cover rounded-t-md"
+        className="w-full h-48 object-cover rounded-t-lg"
+        onError={(e) => {
+          e.currentTarget.src = "/placeholder.svg";
+        }}
       />
       <CardContent className="p-4">
         <h3 className="text-lg font-semibold mb-2">{service.title}</h3>

@@ -1,7 +1,7 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Card } from "@/components/ui/card";
+import { Card, CardHeader, CardTitle, CardContent, CardDescription, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -16,14 +16,40 @@ import { supabase } from "@/integrations/supabase/client";
 import { ServiceCard } from "@/components/services/ServiceCard";
 import { AddServiceModal } from "@/components/services/AddServiceModal";
 import { useToast } from "@/components/ui/use-toast";
-import { Star, PenLine, Users, FileImage, MessageSquare } from "lucide-react";
-import type { Profile as ProfileType, Post as PostType, ServiceType } from "@/types";
+import { Star, PenLine, Users, FileImage, MessageSquare, Bell, User, Briefcase, Share2, PlusCircle, ShoppingCart } from "lucide-react";
+import type { Profile as ProfileType, Post as PostType } from "@/types";
+import ProfileImage from '@/components/ProfileImage';
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { MainLayout } from "@/layouts/MainLayout";
+import { Skeleton } from "@/components/ui/skeleton";
+import { FollowersModal } from "@/components/profile/FollowersModal";
+import { FollowingModal } from "@/components/profile/FollowingModal";
+import { ReviewsModal } from "@/components/profile/ReviewsModal";
+import { ServiceForm } from "@/components/forms/ServiceForm";
+import { FileUpload } from "@/components/FileUpload";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { CreatePost } from "@/components/home/CreatePost";
+import { Badge } from "@/components/ui/badge";
+import { createNotification } from '@/utils/notification-helper';
+
+// Define ServiceType locally since it's not exported from @/types
+interface ServiceType {
+  id: string;
+  title: string;
+  description: string;
+  category: string;
+  price: number | string;
+  image: string;
+  user_id: string;
+  created_at: string;
+}
 
 export function Profile() {
   const navigate = useNavigate();
   const { toast } = useToast();
   const [activeTab, setActiveTab] = useState("Profile");
-  const [activeProfileTab, setActiveProfileTab] = useState("posts");
+  const [activeProfileTab, setActiveProfileTab] = useState<string>("posts");
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
   const [isEditingProfile, setIsEditingProfile] = useState(false);
@@ -38,165 +64,151 @@ export function Profile() {
   const [aboutBusiness, setAboutBusiness] = useState("");
   const [avatar, setAvatar] = useState<File | null>(null);
   const [avatarUrl, setAvatarUrl] = useState("");
+  const [userProfile, setUserProfile] = useState({
+    displayName: '',
+    email: '',
+    avatarUrl: ''
+  });
+  const [userRole, setUserRole] = useState<"business" | "customer" | null>(null);
+  const [notificationCount, setNotificationCount] = useState(0);
+  const [unreadNotifications, setUnreadNotifications] = useState(0);
+  const [showFollowersModal, setShowFollowersModal] = useState(false);
+  const [showFollowingModal, setShowFollowingModal] = useState(false);
+  const [showReviewsModal, setShowReviewsModal] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [loadingProfile, setLoadingProfile] = useState(true);
+  const [loadingPosts, setLoadingPosts] = useState(true);
+  const [loadingServices, setLoadingServices] = useState(true);
+  const [bookings, setBookings] = useState<any[]>([]);
+  const [customerBookings, setCustomerBookings] = useState<any[]>([]);
+  const [loadingBookings, setLoadingBookings] = useState(false);
+  const [loadingCustomerBookings, setLoadingCustomerBookings] = useState(false);
+
+  // Add these state variables for username validation
+  const [isCheckingUsername, setIsCheckingUsername] = useState(false);
+  const [isUsernameAvailable, setIsUsernameAvailable] = useState<boolean | null>(null);
+  const [usernameTimeout, setUsernameTimeout] = useState<NodeJS.Timeout | null>(null);
+
+  // Add this state for the create post modal
+  const [showCreatePostModal, setShowCreatePostModal] = useState(false);
 
   useEffect(() => {
-    const getProfile = async () => {
+    const initializeProfile = async () => {
+      setLoading(true);
       try {
-        const { data: { user } } = await supabase.auth.getUser();
-        
-        if (!user) {
-          navigate("/auth");
+        await getProfile();
+        // Main loading is handled by the specific loading states now
+      } catch (error) {
+        console.error("Error initializing profile:", error);
+        setLoading(false);
+      }
+    };
+
+    initializeProfile();
+  }, []);
+
+  const getProfile = async () => {
+    try {
+      setLoadingProfile(true);
+      const { data: { session } } = await supabase.auth.getSession();
+
+      if (!session) {
+        navigate('/auth');
           return;
         }
         
-        let { data, error } = await supabase
+        const { data, error } = await supabase
           .from('profiles')
           .select('*')
-          .eq('id', user.id)
+        .eq('id', session.user.id)
           .single();
           
         if (error) {
           throw error;
         }
         
-        if (data) {
+      // Update profile state with data
           setProfile(data);
           setUsername(data.username || "");
           setBio(data.bio || "");
           setAboutBusiness(data.about_business || "");
           setAvatarUrl(data.avatar_url || "");
-        }
+          setUserRole(data.user_role || "customer");
+      
+      setLoadingProfile(false);
+      
+      fetchNotificationsCount();
       } catch (error) {
-        console.error("Error loading profile:", error);
-      } finally {
-        setLoading(false);
+      console.error('Error fetching profile:', error);
+      setLoadingProfile(false);
       }
     };
-
-    getProfile();
-  }, [navigate]);
   
   useEffect(() => {
-    const fetchUserPosts = async () => {
-      if (!profile) return;
+    const fetchUserProfile = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
       
-      try {
-        const { data, error } = await supabase
-          .from('posts')
-          .select(`
-            *,
-            profiles(*)
-          `)
-          .eq('user_id', profile.id)
-          .order('created_at', { ascending: false });
-          
-        if (error) throw error;
-        
-        if (data) {
-          setUserPosts(data as PostType[]);
-        }
-      } catch (error) {
-        console.error("Error fetching user posts:", error);
+      if (user) {
+        setUserProfile({
+          displayName: user.user_metadata?.full_name || user.user_metadata?.name || 'User',
+          email: user.email || '',
+          avatarUrl: user.user_metadata?.avatar_url || null
+        });
       }
     };
     
-    const fetchUserServices = async () => {
-      if (!profile) return;
-      
-      try {
-        const { data, error } = await supabase
-          .from('services')
-          .select('*')
-          .eq('user_id', profile.id);
-          
-        if (error) throw error;
-        
-        if (data) {
-          setServices(data);
-        }
-      } catch (error) {
-        console.error("Error fetching user services:", error);
-      }
-    };
-
-    fetchUserPosts();
-    fetchUserServices();
-  }, [profile]);
+    fetchUserProfile();
+  }, []);
+  
+  useEffect(() => {
+    if (profile?.id) {
+      fetchNotificationsCount();
+    }
+  }, [profile?.id]);
   
   const handleUpdateProfile = async () => {
-    try {
-      setUploading(true);
-      
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
+    if (isUsernameAvailable === false) {
         toast({
-          title: "Error",
-          description: "No user logged in",
+        title: "Username not available",
+        description: "Please choose a different username.",
           variant: "destructive",
         });
         return;
       }
       
-      let avatar_url = avatarUrl;
-      if (avatar) {
-        const fileExt = avatar.name.split('.').pop();
-        const fileName = `${user.id}.${fileExt}`;
-        
-        const { error: uploadError, data } = await supabase.storage
-          .from('avatars')
-          .upload(fileName, avatar, { upsert: true });
-          
-        if (uploadError) {
-          throw uploadError;
-        }
-        
-        const { data: { publicUrl } } = supabase.storage
-          .from('avatars')
-          .getPublicUrl(fileName);
-          
-        avatar_url = publicUrl;
-      }
-      
-      const updates = {
-        username,
-        bio,
-        avatar_url,
-        updated_at: new Date().toISOString(),
-      };
-      
+    setLoadingProfile(true);
+
+    try {
       const { error } = await supabase
         .from('profiles')
-        .update(updates)
-        .eq('id', user.id);
-        
-      if (error) throw error;
-      
-      setAvatarUrl(avatar_url);
-      setIsEditingProfile(false);
-      
-      toast({
-        title: "Success",
-        description: "Profile updated successfully!",
-      });
-      
-      if (profile) {
-        setProfile({
-          ...profile,
+        .update({
           username,
           bio,
-          avatar_url,
-          updated_at: new Date().toISOString(),
-        });
-      }
-    } catch (error) {
-      console.error("Error updating profile:", error);
+          avatar_url: avatarUrl,
+          user_role: userRole as "customer" | "business"
+        })
+        .eq('id', profile?.id || '');
+
+      if (error) throw error;
+      
+      setIsEditingProfile(false);
       toast({
-        title: "Error",
-        description: "Failed to update profile",
+        title: "Profile updated",
+        description: "Your profile has been successfully updated.",
+      });
+      
+      // Refresh profile data
+      getProfile();
+      window.location.reload();
+    } catch (error) {
+      console.error('Error updating profile:', error);
+      toast({
+        title: "Update failed",
+        description: "There was an error updating your profile. Please try again.",
         variant: "destructive",
       });
     } finally {
-      setUploading(false);
+      setLoadingProfile(false);
     }
   };
 
@@ -248,39 +260,611 @@ export function Profile() {
     }
   };
   
-  const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (!e.target.files || e.target.files.length === 0) {
-      return;
-    }
-    const file = e.target.files[0];
-    setAvatar(file);
-    const objectUrl = URL.createObjectURL(file);
-    setAvatarUrl(objectUrl);
+  const handleAvatarChange = (url: string) => {
+    setAvatarUrl(url);
   };
   
-  const handleAddService = async (serviceData: ServiceType) => {
+  const handleAddService = async (serviceData: any) => {
     try {
-      setServices(prev => [...prev, serviceData]);
-      toast({
-        title: "Success",
-        description: "Service added successfully!",
-      });
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      if (!session) return;
+
+      // Default base64 image - a simple gray placeholder
+      const defaultImageDataURI = "data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMzAwIiBoZWlnaHQ9IjIwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMzAwIiBoZWlnaHQ9IjIwMCIgZmlsbD0iI2VlZWVlZSIvPjx0ZXh0IHg9IjUwJSIgeT0iNTAlIiBmb250LWZhbWlseT0iQXJpYWwsIHNhbnMtc2VyaWYiIGZvbnQtc2l6ZT0iMThweCIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZG9taW5hbnQtYmFzZWxpbmU9Im1pZGRsZSIgZmlsbD0iIzk5OTk5OSI+Tm8gSW1hZ2U8L3RleHQ+PC9zdmc+";
+
+      // Add user_id to service data if not already present
+      const newService = {
+        title: serviceData.title,
+        description: serviceData.description,
+        price: serviceData.price,
+        category: serviceData.category || "Other", // Ensure category has a default
+        image: serviceData.image || defaultImageDataURI, // Use data URI as fallback
+        owner_id: session.user.id
+      };
+
+      // Insert into database
+      const { data, error } = await supabase
+        .from('services')
+        .insert([newService])
+        .select()
+        .single();
+      
+      if (error) {
+        console.error('Service insert error:', error);
+        throw error;
+      }
+
+      // Get service ID from response
+      const serviceId = data?.id;
+
+      // Update local state with complete service data
+      setServices(prev => [...prev, {...newService, id: serviceId || crypto.randomUUID()}]);
+      
+      // Notify followers about the new service
+      if (serviceId && profile?.username) {
+        // Get all followers of this user
+        const { data: followers } = await supabase
+          .from('follows')
+          .select('follower_id')
+          .eq('following_id', session.user.id);
+        
+        if (followers && followers.length > 0) {
+          // Create notification for each follower
+          const notificationPromises = followers.map(follow => 
+            createNotification({
+              userId: follow.follower_id,
+              actorId: session.user.id,
+              actorName: profile.username || 'Business',
+              type: 'service',
+              entityId: serviceId,
+              message: `${profile.username} added a new service: ${serviceData.title}`
+            })
+          );
+          
+          // Send all notifications in parallel
+          await Promise.all(notificationPromises);
+        }
+      }
       
       setShowAddServiceModal(false);
-    } catch (error) {
-      console.error("Error adding service:", error);
       toast({
-        title: "Error",
-        description: "Failed to add service",
-        variant: "destructive",
+        title: "Service added",
+        description: "Your service has been added successfully."
+      });
+    } catch (error: any) {
+      console.error('Error adding service:', error);
+      
+      // Provide more specific error message based on the error type
+      let errorMessage = "There was an error adding your service. Please try again.";
+      
+      if (error.message?.includes("Bucket not found")) {
+        errorMessage = "Storage system error: Unable to upload image. Please try a different image or contact support.";
+      } else if (error.code === '23502') { // Not null constraint violation
+        errorMessage = "Please ensure all required fields are filled out.";
+      }
+      
+      toast({
+        title: "Add failed",
+        description: errorMessage,
+        variant: "destructive"
       });
     }
   };
   
-  if (loading) {
+  const fetchNotificationsCount = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      if (!user) return;
+      
+      const { count, error } = await supabase
+        .from('notifications')
+        .select('*', { count: 'exact', head: true })
+        .eq('user_id', user.id)
+        .eq('is_read', false);
+        
+      if (error) throw error;
+      
+      setNotificationCount(count || 0);
+      setUnreadNotifications(count || 0);
+    } catch (error) {
+      console.error("Error fetching notification count:", error);
+    }
+  };
+  
+  // Add a function to handle sharing the profile
+  const handleShareProfile = () => {
+    if (!profile?.id) return;
+    
+    const shareUrl = `${window.location.origin}/user/${profile.id}`;
+    
+    if (navigator.share) {
+      navigator.share({
+        title: `${profile?.username || 'User'}'s Profile`,
+        url: shareUrl
+      }).catch(error => console.log('Error sharing:', error));
+    } else {
+      // Fallback for browsers that don't support the Web Share API
+      navigator.clipboard.writeText(shareUrl)
+        .then(() => {
+          toast({
+            title: "Link Copied!",
+            description: "Profile link copied to clipboard",
+          });
+        })
+        .catch(err => {
+          console.error('Failed to copy: ', err);
+          toast({
+            title: "Error",
+            description: "Failed to copy link",
+            variant: "destructive",
+          });
+        });
+    }
+  };
+  
+  // Add this function to the component to ensure correct loading sequence
+  useEffect(() => {
+    // Separate these functions from the main effect to avoid unnecessary re-execution
+    const fetchUserPosts = async () => {
+      try {
+        setLoadingPosts(true);
+        const { data: { session } } = await supabase.auth.getSession();
+        
+        if (!session) return;
+
+        const { data, error } = await supabase
+          .from('posts')
+          .select(`
+            *,
+            profiles (
+              id,
+              username,
+              avatar_url,
+              bio,
+              updated_at,
+              about_business,
+              followers_count,
+              following_count,
+              reviews_count,
+              reviews_rating
+            )
+          `)
+          .eq('user_id', session.user.id)
+          .order('created_at', { ascending: false });
+
+        if (error) throw error;
+
+        setUserPosts(data || []);
+        setLoadingPosts(false);
+      } catch (error) {
+        console.error('Error fetching posts:', error);
+        setLoadingPosts(false);
+      }
+    };
+
+    const fetchUserServices = async () => {
+      try {
+        setLoadingServices(true);
+        
+        const { data: { session } } = await supabase.auth.getSession();
+        
+        if (!session) return;
+
+        const { data, error } = await supabase
+          .from('services')
+          .select('*')
+          .eq('owner_id', session.user.id)
+          .order('created_at', { ascending: false });
+
+        if (error) throw error;
+
+        setServices(data || []);
+        setLoadingServices(false);
+      } catch (error) {
+        console.error('Error fetching services:', error);
+        setLoadingServices(false);
+      }
+    };
+
+    // Only fetch posts and services after profile is loaded
+    if (profile) {
+      fetchUserPosts();
+      if (profile.user_role === 'business') {
+        fetchUserServices();
+      }
+    }
+  }, [profile]);
+
+  // Add this function to check username availability
+  const checkUsernameAvailability = async (username: string) => {
+    if (!username || username === profile?.username) {
+      setIsUsernameAvailable(null);
+      return;
+    }
+    
+    setIsCheckingUsername(true);
+    
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('username')
+        .eq('username', username)
+        .neq('id', profile?.id || '')
+        .maybeSingle();
+      
+      if (error) throw error;
+      
+      // If no data returned, username is available
+      setIsUsernameAvailable(!data);
+    } catch (error) {
+      console.error('Error checking username:', error);
+      setIsUsernameAvailable(null);
+    } finally {
+      setIsCheckingUsername(false);
+    }
+  };
+
+  // Add debounce handling for username input
+  const handleUsernameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const newUsername = e.target.value;
+    setUsername(newUsername);
+    
+    // Clear any existing timeout
+    if (usernameTimeout) {
+      clearTimeout(usernameTimeout);
+    }
+    
+    // Set a new timeout to check availability after typing stops
+    const timeout = setTimeout(() => {
+      checkUsernameAvailability(newUsername);
+    }, 500);
+    
+    setUsernameTimeout(timeout as unknown as NodeJS.Timeout);
+  };
+
+  // Update the handleEditPost function to refresh the whole page
+  const handleEditPost = async (postId: string, newCaption: string) => {
+    try {
+      // setLoadingPosts(true);
+      
+      const { error } = await supabase
+      .from('posts')
+      .update({ caption: newCaption })
+      .eq('id', postId);
+      
+      if (error) throw error;
+      
+      
+      toast({
+        title: "Post updated",
+        description: "Your post has been updated successfully."
+      });
+      
+    } catch (error) {
+      console.error('Error updating post:', error);
+      toast({
+        title: "Update failed",
+        description: "There was an error updating your post. Please try again.",
+        variant: "destructive"
+      });
+      setLoadingPosts(false);
+    }
+  };
+
+  // Update handleDeletePost to refresh the whole page
+  const handleDeletePost = async (postId: string) => {
+    try {
+      // setLoadingPosts(true);
+      
+      // First delete likes and comments
+      await supabase.from('likes').delete().eq('post_id', postId);
+      await supabase.from('comments').delete().eq('post_id', postId);
+      
+      // Then delete the post
+      const { error } = await supabase
+        .from('posts')
+        .delete()
+        .eq('id', postId);
+      
+      if (error) throw error;
+      
+      toast({
+        title: "Post deleted",
+        description: "Your post has been deleted successfully."
+      });
+      
+      // Refresh the whole page
+      setTimeout(() => window.location.reload(), 500);
+    } catch (error) {
+      console.error('Error deleting post:', error);
+      toast({
+        title: "Delete failed",
+        description: "There was an error deleting your post. Please try again.",
+        variant: "destructive"
+      });
+      setLoadingPosts(false);
+    }
+  };
+
+  // Update handleCreatePost to refresh the whole page
+  const handleCreatePost = async (data: { text: string; image_url: string | string[]; isTextPost: boolean }) => {
+    try {
+      setLoadingPosts(true);
+      const { text, image_url, isTextPost } = data;
+      
+      // Create the post
+      const { error } = await supabase
+        .from('posts')
+        .insert({
+          caption: text,
+          image_url: Array.isArray(image_url) ? JSON.stringify(image_url) : image_url,
+          user_id: profile?.id
+        });
+      
+      if (error) throw error;
+      
+      toast({
+        title: "Post created",
+        description: "Your post has been created successfully."
+      });
+      
+      // Close the modal
+      setShowCreatePostModal(false);
+      
+      // Refresh the whole page
+      setTimeout(() => window.location.reload(), 500);
+    } catch (error) {
+      console.error('Error creating post:', error);
+      toast({
+        title: "Post creation failed",
+        description: "There was an error creating your post. Please try again.",
+        variant: "destructive"
+      });
+      setLoadingPosts(false);
+    }
+  };
+
+  useEffect(() => {
+    if (profile?.id && profile?.user_role === "business" && activeProfileTab === "bookings") {
+      fetchBookings();
+    }
+  }, [profile?.id, activeProfileTab]);
+  
+  const fetchBookings = async () => {
+    if (!profile?.id) return;
+    
+    setLoadingBookings(true);
+    try {
+      // Fetch bookings where the current user is the service provider
+      const { data: bookingsData, error } = await supabase
+        .from('bookings')
+        .select('*')
+        .eq('provider_id', profile.id)
+        .order('created_at', { ascending: false });
+      
+      if (error) throw error;
+      
+      if (bookingsData && bookingsData.length > 0) {
+        // Extract service IDs and customer IDs
+        const serviceIds = bookingsData.map(booking => booking.service_id).filter(Boolean);
+        const customerIds = bookingsData.map(booking => booking.customer_id).filter(Boolean);
+        
+        // Fetch services data
+        const { data: servicesData, error: servicesError } = await supabase
+          .from('services')
+          .select('id, title, price, category, image')
+          .in('id', serviceIds);
+          
+        if (servicesError) console.error("Error fetching services:", servicesError);
+        
+        // Fetch customers data
+        const { data: customersData, error: customersError } = await supabase
+          .from('profiles')
+          .select('id, username, avatar_url')
+          .in('id', customerIds);
+          
+        if (customersError) console.error("Error fetching customers:", customersError);
+        
+        // Create lookup tables
+        const servicesMap = (servicesData || []).reduce((acc, service) => {
+          acc[service.id] = service;
+          return acc;
+        }, {});
+        
+        const customersMap = (customersData || []).reduce((acc, customer) => {
+          acc[customer.id] = customer;
+          return acc;
+        }, {});
+        
+        // Join the data
+        const bookingsWithRelations = bookingsData.map(booking => ({
+          ...booking,
+          services: servicesMap[booking.service_id] || { title: 'Unknown Service', price: 'N/A', category: 'Unknown' },
+          customers: customersMap[booking.customer_id] || { username: 'Unknown Customer', avatar_url: null }
+        }));
+        
+        setBookings(bookingsWithRelations);
+      } else {
+        setBookings([]);
+      }
+    } catch (error) {
+      console.error("Error fetching bookings:", error);
+      toast({
+        variant: "destructive",
+        title: "Failed to load bookings",
+        description: "Please try again later.",
+      });
+    } finally {
+      setLoadingBookings(false);
+    }
+  };
+  
+  const handleUpdateBookingStatus = async (bookingId: string, newStatus: string) => {
+    try {
+      const { error } = await supabase
+        .from('bookings')
+        .update({ status: newStatus })
+        .eq('id', bookingId);
+      
+      if (error) throw error;
+      
+      // Update local state
+      setBookings(prev => 
+        prev.map(booking => 
+          booking.id === bookingId ? { ...booking, status: newStatus } : booking
+        )
+      );
+      
+      // Get booking details for notification
+      const booking = bookings.find(b => b.id === bookingId);
+      
+      if (booking) {
+        // Notify the customer about the status change
+        const { data: profileData } = await supabase
+          .from('profiles')
+          .select('username')
+          .eq('id', profile?.id)
+          .single();
+        
+        if (profileData) {
+          await createNotification({
+            userId: booking.customer_id,
+            actorId: profile?.id,
+            actorName: profileData.username || 'Service Provider',
+            type: 'booking',
+            entityId: bookingId,
+            message: `Your booking for "${booking.services?.title || 'service'}" has been ${newStatus}`
+          });
+        }
+      }
+      
+      toast({
+        title: "Booking updated",
+        description: `Booking status has been updated to ${newStatus}.`,
+      });
+    } catch (error) {
+      console.error("Error updating booking:", error);
+      toast({
+        variant: "destructive",
+        title: "Update failed",
+        description: "There was an error updating the booking status.",
+      });
+    }
+  };
+
+  // Add useEffect to fetch customer bookings when needed
+  useEffect(() => {
+    if (profile?.id && profile?.user_role !== "business" && activeProfileTab === "bookings") {
+      fetchCustomerBookings();
+    }
+  }, [profile?.id, activeProfileTab]);
+
+  // Add fetchCustomerBookings function
+  const fetchCustomerBookings = async () => {
+    if (!profile?.id) return;
+    
+    setLoadingCustomerBookings(true);
+    try {
+      // Fetch bookings where the current user is the customer
+      const { data: bookingsData, error } = await supabase
+        .from('bookings')
+        .select('*')
+        .eq('customer_id', profile.id)
+        .order('created_at', { ascending: false });
+      
+      if (error) throw error;
+      
+      if (bookingsData && bookingsData.length > 0) {
+        // Extract service IDs and provider IDs
+        const serviceIds = bookingsData.map(booking => booking.service_id).filter(Boolean);
+        const providerIds = bookingsData.map(booking => booking.provider_id).filter(Boolean);
+        
+        // Fetch services data
+        const { data: servicesData, error: servicesError } = await supabase
+          .from('services')
+          .select('id, title, price, category, image')
+          .in('id', serviceIds);
+          
+        if (servicesError) console.error("Error fetching services:", servicesError);
+        
+        // Fetch providers data
+        const { data: providersData, error: providersError } = await supabase
+          .from('profiles')
+          .select('id, username, avatar_url')
+          .in('id', providerIds);
+          
+        if (providersError) console.error("Error fetching providers:", providersError);
+        
+        // Create lookup tables
+        const servicesMap = (servicesData || []).reduce((acc, service) => {
+          acc[service.id] = service;
+          return acc;
+        }, {});
+        
+        const providersMap = (providersData || []).reduce((acc, provider) => {
+          acc[provider.id] = provider;
+          return acc;
+        }, {});
+        
+        // Join the data
+        const bookingsWithRelations = bookingsData.map(booking => ({
+          ...booking,
+          services: servicesMap[booking.service_id] || { title: 'Unknown Service', price: 'N/A', category: 'Unknown' },
+          providers: providersMap[booking.provider_id] || { username: 'Unknown Provider', avatar_url: null }
+        }));
+        
+        setCustomerBookings(bookingsWithRelations);
+      } else {
+        setCustomerBookings([]);
+      }
+    } catch (error) {
+      console.error("Error fetching customer bookings:", error);
+      toast({
+        variant: "destructive",
+        title: "Failed to load bookings",
+        description: "Please try again later.",
+      });
+    } finally {
+      setLoadingCustomerBookings(false);
+    }
+  };
+
+  const handleCancelCustomerBooking = async (bookingId: string) => {
+    try {
+      const { error } = await supabase
+        .from('bookings')
+        .update({ status: 'cancelled' })
+        .eq('id', bookingId);
+      
+      if (error) throw error;
+      
+      // Update local state
+      setCustomerBookings(prev => 
+        prev.map(booking => 
+          booking.id === bookingId ? { ...booking, status: 'cancelled' } : booking
+        )
+      );
+      
+      toast({
+        title: "Booking cancelled",
+        description: "Your booking has been cancelled.",
+      });
+    } catch (error) {
+      console.error("Error cancelling booking:", error);
+      toast({
+        variant: "destructive",
+        title: "Cancellation failed",
+        description: "There was an error cancelling your booking.",
+      });
+    }
+  };
+
+  if (loading && loadingProfile) {
     return (
       <div className="flex min-h-screen">
-        <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} />
+        <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} userRole={profile?.user_role} />
         <div className="flex-1 flex justify-center items-center">
           Loading profile...
         </div>
@@ -289,228 +873,637 @@ export function Profile() {
   }
 
   return (
-    <div className="flex min-h-screen w-full">
-      <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} />
-      <div className="flex-1 lg:ml-72">
-        <MobileHeader />
-        <div className="container mx-auto pt-8 pb-20 lg:pb-8 px-4">
-          <Card className="p-6 mb-6">
-            <div className="flex flex-col md:flex-row gap-6 items-start md:items-center">
-              <Avatar className="w-24 h-24 border-2 border-white/20">
-                {avatarUrl ? (
-                  <AvatarImage src={avatarUrl} alt={username} />
-                ) : (
-                  <AvatarFallback>{username?.[0]?.toUpperCase() || '?'}</AvatarFallback>
-                )}
-              </Avatar>
-              
-              <div className="flex-1">
-                <div className="flex flex-col sm:flex-row sm:items-center gap-3 mb-2">
-                  <h2 className="text-2xl font-bold">{profile?.username || "Anonymous"}</h2>
-                  <Button 
-                    variant="outline" 
-                    size="sm" 
-                    onClick={() => setIsEditingProfile(true)}
-                  >
-                    Edit Profile
-                  </Button>
-                </div>
-                
-                <div className="flex flex-wrap gap-6 mb-3">
-                  <div className="flex items-center gap-2">
-                    <FileImage className="w-4 h-4" />
-                    <span className="text-sm">
-                      <strong>{userPosts.length}</strong> posts
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Users className="w-4 h-4" />
-                    <span className="text-sm">
-                      <strong>{profile?.followers_count || 0}</strong> followers
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Users className="w-4 h-4" />
-                    <span className="text-sm">
-                      <strong>{profile?.following_count || 0}</strong> following
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Star className="w-4 h-4" />
-                    <span className="text-sm">
-                      <strong>{profile?.reviews_count || 0}</strong> reviews
-                      {profile?.reviews_count ? ` (${profile?.reviews_rating?.toFixed(1)} ★)` : ''}
-                    </span>
+    <MainLayout activeTab={activeTab} setActiveTab={setActiveTab} userRole={profile?.user_role}>
+      <div className="min-h-screen bg-background">
+        <div className="container mx-auto max-w-7xl py-8 px-4">
+          {/* Profile header with skeleton loader */}
+          <Card className="rounded-lg overflow-hidden mb-8">
+            {loadingProfile ? (
+              <div className="p-6">
+                <div className="flex flex-col md:flex-row gap-6">
+                  <Skeleton className="h-24 w-24 rounded-full" />
+                  <div className="flex-1 space-y-4">
+                    <Skeleton className="h-8 w-48" />
+                    <Skeleton className="h-4 w-full" />
+                    <div className="flex gap-4">
+                      <Skeleton className="h-10 w-24" />
+                      <Skeleton className="h-10 w-24" />
+                    </div>
                   </div>
                 </div>
-                
-                <p className="text-sm text-white/80">{profile?.bio || "No bio yet"}</p>
               </div>
-            </div>
-            
-            <div className="mt-6">
-              <div className="flex items-center justify-between mb-2">
-                <h3 className="font-semibold">About Business</h3>
-                <Button 
-                  variant="ghost" 
-                  size="sm" 
-                  onClick={() => setIsEditingAboutBusiness(true)}
-                >
-                  <PenLine className="w-4 h-4 mr-1" />
-                  Edit
-                </Button>
+            ) : (
+              <div className="p-6">
+                <div className="flex flex-col md:flex-row gap-6">
+                  <div className="relative">
+                    <Avatar className="h-24 w-24 border-2 border-white/20">
+                      <AvatarImage src={profile?.avatar_url || undefined} />
+                      <AvatarFallback>{profile?.username?.[0] || 'U'}</AvatarFallback>
+                    </Avatar>
+                    {/* <Button
+                      className="absolute -bottom-2 -right-2 h-8 w-8 rounded-full p-0"
+                      size="sm" 
+                      onClick={() => fileInputRef.current?.click()}
+                    >
+                      <FileImage className="h-4 w-4" />
+                    </Button> */}
+                    <input
+                        type="file" 
+                      ref={fileInputRef}
+                      onChange={handleAvatarChange}
+                      className="hidden"
+                        accept="image/*" 
+                      />
+                  </div>
+                  
+                  <div className="flex-1">
+                    <div className="flex flex-col md:flex-row gap-4 justify-between mb-4">
+                      <div>
+                        {isEditingProfile ? (
+                          <div className="mb-4">
+                    <Label htmlFor="username">Username</Label>
+                    <Input 
+                      id="username" 
+                      value={username} 
+                      onChange={handleUsernameChange} 
+                              className="mb-2"
+                    />
+                    <Label htmlFor="bio">Bio</Label>
+                    <Textarea 
+                      id="bio" 
+                      value={bio} 
+                      onChange={(e) => setBio(e.target.value)} 
+                              className="mb-2 min-h-[80px]"
+                            />
+                            <div className="flex gap-2 mt-4">
+                              <Button onClick={handleUpdateProfile}>Save</Button>
+                              <Button
+                                variant="outline"
+                                onClick={() => {
+                                  setUsername(profile?.username || "");
+                                  setBio(profile?.bio || "");
+                                  setIsEditingProfile(false);
+                                }}
+                              >
+                                Cancel
+                              </Button>
+                            </div>
+                          </div>
+                        ) : (
+                          <>
+                            <h1 className="text-2xl font-bold mb-1">
+                              {profile?.username}
+                            </h1>
+                            <p className="text-white/60 mb-3">{profile?.bio}</p>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => setIsEditingProfile(true)}
+                              className="mb-4"
+                            >
+                              Edit Profile
+                            </Button>
+                          </>
+                        )}
+                  </div>
+                  
+                      <div>
+                        <Button 
+                        onClick={handleShareProfile} 
+                        size="sm" 
+                        variant="ghost"
+                        className="text-primary/70 hover:text-primary hover:bg-primary/10 h-10"
+                      >
+                        <Share2 className="h-4 w-4 mr-2" />
+                        Share Profile
+                      </Button>
+                      <Button 
+                        onClick={() => navigate('/notifications')} 
+                        size="sm" 
+                        variant="ghost"
+                        className="text-primary/70 hover:text-primary hover:bg-primary/10 h-10 relative ml-2"
+                        aria-label="Notifications"
+                        title="View notifications"
+                      >
+                        <Bell className="h-4 w-4 " />
+                        {unreadNotifications > 0 && (
+                          <span className="absolute -top-1 -right-1 bg-primary text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
+                            {unreadNotifications > 9 ? '9+' : unreadNotifications}
+                          </span>
+                        )}
+                      </Button>
+                      </div>
+                    </div>
+                    
+                    <div className="grid grid-cols-3 md:grid-cols-4 gap-4 text-center">
+                      <div className="bg-black/20 rounded-lg p-3">
+                        <div className="flex items-center justify-center gap-1 mb-1">
+                          <FileImage className="h-4 w-4 text-white/60" />
+                          <span className="font-semibold">{userPosts.length}</span>
+                        </div>
+                        <p className="text-xs text-white/60">Posts</p>
+                      </div>
+                      
+                      <div 
+                        className="bg-black/20 rounded-lg p-3 cursor-pointer hover:bg-black/30 transition"
+                        onClick={() => setShowFollowersModal(true)}
+                      >
+                        <div className="flex items-center justify-center gap-1 mb-1">
+                          <Users className="h-4 w-4 text-white/60" />
+                          <span className="font-semibold">{profile?.followers_count || 0}</span>
+                        </div>
+                        <p className="text-xs text-white/60">Followers</p>
+                      </div>
+                      
+                      <div 
+                        className="bg-black/20 rounded-lg p-3 cursor-pointer hover:bg-black/30 transition"
+                        onClick={() => setShowFollowingModal(true)}
+                      >
+                        <div className="flex items-center justify-center gap-1 mb-1">
+                          <Users className="h-4 w-4 text-white/60" />
+                          <span className="font-semibold">{profile?.following_count || 0}</span>
+                        </div>
+                        <p className="text-xs text-white/60">Following</p>
+                      </div>
+                      
+                      {profile?.user_role === "business" && (
+                        <div 
+                          className="bg-black/20 rounded-lg p-3 cursor-pointer hover:bg-black/30 transition"
+                          onClick={() => setShowReviewsModal(true)}
+                        >
+                          <div className="flex items-center justify-center gap-1 mb-1">
+                            <Star className="h-4 w-4 text-white/60" />
+                            <span className="font-semibold">{profile?.reviews_rating?.toFixed(1) || '0.0'}</span>
+                          </div>
+                          <p className="text-xs text-white/60">Rating ({profile?.reviews_count || 0})</p>
+                        </div>
+                      )}
+                    </div>
+                    
+                    {profile?.user_role === "business" && (
+                      <div className="mt-4 p-4 bg-black/10 rounded-lg">
+                        <div className="flex justify-between items-center mb-2">
+                          <h3 className="font-medium">About Business</h3>
+                          <button>
+                            <PenLine
+                            size="20px"
+                            onClick={() => setIsEditingAboutBusiness(true)}
+                          >
+                            Edit
+                          </PenLine>
+                          </button>
+                        </div>
+                        <p className="text-sm text-white/80">{profile?.about_business || "Add information about your business"}</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
               </div>
-              <p className="text-sm text-white/80">{profile?.about_business || "No business information yet."}</p>
-            </div>
+            )}
           </Card>
           
+          {/* Tabs for Posts, Services, and Bookings based on user role */}
+          <Tabs value={activeProfileTab} onValueChange={setActiveProfileTab}>
+            <TabsList className="mb-6">
+              <TabsTrigger value="posts">Posts</TabsTrigger>
+              {profile?.user_role === "business" ? (
+                <TabsTrigger value="services">Services</TabsTrigger>
+              ) : (
+                <TabsTrigger value="bookings">Bookings</TabsTrigger>
+              )}
+            </TabsList>
+            
+            <TabsContent value="posts" className="pb-4">
+              <div className="mb-4 flex justify-between items-center">
+                <h2 className="text-xl font-semibold"></h2>
+                {profile?.id && (
+                  <Button 
+                    onClick={() => setShowCreatePostModal(true)}
+                    className="flex items-center gap-2"
+                  >
+                    <PlusCircle className="h-4 w-4" />
+                    Create Post
+                  </Button>
+                )}
+              </div>
+              
+              <div className="grid grid-cols-1 gap-4">
+                {loadingPosts ? (
+                  // Post skeletons
+                  Array(3).fill(0).map((_, i) => (
+                    <div key={i} className="w-full rounded-lg overflow-hidden">
+                      <div className="p-4 bg-black/20 flex items-center gap-3">
+                        <Skeleton className="h-10 w-10 rounded-full" />
+                        <div className="space-y-2">
+                          <Skeleton className="h-4 w-32" />
+                          <Skeleton className="h-3 w-24" />
+                        </div>
+                      </div>
+                      <Skeleton className="h-64 w-full" />
+                      <div className="p-4 bg-black/20 space-y-2">
+                        <Skeleton className="h-4 w-3/4" />
+                        <Skeleton className="h-4 w-1/2" />
+                      </div>
+                    </div>
+                  ))
+                ) : userPosts.length > 0 ? (
+                  userPosts.map((post) => (
+                    <Post 
+                      key={post.id} 
+                      {...post} 
+                      profiles={post.profiles} 
+                      currentUserId={async () => profile?.id}
+                      onEdit={handleEditPost}
+                      onDelete={handleDeletePost}
+                    />
+                  ))
+                ) : (
+                  <div className="text-center py-8">
+                    <Card className="p-8 text-center">
+                      <p className="mb-4">You haven't created any posts yet</p>
+                      <Button onClick={() => setShowCreatePostModal(true)}>Create Post</Button>
+                    </Card>
+                  </div>
+                )}
+              </div>
+            </TabsContent>
+            
+            <TabsContent value="services" className="mt-0">
+              <div className="flex justify-end mb-4">
+                  <Button onClick={() => setShowAddServiceModal(true)}>Add Service</Button>
+                </div>
+                
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {loadingServices ? (
+                  // Service skeletons
+                  Array(6).fill(0).map((_, i) => (
+                    <div key={i} className="rounded-lg overflow-hidden">
+                      <Skeleton className="aspect-video w-full" />
+                      <div className="p-4 bg-black/20 space-y-2">
+                        <Skeleton className="h-5 w-3/4" />
+                        <Skeleton className="h-4 w-1/2" />
+                        <Skeleton className="h-6 w-24" />
+                      </div>
+                    </div>
+                  ))
+                ) : services.length > 0 ? (
+                  services.map((service) => (
+                    <Card key={service.id} className="overflow-hidden">
+                      <div className="aspect-video bg-black/40 relative">
+                        {service.image ? (
+                          <img
+                            src={service.image}
+                            alt={service.title}
+                            className="w-full h-full object-cover"
+                          />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center">
+                            <span className="text-white/40">No image</span>
+                          </div>
+                        )}
+                      </div>
+                      <CardHeader>
+                        <CardTitle className="text-xl">{service.title}</CardTitle>
+                        <div className="flex justify-between items-center">
+                          <p className="text-sm text-primary font-bold">${service.price}</p>
+                          <Badge variant="outline">{service.category}</Badge>
+                        </div>
+                      </CardHeader>
+                      <CardContent>
+                        <p className="line-clamp-3 text-sm text-muted-foreground">
+                          {service.description}
+                        </p>
+                      </CardContent>
+                    </Card>
+                  ))
+                ) : (
+                  <div className="col-span-full text-center py-8">
+                  <Card className="p-8 text-center">
+                    <p className="mb-4">You haven't added any services yet</p>
+                      <Button onClick={() => setShowAddServiceModal(true)}>Add Service</Button>
+                  </Card>
+                  </div>
+                )}
+              </div>
+              </TabsContent>
+            <TabsContent value="bookings" className="mt-0">
+              <Card>
+                <CardHeader>
+                  <CardTitle>My Bookings</CardTitle>
+                  <CardDescription>
+                    Services you have booked
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {loadingBookings ? (
+                    // Loading skeleton
+                    <div className="space-y-4">
+                      {Array(3).fill(0).map((_, i) => (
+                        <div key={i} className="p-4 border rounded-lg animate-pulse">
+                          <div className="flex justify-between">
+                            <div className="h-5 bg-gray-300 rounded w-1/3"></div>
+                            <div className="h-5 bg-gray-300 rounded w-1/4"></div>
+                          </div>
+                          <div className="h-4 bg-gray-300 rounded w-1/2 mt-2"></div>
+                          <div className="h-10 bg-gray-300 rounded w-full mt-4"></div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : bookings.length > 0 ? (
+                    <div className="space-y-4">
+                      {bookings.map((booking) => (
+                        <Card key={booking.id} className="overflow-hidden">
+                          <CardHeader className="p-4">
+                            <div className="flex justify-between items-center">
+                              <div>
+                                <div className="flex items-center gap-2">
+                                  <ShoppingCart className="h-4 w-4" />
+                                  <h3 className="font-medium">{booking.services.title}</h3>
+                                </div>
+                                <div className="text-sm text-muted-foreground mt-1">
+                                  <p>Provider: {booking.customers.username}</p>
+                                  <p>Price: ${booking.services.price}</p>
+                                  <p>Booked on: {new Date(booking.created_at).toLocaleDateString()}</p>
+                                </div>
+                              </div>
+                              <Badge variant={
+                                booking.status === 'completed' ? 'default' :
+                                booking.status === 'pending' ? 'secondary' :
+                                booking.status === 'cancelled' ? 'destructive' :
+                                booking.status === 'confirmed' ? 'outline' : 'default'
+                              }>
+                                {booking.status.charAt(0).toUpperCase() + booking.status.slice(1)}
+                              </Badge>
+                            </div>
+                          </CardHeader>
+                          <CardFooter className="p-4 bg-muted/20 flex justify-end gap-2">
+                            {["pending", "confirmed"].includes(booking.status) && (
+                              <Button 
+                                variant="outline" 
+                                size="sm"
+                                onClick={() => handleUpdateBookingStatus(booking.id, 'cancelled')}
+                              >
+                                Cancel Booking
+                              </Button>
+                            )}
+                            <Button
+                              variant="default"
+                              size="sm"
+                              onClick={() => navigate(`/messages?user=${booking.customer_id}`)}
+                            >
+                              <MessageSquare className="h-4 w-4 mr-2" />
+                              Message Provider
+                            </Button>
+                          </CardFooter>
+                        </Card>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="text-center py-8">
+                      <p>You don't have any service bookings yet.</p>
+                      <Button 
+                        onClick={() => navigate('/discover')} 
+                        className="mt-4"
+                      >
+                        Discover Services
+                      </Button>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </TabsContent>
+          </Tabs>
+          
+          {/* Edit About Business Modal */}
+          <Dialog open={isEditingAboutBusiness} onOpenChange={setIsEditingAboutBusiness}>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Edit Business Information</DialogTitle>
+                <DialogDescription>
+                  Provide details about your business to attract more customers.
+                </DialogDescription>
+              </DialogHeader>
+              <div className="py-4">
+                <Textarea
+                  value={aboutBusiness}
+                  onChange={(e) => setAboutBusiness(e.target.value)}
+                  placeholder="Describe your business, services, years of experience, etc."
+                  className="min-h-[150px]"
+                />
+              </div>
+              <div className="flex justify-end gap-2">
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setAboutBusiness(profile?.about_business || "");
+                    setIsEditingAboutBusiness(false);
+                  }}
+                >
+                  Cancel
+                </Button>
+                <Button onClick={handleUpdateAboutBusiness}>Save</Button>
+              </div>
+            </DialogContent>
+          </Dialog>
+          
+          {/* Add Service Modal */}
+          <AddServiceModal
+            isOpen={showAddServiceModal}
+            onClose={() => setShowAddServiceModal(false)}
+            onServiceAdded={handleAddService}
+          />
+          
+          {/* Modals for followers, following, and reviews */}
+          {profile?.id && (
+            <>
+              <FollowersModal 
+                userId={profile.id}
+                isOpen={showFollowersModal}
+                onClose={() => setShowFollowersModal(false)}
+                currentUserId={profile.id}
+              />
+              
+              <FollowingModal
+                userId={profile.id}
+                isOpen={showFollowingModal}
+                onClose={() => setShowFollowingModal(false)}
+                currentUserId={profile.id}
+              />
+              
+              <ReviewsModal 
+                userId={profile.id}
+                isOpen={showReviewsModal}
+                onClose={() => setShowReviewsModal(false)}
+                currentUserId={profile.id}
+              />
+            </>
+          )}
+
+          {/* Edit Profile Modal */}
           <Dialog open={isEditingProfile} onOpenChange={setIsEditingProfile}>
-            <DialogContent className="sm:max-w-[425px]">
+            <DialogContent className="sm:max-w-[500px] max-h-[90vh] overflow-y-auto">
               <DialogHeader>
                 <DialogTitle>Edit Profile</DialogTitle>
                 <DialogDescription>
-                  Make changes to your profile here.
+                  Update your profile information here. Click save when you're done.
                 </DialogDescription>
               </DialogHeader>
               
-              <div className="grid gap-4 py-4">
-                <div className="flex flex-col space-y-1.5">
+              <div className="space-y-6 py-4">
+                {/* Profile Picture Upload */}
+                <div className="space-y-2">
                   <Label htmlFor="avatar">Profile Picture</Label>
-                  <div className="flex items-center space-x-4">
-                    <Avatar className="w-16 h-16">
-                      {avatarUrl ? (
-                        <AvatarImage src={avatarUrl} alt={username} />
-                      ) : (
-                        <AvatarFallback>{username?.[0]?.toUpperCase() || '?'}</AvatarFallback>
-                      )}
+                  <div className="flex items-center gap-4">
+                    <Avatar className="w-20 h-20">
+                      <AvatarImage src={avatarUrl || ""} alt={username} />
+                      <AvatarFallback>{username?.charAt(0)?.toUpperCase() || "U"}</AvatarFallback>
                     </Avatar>
-                    <Input 
-                      id="avatar" 
-                      type="file" 
-                      accept="image/*" 
-                      onChange={handleAvatarChange} 
+                    <FileUpload
+                      endpoint="profilePicture"
+                      onChange={handleAvatarChange}
+                      className="w-full"
                     />
-                  </div>
-                </div>
-                
-                <div className="flex flex-col space-y-1.5">
+        </div>
+      </div>
+      
+                {/* Username */}
+                <div className="space-y-2">
                   <Label htmlFor="username">Username</Label>
-                  <Input 
-                    id="username" 
-                    value={username} 
-                    onChange={(e) => setUsername(e.target.value)} 
-                    placeholder="Enter your username" 
-                  />
+                  <div className="relative">
+                    <Input 
+                      id="username" 
+                      value={username} 
+                      onChange={handleUsernameChange} 
+                      className={`pr-10 ${isUsernameAvailable === false ? 'border-red-500' : ''}`}
+                    />
+                    {isCheckingUsername && (
+                      <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                        <svg className="animate-spin h-5 w-5 text-gray-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                      </div>
+                    )}
+                    {!isCheckingUsername && isUsernameAvailable === true && (
+                      <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                        <svg className="h-5 w-5 text-green-500" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                          <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                        </svg>
+                      </div>
+                    )}
+                    {!isCheckingUsername && isUsernameAvailable === false && (
+                      <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                        <svg className="h-5 w-5 text-red-500" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                          <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                        </svg>
+                      </div>
+                    )}
+                  </div>
+                  {isUsernameAvailable === false && (
+                    <p className="text-red-500 text-sm mt-1">Username is already taken</p>
+                  )}
                 </div>
                 
-                <div className="flex flex-col space-y-1.5">
+                {/* Bio */}
+                <div className="space-y-2">
                   <Label htmlFor="bio">Bio</Label>
                   <Textarea 
                     id="bio" 
                     value={bio} 
                     onChange={(e) => setBio(e.target.value)} 
-                    placeholder="Tell us about yourself" 
-                    rows={3} 
+                    className="min-h-[100px]"
                   />
+                </div>
+                
+                {/* User Role - Card Radio Buttons */}
+                <div className="space-y-2">
+                  <Label htmlFor="userRole">I am a</Label>
+                  <div className="grid grid-cols-2 gap-4 pt-2">
+                    <label 
+                      className={`flex flex-col items-center p-4 rounded-lg border-2 cursor-pointer transition-all ${
+                        userRole === "customer" 
+                          ? "border-primary bg-primary/10" 
+                          : "border-gray-200 hover:border-gray-300"
+                      }`}
+                    >
+                      <input 
+                        type="radio" 
+                        name="userRole" 
+                        value="customer" 
+                        checked={userRole === "customer"} 
+                        onChange={() => setUserRole("customer")}
+                        className="sr-only" 
+                      />
+                      <div className="text-lg mb-2">👤</div>
+                      <div className="font-medium">Customer</div>
+                      <div className="text-xs text-gray-500 text-center mt-1">
+                        Browse and book services
+                      </div>
+                    </label>
+                    
+                    <label 
+                      className={`flex flex-col items-center p-4 rounded-lg border-2 cursor-pointer transition-all ${
+                        userRole === "business" 
+                          ? "border-primary bg-primary/10" 
+                          : "border-gray-200 hover:border-gray-300"
+                      }`}
+                    >
+                      <input 
+                        type="radio" 
+                        name="userRole" 
+                        value="business" 
+                        checked={userRole === "business"} 
+                        onChange={() => setUserRole("business")}
+                        className="sr-only" 
+                      />
+                      <div className="text-lg mb-2">🛠️</div>
+                      <div className="font-medium">Service Provider</div>
+                      <div className="text-xs text-gray-500 text-center mt-1">
+                        Offer and manage services
+                      </div>
+                    </label>
+                  </div>
                 </div>
               </div>
               
               <DialogFooter>
-                <Button variant="outline" onClick={() => setIsEditingProfile(false)}>Cancel</Button>
-                <Button onClick={handleUpdateProfile} disabled={uploading}>
-                  {uploading ? "Saving..." : "Save Changes"}
+                <Button variant="outline" onClick={() => {
+                  setUsername(profile?.username || "");
+                  setBio(profile?.bio || "");
+                  setUserRole(profile?.user_role || "customer");
+                  setIsUsernameAvailable(null);
+                  setIsEditingProfile(false);
+                }}>
+                  Cancel
                 </Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
-          
-          <Dialog open={isEditingAboutBusiness} onOpenChange={setIsEditingAboutBusiness}>
-            <DialogContent className="sm:max-w-[425px]">
-              <DialogHeader>
-                <DialogTitle>Edit Business Information</DialogTitle>
-                <DialogDescription>
-                  Tell others about your business.
-                </DialogDescription>
-              </DialogHeader>
-              
-              <div className="grid gap-4 py-4">
-                <div className="flex flex-col space-y-1.5">
-                  <Label htmlFor="aboutBusiness">About Your Business</Label>
-                  <Textarea 
-                    id="aboutBusiness" 
-                    value={aboutBusiness} 
-                    onChange={(e) => setAboutBusiness(e.target.value)} 
-                    placeholder="Describe your business, services, experience, etc." 
-                    rows={5} 
-                  />
-                </div>
-              </div>
-              
-              <DialogFooter>
-                <Button variant="outline" onClick={() => setIsEditingAboutBusiness(false)}>Cancel</Button>
-                <Button onClick={handleUpdateAboutBusiness}>
+                <Button 
+                  onClick={handleUpdateProfile} 
+                  disabled={isUsernameAvailable === false || isCheckingUsername}
+                >
                   Save Changes
                 </Button>
               </DialogFooter>
             </DialogContent>
           </Dialog>
-          
-          <Tabs value={activeProfileTab} onValueChange={setActiveProfileTab}>
-            <TabsList className="mb-6">
-              <TabsTrigger value="posts">Posts</TabsTrigger>
-              <TabsTrigger value="services">Services</TabsTrigger>
-            </TabsList>
-            
-            <TabsContent value="posts" className="space-y-6">
-              {userPosts.length > 0 ? (
-                userPosts.map((post) => (
-                  <Post 
-                    key={post.id} 
-                    {...post} 
-                    profiles={post.profiles} 
-                    currentUserId={async () => profile?.id || null} 
-                  />
-                ))
-              ) : (
-                <Card className="p-8 text-center">
-                  <p className="mb-4">You haven't posted anything yet</p>
-                  <Button onClick={() => navigate("/home")}>Make your first post</Button>
-                </Card>
-              )}
-            </TabsContent>
-            
-            <TabsContent value="services">
-              <div className="mb-6 flex justify-between items-center">
-                <h2 className="text-xl font-bold">Your Services</h2>
-                <Button onClick={() => setShowAddServiceModal(true)}>Add Service</Button>
-              </div>
-              
-              {services.length > 0 ? (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                  {services.map((service) => (
-                    <ServiceCard 
-                      key={service.id} 
-                      service={service} 
-                      onClick={() => {}}
-                    />
-                  ))}
-                </div>
-              ) : (
-                <Card className="p-8 text-center">
-                  <p className="mb-4">You haven't added any services yet</p>
-                  <Button onClick={() => setShowAddServiceModal(true)}>Add your first service</Button>
-                </Card>
-              )}
-            </TabsContent>
-          </Tabs>
+
+          {/* Create Post Modal */}
+          {profile?.id && (
+            <Dialog open={showCreatePostModal} onOpenChange={setShowCreatePostModal}>
+              <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-auto">
+                <DialogHeader>
+                  <DialogTitle>Create Post</DialogTitle>
+                  <DialogDescription>
+                    Share what's on your mind or upload images.
+                  </DialogDescription>
+                </DialogHeader>
+                <CreatePost 
+                  onSubmit={handleCreatePost}
+                />
+              </DialogContent>
+            </Dialog>
+          )}
         </div>
-      </div>
-      
-      <AddServiceModal 
-        isOpen={showAddServiceModal}
-        onClose={() => setShowAddServiceModal(false)}
-        onServiceAdded={handleAddService}
-      />
     </div>
+    </MainLayout>
   );
 }

@@ -167,13 +167,13 @@ export function ServiceModal({ service, isOpen, onClose }: ServiceModalProps) {
 
         <DialogFooter className="mt-6">
           <Button onClick={onClose} variant="outline">Close</Button>
-          <Button 
+          {/* <Button 
             variant="default" 
             onClick={handleBookService}
             disabled={isBooking}
           >
             {isBooking ? "Processing..." : "Book Service"}
-          </Button>
+          </Button> */}
         </DialogFooter>
       </DialogContent>
     </Dialog>

@@ -1,433 +1,326 @@
-import { useState } from 'react';
-import { 
-  Dialog, 
-  DialogContent, 
-  DialogHeader, 
-  DialogTitle,
-  DialogFooter,
-  DialogDescription
-} from "@/components/ui/dialog";
+import { useState } from "react";
+import { useForm } from "react-hook-form";
+import { z } from "zod";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { supabase } from "@/integrations/supabase/client";
+import { useUser } from "@/hooks/use-user";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Label } from "@/components/ui/label";
+import { useToast } from "@/components/ui/use-toast";
+import { Loader2, Upload } from "lucide-react";
+import { v4 as uuidv4 } from 'uuid';
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { 
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue
-} from "@/components/ui/select";
-import { supabase } from "@/integrations/supabase/client";
-import { ServiceType } from "@/types";
-import { FileUpload } from "@/components/FileUpload";
 
 interface AddServiceModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onServiceAdded?: (service: ServiceType) => void;
-  onAddService?: (serviceData: any) => Promise<void>;
-  
-  // For direct control mode (Services page)
-  title?: string;
-  description?: string;
-  price?: string;
-  image?: File | null;
-  imageUrl?: string;
-  onTitleChange?: (e: React.ChangeEvent<HTMLInputElement>) => void;
-  onDescriptionChange?: (e: React.ChangeEvent<HTMLTextAreaElement>) => void;
-  onPriceChange?: (e: React.ChangeEvent<HTMLInputElement>) => void;
-  onImageChange?: (e: React.ChangeEvent<HTMLInputElement>) => void;
-  loading?: boolean;
+  onServiceAdded: (service: any) => void;
 }
 
-export function AddServiceModal({ 
-  isOpen, 
-  onClose, 
-  onServiceAdded, 
-  onAddService,
-  title: externalTitle, 
-  description: externalDescription, 
-  price: externalPrice,
-  image: externalImage,
-  imageUrl: externalImageUrl,
-  onTitleChange,
-  onDescriptionChange,
-  onPriceChange,
-  onImageChange,
-  loading: externalLoading
-}: AddServiceModalProps) {
-  // Use internal state management if external props are not provided
-  const isDirectControlMode = onAddService !== undefined;
-  const [isLoading, setIsLoading] = useState(false);
-  const [formData, setFormData] = useState({
-    title: '',
-    description: '',
-    category: '',
-    image: '',
-    business: '',
-    price: '',
-    features: ['']
+const formSchema = z.object({
+  title: z.string().min(2, "Title must be at least 2 characters").max(100),
+  description: z.string().min(10, "Description must be at least 10 characters").max(500),
+  category: z.string().min(1, "Please select a category"),
+  price: z.coerce.number().positive("Price must be positive"),
+  location: z.string().min(2, "Location must be at least 2 characters").max(100),
+  duration: z.coerce.number().positive("Duration must be positive"),
+});
+
+export function AddServiceModal({ isOpen, onClose, onServiceAdded }: AddServiceModalProps) {
+  const { user } = useUser();
+  const { toast } = useToast();
+  const [loading, setLoading] = useState(false);
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [uploadProgress, setUploadProgress] = useState(0);
+
+  const form = useForm<z.infer<typeof formSchema>>({
+    resolver: zodResolver(formSchema),
+    defaultValues: {
+      title: "",
+      description: "",
+      category: "",
+      price: 0,
+      location: "",
+      duration: 60,
+    },
   });
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-    const { name, value } = e.target;
+  const { register, handleSubmit, formState: { errors } } = form;
+
+  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Check file size (limit to 5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      toast({
+        title: "File too large",
+        description: "Image must be less than 5MB",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setImageFile(file);
     
-    if (isDirectControlMode) {
-      // Direct mode - use the passed change handlers
-      if (name === 'title' && onTitleChange) {
-        onTitleChange(e as React.ChangeEvent<HTMLInputElement>);
-      } else if (name === 'description' && onDescriptionChange) {
-        onDescriptionChange(e as React.ChangeEvent<HTMLTextAreaElement>);
-      } else if (name === 'price' && onPriceChange) {
-        onPriceChange(e as React.ChangeEvent<HTMLInputElement>);
-      }
-    } else {
-      // Local state mode
-      setFormData(prev => ({ ...prev, [name]: value }));
+    // Create preview
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      setImagePreview(e.target?.result as string);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const uploadImage = async (file: File, userId: string): Promise<string | null> => {
+    try {
+      setUploadProgress(0);
+      
+      // Create a unique file path
+      const fileExt = file.name.split('.').pop();
+      const filePath = `services/${userId}/${uuidv4()}.${fileExt}`;
+      
+      // Upload the file
+      const { error: uploadError, data } = await supabase.storage
+        .from('images')
+        .upload(filePath, file, {
+          cacheControl: '3600',
+          upsert: false,
+        });
+
+      if (uploadError) throw uploadError;
+      
+      setUploadProgress(100);
+      
+      // Get the public URL
+      const { data: { publicUrl } } = supabase.storage
+        .from('images')
+        .getPublicUrl(filePath);
+        
+      return publicUrl;
+    } catch (error) {
+      console.error("Error uploading image:", error);
+      return null;
     }
   };
 
-  const handleSelectChange = (value: string) => {
-    setFormData(prev => ({ ...prev, category: value }));
-  };
-
-  const handleFeatureChange = (index: number, value: string) => {
-    const newFeatures = [...formData.features];
-    newFeatures[index] = value;
-    setFormData(prev => ({ ...prev, features: newFeatures }));
-  };
-
-  const addFeature = () => {
-    setFormData(prev => ({ 
-      ...prev, 
-      features: [...prev.features, ''] 
-    }));
-  };
-
-  const removeFeature = (index: number) => {
-    const newFeatures = [...formData.features];
-    newFeatures.splice(index, 1);
-    setFormData(prev => ({ ...prev, features: newFeatures }));
-  };
-
-  const handleImageUpload = (url: string) => {
-    if (isDirectControlMode) {
-      // In direct control mode, we don't use this method
-      // as the parent component handles image upload
-    } else {
-      setFormData(prev => ({ ...prev, image: url }));
-    }
-  };
-
-  const handleFileInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (isDirectControlMode && onImageChange) {
-      onImageChange(e);
-    }
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    if (isDirectControlMode && onAddService) {
-      await onAddService({
-        title: externalTitle,
-        description: externalDescription,
-        price: externalPrice,
-        image: externalImageUrl,
+  const onSubmit = async (values: z.infer<typeof formSchema>) => {
+    if (!user) {
+      toast({
+        title: "Error",
+        description: "You must be logged in to add a service",
+        variant: "destructive",
       });
       return;
     }
     
-    setIsLoading(true);
+    setLoading(true);
 
     try {
-      // Filter out empty features
-      const filteredFeatures = formData.features.filter(f => f.trim() !== '');
-      
-      const { data: userData } = await supabase.auth.getUser();
-      if (!userData.user) {
-        throw new Error('User not authenticated');
-      }
-
-      const newService = {
-        title: formData.title,
-        description: formData.description,
-        category: formData.category,
-        image: formData.image,
-        price: formData.price || "0",
-        owner_id: userData.user.id
-      };
-
-      // If onServiceAdded is provided, let the parent component handle the database insertion
-      if (onServiceAdded) {
-        onServiceAdded(newService as ServiceType);
-        onClose();
+      // Upload image if provided
+      let imageUrl = null;
+      if (imageFile) {
+        imageUrl = await uploadImage(imageFile, user.id);
         
-        // Reset form
-        setFormData({
-          title: '',
-          description: '',
-          category: '',
-          image: '',
-          business: '',
-          price: '',
-          features: ['']
-        });
-        return;
+        if (!imageUrl) {
+          toast({
+            title: "Warning",
+            description: "Failed to upload image, but service will be created without an image",
+          });
+        }
       }
 
-      // Otherwise, handle the insertion here
+      // Insert into the services table
       const { data, error } = await supabase
-        .from('services')
-        .insert(newService)
+        .from("services")
+        .insert({
+          title: values.title,
+          description: values.description,
+          category: values.category,
+          price: values.price,
+          location: values.location,
+          duration_minutes: values.duration,
+          image: imageUrl,
+          owner_id: user.id,
+          ratings_count: 0,
+          ratings_sum: 0,
+        })
         .select()
         .single();
 
       if (error) throw error;
       
-      onClose();
-      
-      // Reset form
-      setFormData({
-        title: '',
-        description: '',
-        category: '',
-        image: '',
-        business: '',
-        price: '',
-        features: ['']
+      toast({
+        title: "Service created",
+        description: "Your service has been created successfully",
       });
-    } catch (error) {
-      console.error('Error adding service:', error);
+
+      onServiceAdded(data);
+    } catch (error: any) {
+      console.error("Error adding service:", error);
+      toast({
+        title: "Error",
+        description: error.message || "An error occurred while adding the service",
+        variant: "destructive",
+      });
     } finally {
-      setIsLoading(false);
+      setLoading(false);
     }
   };
 
-  // Determine loading state based on mode
-  const loading = isDirectControlMode ? externalLoading : isLoading;
-
   return (
-    <Dialog open={isOpen} onOpenChange={(open) => {
-      if (!open) onClose();
-    }}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-hidden">
+    <Dialog open={isOpen} onOpenChange={onClose}>
+      <DialogContent className="sm:max-w-[500px] max-h-[85vh] flex flex-col overflow-hidden">
         <DialogHeader>
           <DialogTitle>Add New Service</DialogTitle>
-          <DialogDescription>
-            Create a new service to showcase your skills and offerings.
-          </DialogDescription>
         </DialogHeader>
-
-        <ScrollArea className="max-h-[calc(90vh-180px)] pr-4">
-          <form onSubmit={handleSubmit} className="space-y-4">
+        <ScrollArea className="flex-1 overflow-auto pr-3">
+          <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="title">Title *</Label>
-              {isDirectControlMode ? (
-                <Input 
-                  id="title"
-                  name="title"
-                  value={externalTitle}
-                  onChange={handleInputChange}
-                  placeholder="Service title"
-                  required
-                />
-              ) : (
-                <Input 
-                  id="title"
-                  name="title"
-                  value={formData.title}
-                  onChange={handleInputChange}
-                  placeholder="Service title"
-                  required
-                />
+              <Label htmlFor="title">Service Title</Label>
+              <Input
+                id="title"
+                placeholder="e.g. Home Cleaning Service"
+                {...register("title")}
+              />
+              {errors.title && (
+                <p className="text-sm text-red-500">{errors.title.message}</p>
               )}
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="description">Description *</Label>
-              {isDirectControlMode ? (
-                <Textarea 
-                  id="description"
-                  name="description"
-                  value={externalDescription}
-                  onChange={handleInputChange}
-                  placeholder="Describe your service"
-                  required
-                  rows={4}
-                />
-              ) : (
-                <Textarea 
-                  id="description"
-                  name="description"
-                  value={formData.description}
-                  onChange={handleInputChange}
-                  placeholder="Describe your service"
-                  required
-                  rows={4}
-                />
+              <Label htmlFor="description">Description</Label>
+              <Textarea
+                id="description"
+                placeholder="Describe your service in detail..."
+                className="min-h-[100px]"
+                {...register("description")}
+              />
+              {errors.description && (
+                <p className="text-sm text-red-500">{errors.description.message}</p>
               )}
             </div>
 
-            {!isDirectControlMode && (
+            <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="category">Category *</Label>
-                <Select 
-                  value={formData.category} 
-                  onValueChange={handleSelectChange}
-                  required
+                <Label htmlFor="category">Category</Label>
+                <Select
+                  onValueChange={(value) => form.setValue("category", value)}
+                  defaultValue={form.getValues("category")}
                 >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select a category" />
+                  <SelectTrigger id="category">
+                    <SelectValue placeholder="Select category" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="Design">Design</SelectItem>
-                    <SelectItem value="Development">Development</SelectItem>
-                    <SelectItem value="Marketing">Marketing</SelectItem>
-                    <SelectItem value="Writing">Writing</SelectItem>
-                    <SelectItem value="Education">Education</SelectItem>
-                    <SelectItem value="Consulting">Consulting</SelectItem>
-                    <SelectItem value="Other">Other</SelectItem>
+                    <SelectItem value="cleaning">Cleaning</SelectItem>
+                    <SelectItem value="repair">Repair & Maintenance</SelectItem>
+                    <SelectItem value="health">Health & Wellness</SelectItem>
+                    <SelectItem value="education">Education & Tutoring</SelectItem>
+                    <SelectItem value="tech">Tech Support</SelectItem>
+                    <SelectItem value="beauty">Beauty & Spa</SelectItem>
+                    <SelectItem value="delivery">Delivery & Errands</SelectItem>
+                    <SelectItem value="other">Other</SelectItem>
                   </SelectContent>
                 </Select>
-              </div>
-            )}
-
-            <div className="space-y-2">
-              <Label htmlFor="price">Price *</Label>
-              {isDirectControlMode ? (
-                <Input 
-                  id="price"
-                  name="price"
-                  value={externalPrice}
-                  onChange={handleInputChange}
-                  placeholder="e.g. $100/hour or Starting from $500"
-                  required
-                />
-              ) : (
-                <Input 
-                  id="price"
-                  name="price"
-                  value={formData.price}
-                  onChange={handleInputChange}
-                  placeholder="e.g. $100/hour or Starting from $500"
-                  required
-                />
-              )}
-            </div>
-
-            <div className="space-y-2">
-              {isDirectControlMode ? (
-                <>
-                  <Label htmlFor="image">Service Image</Label>
-                  <Input
-                    id="image"
-                    name="image"
-                    type="file"
-                    accept="image/*"
-                    onChange={handleFileInputChange}
-                  />
-                  {externalImageUrl && (
-                    <div className="mt-2">
-                      <p className="text-sm text-muted-foreground mb-1">Preview:</p>
-                      <img 
-                        src={externalImageUrl} 
-                        alt="Service preview" 
-                        className="max-h-32 rounded-md border"
-                      />
-                    </div>
-                  )}
-                </>
-              ) : (
-                <>
-                  <FileUpload 
-                    endpoint="serviceImage" 
-                    onChange={handleImageUpload}
-                    className="w-full"
-                  />
-                  {formData.image && (
-                    <div className="mt-2">
-                      <p className="text-sm text-muted-foreground mb-1">Preview:</p>
-                      <img 
-                        src={formData.image} 
-                        alt="Service preview" 
-                        className="max-h-32 rounded-md border"
-                      />
-                    </div>
-                  )}
-                </>
-              )}
-            </div>
-
-            {!isDirectControlMode && (
-              <>
-                <div className="space-y-2">
-                  <Label htmlFor="business">Business Name</Label>
-                  <Input 
-                    id="business"
-                    name="business"
-                    value={formData.business}
-                    onChange={handleInputChange}
-                    placeholder="Your business name (optional)"
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label>Features</Label>
-                  {formData.features.map((feature, index) => (
-                    <div key={index} className="flex gap-2 items-center">
-                      <Input 
-                        value={feature}
-                        onChange={(e) => handleFeatureChange(index, e.target.value)}
-                        placeholder={`Feature ${index + 1}`}
-                      />
-                      {formData.features.length > 1 && (
-                        <Button 
-                          type="button" 
-                          variant="destructive" 
-                          size="icon"
-                          onClick={() => removeFeature(index)}
-                        >
-                          ✕
-                        </Button>
-                      )}
-                    </div>
-                  ))}
-                  <Button 
-                    type="button" 
-                    variant="outline" 
-                    size="sm"
-                    onClick={addFeature}
-                  >
-                    Add Feature
-                  </Button>
-                </div>
-              </>
-            )}
-
-            <DialogFooter className="mt-6">
-              <Button 
-                variant="outline" 
-                onClick={() => onClose()}
-                type="button"
-              >
-                Cancel
-              </Button>
-              <Button 
-                type="submit"
-                onClick={handleSubmit}
-                disabled={loading || (isDirectControlMode ? 
-                  !externalTitle?.trim() || !externalDescription?.trim() || !String(externalPrice).trim() :
-                  !formData.title.trim() || !formData.description.trim() || !formData.price.trim()
+                {errors.category && (
+                  <p className="text-sm text-red-500">{errors.category.message}</p>
                 )}
-              >
-                {loading ? "Adding..." : "Add Service"}
-              </Button>
-            </DialogFooter>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="price">Price ($)</Label>
+                <Input
+                  id="price"
+                  type="number"
+                  placeholder="99.99"
+                  {...register("price")}
+                />
+                {errors.price && (
+                  <p className="text-sm text-red-500">{errors.price.message}</p>
+                )}
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="location">Service Location</Label>
+                <Input
+                  id="location"
+                  placeholder="e.g. New York City"
+                  {...register("location")}
+                />
+                {errors.location && (
+                  <p className="text-sm text-red-500">{errors.location.message}</p>
+                )}
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="duration">Duration (minutes)</Label>
+                <Input
+                  id="duration"
+                  type="number"
+                  placeholder="60"
+                  {...register("duration")}
+                />
+                {errors.duration && (
+                  <p className="text-sm text-red-500">{errors.duration.message}</p>
+                )}
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="image">Service Image</Label>
+              <div className="grid grid-cols-1 gap-4">
+                {imagePreview && (
+                  <div className="relative w-full aspect-video rounded-md overflow-hidden">
+                    <img 
+                      src={imagePreview} 
+                      alt="Preview" 
+                      className="w-full h-full object-cover"
+                    />
+                  </div>
+                )}
+                <div className="flex items-center justify-center w-full">
+                  <label
+                    htmlFor="image-upload"
+                    className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed rounded-lg cursor-pointer bg-gray-50 dark:hover:bg-bray-800 dark:bg-gray-700 hover:bg-gray-100 dark:border-gray-600 dark:hover:border-gray-500 dark:hover:bg-gray-600"
+                  >
+                    <div className="flex flex-col items-center justify-center pt-5 pb-6">
+                      <Upload className="w-8 h-8 mb-3 text-gray-500 dark:text-gray-400" />
+                      <p className="mb-2 text-sm text-gray-500 dark:text-gray-400">
+                        <span className="font-semibold">Click to upload</span> or drag and drop
+                      </p>
+                      <p className="text-xs text-gray-500 dark:text-gray-400">
+                        PNG, JPG or WEBP (MAX. 5MB)
+                      </p>
+                    </div>
+                    <Input
+                      id="image-upload"
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={handleImageChange}
+                    />
+                  </label>
+                </div>
+              </div>
+            </div>
           </form>
         </ScrollArea>
+        
+        <DialogFooter className="pt-4 mt-4 border-t">
+          <Button variant="outline" type="button" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button onClick={handleSubmit(onSubmit)} disabled={loading}>
+            {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            Add Service
+          </Button>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   );

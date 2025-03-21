@@ -8,6 +8,7 @@ export interface Profile {
   avatar_url: string | null;
   bio: string | null;
   about_business: string | null;
+  business_name?: string | null;
   user_role: "business" | "customer" | null;
   onboarding_completed: boolean;
   followers_count: number;
@@ -17,6 +18,10 @@ export interface Profile {
   created_at: string;
   updated_at: string;
   auth_metadata: any; // OAuth metadata when available
+  kyc_verified?: boolean;
+  kyc_status?: string;
+  kyc_provider?: string;
+  kyc_reference_id?: string;
   // Add other profile fields...
 }
 

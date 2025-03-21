@@ -15,9 +15,12 @@ import { UserProfile } from "./pages/UserProfile";
 import NotFound from "./pages/NotFound";
 import AuthCallback from './pages/AuthCallback';
 import { UsernameSetup } from "./components/onboarding/UsernameSetup";
+import { Onboarding } from "./pages/Onboarding";
 import { useEffect, useState } from "react";
-import Services from "./pages/Services";
-import Bookings from "./pages/Bookings";
+import ServiceDetailPage from "./pages/ServiceDetailPage";
+import Settings from "./pages/Settings";
+import ServicesAndBookingsPage from "./pages/ServicesAndBookingsPage";
+import BookingDetailsPage from "./pages/BookingDetailsPage";
 
 const queryClient = new QueryClient();
 
@@ -56,6 +59,7 @@ const App = () => {
             <Route path="/messages" element={<Messages />} />
             <Route path="/notifications" element={<Notifications />} />
             <Route path="/profile" element={<Profile />} />
+            <Route path="/settings" element={<Settings />} />
             <Route path="/@:username" element={<UserProfile />} />
             <Route path="/@:username/:postId" element={<UserProfile />} />
             <Route path="/user/:userId" element={<UserProfile />} />
@@ -64,8 +68,11 @@ const App = () => {
             <Route path="/userprofile/:userId/:postId" element={<UserProfile />} />
             <Route path="/auth-callback" element={<AuthCallback />} />
             <Route path="/setup-username" element={<UsernameSetup />} />
-            <Route path="/services" element={<Services />} />
-            <Route path="/bookings" element={<Bookings />} />
+            <Route path="/onboarding" element={<Onboarding />} />
+            <Route path="/services" element={<ServicesAndBookingsPage />} />
+            <Route path="/services/:serviceId" element={<ServiceDetailPage />} />
+            <Route path="/bookings" element={<ServicesAndBookingsPage />} />
+            <Route path="/bookings/:id" element={<BookingDetailsPage />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </BrowserRouter>

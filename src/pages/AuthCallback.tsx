@@ -21,10 +21,10 @@ export default function AuthCallback() {
           .eq('id', user.id)
           .single();
         
-        // If the user doesn't have a profile or the user_role is not set,
+        // If the user doesn't have a profile or onboarding isn't completed,
         // redirect to onboarding
-        if (!existingProfile || !existingProfile.user_role) {
-          navigate("/profile");
+        if (!existingProfile || !existingProfile.onboarding_completed) {
+          navigate("/onboarding");
         } else {
           navigate("/home");
         }

@@ -18,9 +18,10 @@ interface FollowingModalProps {
   onClose: () => void;
   userId: string;
   currentUserId: string | null;
+  onFollowingLoaded?: (count: number) => void;
 }
 
-export function FollowingModal({ isOpen, onClose, userId, currentUserId }: FollowingModalProps) {
+export function FollowingModal({ isOpen, onClose, userId, currentUserId, onFollowingLoaded }: FollowingModalProps) {
   const [following, setFollowing] = useState<Following[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -44,6 +45,10 @@ export function FollowingModal({ isOpen, onClose, userId, currentUserId }: Follo
         }
         
         setFollowing(data || []);
+        // Notify parent component about the following count
+        if (onFollowingLoaded) {
+          onFollowingLoaded(data?.length || 0);
+        }
       } catch (fnError) {
         console.error("Error using get_following function:", fnError);
         
@@ -73,9 +78,17 @@ export function FollowingModal({ isOpen, onClose, userId, currentUserId }: Follo
           }));
           
           setFollowing(formattedData);
+          // Notify parent component about the following count
+          if (onFollowingLoaded) {
+            onFollowingLoaded(formattedData.length);
+          }
         } catch (error) {
           console.error("Error fetching following:", error);
           setError("Failed to load following. Please try again later.");
+          // Send 0 as the count in case of an error
+          if (onFollowingLoaded) {
+            onFollowingLoaded(0);
+          }
         }
       } finally {
         setLoading(false);

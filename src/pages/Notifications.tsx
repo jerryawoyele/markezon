@@ -18,7 +18,8 @@ import {
   Bell, 
   Briefcase, 
   AtSign,
-  Package
+  Package,
+  ArrowLeft
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
@@ -293,73 +294,84 @@ export default function Notifications() {
   }
 
   return (
-    <MainLayout activeTab={activeTab} setActiveTab={setActiveTab} userRole={userRole}>
-      <div className="container mx-auto py-8 px-4">
+    <MainLayout activeTab={activeTab} setActiveTab={setActiveTab} userRole={userRole} isAuthenticated={true}>
+      <div className="container py-8">
+        <div className="flex items-center gap-4 mb-6">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => navigate('/profile')}
+            className="flex items-center gap-2"
+          >
+            <ArrowLeft className="h-4 w-4" />
+            Back to Profile
+          </Button>
+          <h1 className="text-2xl font-bold">Notifications</h1>
+        </div>
+        {notifications.some(n => !n.is_read) && (
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleMarkAllAsRead}
+            className="mb-4"
+          >
+            Mark all as read
+          </Button>
+        )}
         <div className="space-y-4">
-          <div className="flex justify-between items-center mb-6">
-            <h1 className="text-2xl font-bold">Notifications</h1>
-            {notifications.some(n => !n.is_read) && (
-              <Button variant="outline" size="sm" onClick={handleMarkAllAsRead}>
-                Mark all as read
-              </Button>
-            )}
-          </div>
-
-          <div className="space-y-4">
-            {notifications.length > 0 ? (
-              notifications.map((notification) => (
-                <Card
-                  key={notification.id}
-                  className={`p-4 transition-colors cursor-pointer hover:bg-black/30 ${
-                    notification.is_read ? 'bg-black/20' : 'bg-black/40 border-l-4 border-primary'
-                  }`}
-                  onClick={() => handleNotificationClick(notification)}
-                >
-                  <div className="flex gap-4">
-                    <Avatar>
-                      {notification.actor_profile?.avatar_url ? (
-                        <AvatarImage src={notification.actor_profile.avatar_url} />
-                      ) : (
-                        <AvatarFallback className="bg-white/10 flex items-center justify-center">
-                          {getNotificationIcon(notification.type)}
-                        </AvatarFallback>
-                      )}
-                    </Avatar>
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2">
-                        <h3 className="font-medium">{notification.actor_name || 'Notification'}</h3>
-                        {!notification.is_read && (
-                          <span className="bg-primary w-2 h-2 rounded-full"></span>
-                        )}
-                      </div>
-                      <p className="text-sm text-white/60">{notification.message}</p>
-                      <span className="text-xs text-white/40">
-                        {formatTimestamp(notification.created_at)}
-                      </span>
-                    </div>
-                    {!notification.is_read && (
-                      <Button 
-                        variant="ghost" 
-                        size="sm" 
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          markAsRead(notification.id);
-                        }}
-                      >
-                        Mark as read
-                      </Button>
+          {notifications.length > 0 ? (
+            notifications.map((notification) => (
+              <Card
+                key={notification.id}
+                className={`p-4 transition-colors cursor-pointer hover:bg-black/30 ${
+                  notification.is_read ? 'bg-black/20' : 'bg-black/40 border-l-4 border-primary'
+                }`}
+                onClick={() => handleNotificationClick(notification)}
+              >
+                <div className="flex gap-4">
+                  <Avatar>
+                    {notification.actor_profile?.avatar_url ? (
+                      <AvatarImage src={notification.actor_profile.avatar_url} />
+                    ) : (
+                      <AvatarFallback className="bg-white/10 flex items-center justify-center">
+                        {getNotificationIcon(notification.type)}
+                      </AvatarFallback>
                     )}
+                  </Avatar>
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2">
+                      <h3 className="font-medium">{notification.actor_name || 'Notification'}</h3>
+                      {!notification.is_read && (
+                        <span className="bg-primary w-2 h-2 rounded-full"></span>
+                      )}
+                    </div>
+                    <p className="text-sm text-white/60">{notification.message}</p>
+                    <span className="text-xs text-white/40">
+                      {formatTimestamp(notification.created_at)}
+                    </span>
                   </div>
-                </Card>
-              ))
-            ) : (
-              <Card className="p-8 text-center text-white/60">
-                <Package className="mx-auto h-12 w-12 mb-4 text-white/30" />
-                <p className="text-lg mb-2">No notifications yet</p>
-                <p className="text-sm mb-4">When you receive notifications, they'll appear here</p>
+                  {!notification.is_read && (
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        markAsRead(notification.id);
+                      }}
+                    >
+                      Mark as read
+                    </Button>
+                  )}
+                </div>
               </Card>
-            )}
-          </div>
+            ))
+          ) : (
+            <Card className="p-8 text-center text-white/60">
+              <Package className="mx-auto h-12 w-12 mb-4 text-white/30" />
+              <p className="text-lg mb-2">No notifications yet</p>
+              <p className="text-sm mb-4">When you receive notifications, they'll appear here</p>
+            </Card>
+          )}
         </div>
       </div>
     </MainLayout>

@@ -19,9 +19,10 @@ interface FollowersModalProps {
   onClose: () => void;
   userId: string;
   currentUserId: string | null;
+  onFollowersLoaded?: (count: number) => void;
 }
 
-export function FollowersModal({ isOpen, onClose, userId, currentUserId }: FollowersModalProps) {
+export function FollowersModal({ isOpen, onClose, userId, currentUserId, onFollowersLoaded }: FollowersModalProps) {
   const [followers, setFollowers] = useState<Follower[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -45,6 +46,10 @@ export function FollowersModal({ isOpen, onClose, userId, currentUserId }: Follo
         }
         
         setFollowers(data || []);
+        // Notify parent component about the followers count
+        if (onFollowersLoaded) {
+          onFollowersLoaded(data?.length || 0);
+        }
       } catch (fnError) {
         console.error("Error using get_followers function:", fnError);
         
@@ -74,9 +79,17 @@ export function FollowersModal({ isOpen, onClose, userId, currentUserId }: Follo
           }));
           
           setFollowers(formattedData);
+          // Notify parent component about the followers count
+          if (onFollowersLoaded) {
+            onFollowersLoaded(formattedData.length);
+          }
         } catch (error) {
           console.error("Error fetching followers:", error);
           setError("Failed to load followers. Please try again later.");
+          // Send 0 as the count in case of an error
+          if (onFollowersLoaded) {
+            onFollowersLoaded(0);
+          }
         }
       } finally {
         setLoading(false);

@@ -1,100 +1,161 @@
 import { useState, useEffect } from "react";
-import { 
-  Dialog, 
-  DialogContent, 
-  DialogHeader, 
-  DialogTitle, 
-  DialogDescription,
-  DialogFooter
-} from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
-import { useToast } from "@/components/ui/use-toast";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardHeader, CardContent, CardFooter, CardTitle, CardDescription } from "@/components/ui/card";
-import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { MessageSquare, CalendarClock } from "lucide-react";
-import { createNotification } from '@/utils/notification-helper';
-import { useNavigate } from "react-router-dom";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Calendar, Clock, User, DollarSign, MessageSquare } from "lucide-react";
+import { Textarea } from "@/components/ui/textarea";
+import { useToast } from "@/components/ui/use-toast";
+import { EscrowService } from "@/utils/escrow-service";
+import { createNotification } from "@/utils/notification-helper";
 
 interface ServiceBookingsModalProps {
-  serviceId: string | null;
-  serviceName: string;
   isOpen: boolean;
   onClose: () => void;
+  service: any;
 }
 
-export function ServiceBookingsModal({ serviceId, serviceName, isOpen, onClose }: ServiceBookingsModalProps) {
+export function ServiceBookingsModal({ 
+  isOpen, 
+  onClose,
+  service
+}: ServiceBookingsModalProps) {
   const [bookings, setBookings] = useState<any[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [localTab, setLocalTab] = useState("pending");
+  const [loading, setLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState("all");
+  const [messageText, setMessageText] = useState("");
+  const [messageTargetBooking, setMessageTargetBooking] = useState<string | null>(null);
   const { toast } = useToast();
-  const navigate = useNavigate();
 
   useEffect(() => {
-    if (isOpen && serviceId) {
+    if (isOpen && service) {
       fetchBookings();
     }
-  }, [isOpen, serviceId]);
+  }, [isOpen, service]);
 
   const fetchBookings = async () => {
-    if (!serviceId) return;
+    if (!service?.id) return;
     
-    setLoading(true);
     try {
-      // Fetch bookings for this specific service
-      const { data: bookingsData, error } = await supabase
+      setLoading(true);
+      
+      // First, get the bookings
+      const { data, error } = await supabase
         .from('bookings')
         .select('*')
-        .eq('service_id', serviceId)
+        .eq('service_id', service.id)
         .order('created_at', { ascending: false });
       
       if (error) throw error;
       
-      if (bookingsData && bookingsData.length > 0) {
-        // Extract customer IDs
-        const customerIds = bookingsData.map(booking => booking.customer_id).filter(Boolean);
-        
-        // Fetch customers data
-        const { data: customersData, error: customersError } = await supabase
+      if (!data || data.length === 0) {
+        setBookings([]);
+        setLoading(false);
+        return;
+      }
+      
+      // Get customer data
+      const customerIds = data.map(booking => booking.customer_id);
+      const { data: customerData, error: customerError } = await supabase
           .from('profiles')
           .select('id, username, avatar_url')
           .in('id', customerIds);
           
-        if (customersError) console.error("Error fetching customers:", customersError);
+      if (customerError) throw customerError;
+      
+      // Get payment data
+      const bookingIds = data.map(booking => booking.id);
+      const { data: paymentData, error: paymentError } = await supabase
+        .from('escrow_payments')
+        .select('*')
+        .in('booking_id', bookingIds);
         
-        // Create lookup table for customers
-        const customersMap = (customersData || []).reduce((acc, customer) => {
-          acc[customer.id] = customer;
-          return acc;
-        }, {});
+      if (paymentError) throw paymentError;
+      
+      // Combine the data
+      const enrichedBookings = data.map(booking => {
+        const customer = customerData?.find(c => c.id === booking.customer_id);
+        const payments = paymentData?.filter(p => p.booking_id === booking.id) || [];
         
-        // Join the data
-        const bookingsWithRelations = bookingsData.map(booking => ({
+        return {
           ...booking,
-          customer: customersMap[booking.customer_id] || { username: 'Unknown Customer', avatar_url: null }
-        }));
-        
-        setBookings(bookingsWithRelations);
-      } else {
-        setBookings([]);
-      }
+          customer: customer || { username: 'Anonymous' },
+          escrow_payments: payments
+        };
+      });
+      
+      setBookings(enrichedBookings);
     } catch (error) {
       console.error("Error fetching bookings:", error);
       toast({
+        title: "Error",
+        description: "Failed to fetch booking data",
         variant: "destructive",
-        title: "Failed to load bookings",
-        description: "Please try again later.",
       });
     } finally {
       setLoading(false);
     }
   };
 
-  const handleUpdateBookingStatus = async (bookingId: string, newStatus: string) => {
+  const filteredBookings = () => {
+    if (activeTab === "all") return bookings;
+    return bookings.filter(booking => {
+      if (activeTab === "pending") return booking.status === "pending";
+      if (activeTab === "confirmed") return booking.status === "confirmed";
+      if (activeTab === "completed") return booking.status === "completed";
+      if (activeTab === "canceled") return booking.status === "canceled";
+      return true;
+    });
+  };
+
+  const handleStatusChange = async (bookingId: string, newStatus: string) => {
     try {
+      if (newStatus === "completed") {
+        // For completed status, we'll only mark it as pending_completion
+        // This requires customer confirmation
+        const { error } = await supabase
+          .from('bookings')
+          .update({ status: "pending_completion" })
+          .eq('id', bookingId);
+          
+        if (error) throw error;
+        
+        // Update local state
+        setBookings(bookings.map(booking => 
+          booking.id === bookingId 
+            ? { ...booking, status: "pending_completion" } 
+            : booking
+        ));
+        
+        // Get customer information for notification
+        const booking = bookings.find(b => b.id === bookingId);
+        if (booking?.customer_id) {
+          // Create notification for customer to confirm completion
+          const { data: serviceData } = await supabase
+            .from('services')
+            .select('title')
+            .eq('id', service.id)
+            .single();
+            
+          await createNotification({
+            userId: booking.customer_id,
+            actorId: service.owner_id,
+            type: 'booking_completion',
+            message: `Service provider has marked "${serviceData?.title || 'a service'}" as completed. Please confirm completion.`,
+            linkType: 'booking',
+            linkId: bookingId
+          });
+        }
+        
+        toast({
+          title: "Status Updated",
+          description: "Customer has been notified to confirm service completion",
+        });
+        
+        return;
+      }
+
       const { error } = await supabase
         .from('bookings')
         .update({ status: newStatus })
@@ -102,185 +163,242 @@ export function ServiceBookingsModal({ serviceId, serviceName, isOpen, onClose }
       
       if (error) throw error;
       
-      // Update local state
-      setBookings(prev => 
-        prev.map(booking => 
-          booking.id === bookingId ? { ...booking, status: newStatus } : booking
-        )
-      );
-      
-      // Get booking details for notification
-      const booking = bookings.find(b => b.id === bookingId);
-      
-      if (booking) {
-        // Get current user's profile info for notification
-        const { data: { session } } = await supabase.auth.getSession();
-        const { data: profileData } = await supabase
-          .from('profiles')
-          .select('username')
-          .eq('id', session?.user?.id || '')
-          .single();
-        
-        // Notify the customer about the status change
-        if (profileData && session) {
-          await createNotification({
-            userId: booking.customer_id,
-            actorId: session.user.id,
-            actorName: profileData.username || 'Service Provider',
-            type: 'booking',
-            entityId: bookingId,
-            message: `Your booking for "${serviceName}" has been ${newStatus}`
-          });
+      // Handle escrow status changes based on booking status change
+      if (newStatus === "canceled") {
+        // Refund the payment
+        const booking = bookings.find(b => b.id === bookingId);
+        if (booking?.escrow_payments?.[0]?.id) {
+          await EscrowService.refundPayment(booking.escrow_payments[0].id);
         }
       }
+
+      // Update local state
+      setBookings(bookings.map(booking => 
+        booking.id === bookingId 
+          ? { ...booking, status: newStatus } 
+          : booking
+      ));
       
       toast({
-        title: "Booking updated",
-        description: `Booking status has been updated to ${newStatus}.`,
+        title: "Status Updated",
+        description: `Booking status has been changed to ${newStatus}`,
       });
     } catch (error) {
-      console.error("Error updating booking:", error);
+      console.error("Error updating booking status:", error);
       toast({
+        title: "Error",
+        description: "Failed to update booking status",
         variant: "destructive",
-        title: "Update failed",
-        description: "There was an error updating the booking status.",
       });
     }
   };
 
-  const renderBookingsList = (tabValue: string) => {
-    // Filter bookings based on tab
-    const filtered = bookings.filter(booking => booking.status === tabValue);
+  const handleSendMessage = async () => {
+    if (!messageText.trim() || !messageTargetBooking) return;
+    
+    try {
+      const booking = bookings.find(b => b.id === messageTargetBooking);
+      
+      // Insert message into database
+      const { error } = await supabase
+        .from('messages')
+        .insert({
+          booking_id: messageTargetBooking,
+          sender_id: service.owner_id,
+          recipient_id: booking?.customer_id,
+          content: messageText,
+          is_read: false
+        });
 
-    if (loading) {
-      return (
-        <div className="space-y-4">
-          {Array(3).fill(0).map((_, i) => (
-            <div key={i} className="p-4 border rounded-lg animate-pulse">
-              <div className="flex justify-between">
-                <div className="h-5 bg-gray-300 rounded w-1/3"></div>
-                <div className="h-5 bg-gray-300 rounded w-1/4"></div>
-              </div>
-              <div className="h-4 bg-gray-300 rounded w-1/2 mt-2"></div>
-              <div className="h-10 bg-gray-300 rounded w-full mt-4"></div>
-            </div>
-          ))}
-        </div>
-      );
+      if (error) throw error;
+
+      toast({
+        title: "Message Sent",
+        description: "Your message has been sent successfully"
+      });
+
+      // Reset message state
+      setMessageText("");
+      setMessageTargetBooking(null);
+    } catch (error) {
+      console.error("Error sending message:", error);
+      toast({
+        title: "Error",
+        description: "Failed to send message",
+        variant: "destructive"
+      });
     }
-    
-    if (filtered.length > 0) {
-      return (
-        <div className="space-y-4 max-h-[60vh] overflow-y-auto pr-2">
-          {filtered.map((booking) => (
-            <Card key={booking.id} className="overflow-hidden">
-              <CardHeader className="p-4">
-                <div className="flex justify-between items-center">
-                  <div className="flex items-center gap-3">
-                    <Avatar>
-                      <AvatarImage src={booking.customer?.avatar_url} />
-                      <AvatarFallback>{booking.customer?.username?.[0] || '?'}</AvatarFallback>
-                    </Avatar>
-                    <div>
-                      <CardTitle className="text-base">{booking.customer?.username}</CardTitle>
-                      <div className="flex items-center text-sm text-muted-foreground gap-1">
-                        <CalendarClock className="h-3 w-3" />
-                        <span>{new Date(booking.created_at).toLocaleDateString()}</span>
-                      </div>
-                    </div>
-                  </div>
-                  <Badge variant={
-                    booking.status === 'completed' ? 'default' :
-                    booking.status === 'pending' ? 'secondary' :
-                    booking.status === 'cancelled' ? 'destructive' :
-                    booking.status === 'confirmed' ? 'outline' : 'default'
-                  }>
-                    {booking.status.charAt(0).toUpperCase() + booking.status.slice(1)}
-                  </Badge>
-                </div>
-              </CardHeader>
-              <CardFooter className="p-4 bg-muted/20 flex items-center justify-between">
-                <div>
-                  <Select 
-                    defaultValue={booking.status}
-                    onValueChange={(value) => handleUpdateBookingStatus(booking.id, value)}
-                  >
-                    <SelectTrigger className="w-[180px]">
-                      <SelectValue placeholder="Update status" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="pending">Pending</SelectItem>
-                      <SelectItem value="confirmed">Confirmed</SelectItem>
-                      <SelectItem value="completed">Completed</SelectItem>
-                      <SelectItem value="cancelled">Cancelled</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => navigate(`/messages?user=${booking.customer_id}`)}
-                >
-                  <MessageSquare className="h-4 w-4 mr-2" />
-                  Message
-                </Button>
-              </CardFooter>
-            </Card>
-          ))}
-        </div>
-      );
-    } 
-    
-    return (
-      <Card className="p-8 text-center">
-        <CardTitle className="mb-2">No bookings found</CardTitle>
-        <CardDescription className="mb-4">
-          You don't have any {tabValue} bookings for this service.
-        </CardDescription>
-      </Card>
-    );
+  };
+
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+    });
+  };
+
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'pending': return 'bg-yellow-100 text-yellow-800';
+      case 'confirmed': return 'bg-blue-100 text-blue-800';
+      case 'completed': return 'bg-green-100 text-green-800';
+      case 'canceled': return 'bg-red-100 text-red-800';
+      default: return 'bg-gray-100 text-gray-800';
+    }
   };
 
   return (
-    <Dialog open={isOpen} onOpenChange={(open) => {
-      if (!open) onClose();
-    }}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-hidden">
+    <Dialog open={isOpen} onOpenChange={onClose}>
+      <DialogContent className="sm:max-w-[600px] max-h-[85vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Bookings for {serviceName}</DialogTitle>
-          <DialogDescription>
-            Manage customer bookings for this service
-          </DialogDescription>
+          <DialogTitle className="text-xl">
+            Bookings for {service?.title}
+          </DialogTitle>
         </DialogHeader>
         
-        <Tabs value={localTab} onValueChange={setLocalTab} className="mt-4">
-          <TabsList className="mb-4">
+        <Tabs defaultValue="all" onValueChange={setActiveTab}>
+          <TabsList className="grid grid-cols-5 mb-4">
+            <TabsTrigger value="all">All</TabsTrigger>
             <TabsTrigger value="pending">Pending</TabsTrigger>
             <TabsTrigger value="confirmed">Confirmed</TabsTrigger>
             <TabsTrigger value="completed">Completed</TabsTrigger>
-            <TabsTrigger value="cancelled">Cancelled</TabsTrigger>
+            <TabsTrigger value="canceled">Canceled</TabsTrigger>
           </TabsList>
           
-          <TabsContent value="pending">
-            {renderBookingsList("pending")}
-          </TabsContent>
-          
-          <TabsContent value="confirmed">
-            {renderBookingsList("confirmed")}
-          </TabsContent>
-          
-          <TabsContent value="completed">
-            {renderBookingsList("completed")}
-          </TabsContent>
-          
-          <TabsContent value="cancelled">
-            {renderBookingsList("cancelled")}
+          <TabsContent value={activeTab} className="mt-0">
+            {loading ? (
+              <div className="flex justify-center p-8">
+                <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full"></div>
+              </div>
+            ) : filteredBookings().length === 0 ? (
+              <div className="text-center p-8 border rounded-lg border-dashed">
+                <p className="text-muted-foreground">No {activeTab === "all" ? "" : activeTab} bookings found</p>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {filteredBookings().map((booking) => (
+                  <div key={booking.id} className="border rounded-lg p-4 space-y-3">
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <h3 className="font-medium flex items-center gap-2">
+                          <User className="h-4 w-4" />
+                          {booking.customer?.username || "Anonymous User"}
+                        </h3>
+                        <p className="text-sm text-muted-foreground">
+                          {booking.customer?.email || "No email provided"}
+                        </p>
+                      </div>
+                      <Badge 
+                        className={getStatusColor(booking.status)}
+                        variant="outline"
+                      >
+                        {booking.status.charAt(0).toUpperCase() + booking.status.slice(1)}
+                      </Badge>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2 text-sm">
+                      <div className="flex items-center gap-1">
+                        <Calendar className="h-4 w-4 text-muted-foreground" />
+                        <span>Booked: {formatDate(booking.created_at)}</span>
+                      </div>
+                      {booking.scheduled_time && (
+                        <div className="flex items-center gap-1">
+                          <Clock className="h-4 w-4 text-muted-foreground" />
+                          <span>Scheduled: {formatDate(booking.scheduled_time)}</span>
+                        </div>
+                      )}
+                      {booking.escrow_payments?.[0] && (
+                        <div className="flex items-center gap-1">
+                          <DollarSign className="h-4 w-4 text-muted-foreground" />
+                          <span>Amount: ${booking.escrow_payments[0].amount}</span>
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="border-t pt-3 flex flex-wrap gap-2">
+                      {booking.status === "pending" && (
+                        <>
+                          <Button 
+                            size="sm" 
+                            onClick={() => handleStatusChange(booking.id, "confirmed")}
+                          >
+                            Confirm
+                          </Button>
+                          <Button 
+                            size="sm" 
+                            variant="destructive"
+                            onClick={() => handleStatusChange(booking.id, "canceled")}
+                          >
+                            Decline
+                          </Button>
+                        </>
+                      )}
+
+                      {booking.status === "confirmed" && (
+                        <>
+                          <Button 
+                            size="sm" 
+                            onClick={() => handleStatusChange(booking.id, "completed")}
+                          >
+                            Mark as Completed
+                          </Button>
+                          <Button 
+                            size="sm" 
+                            variant="destructive"
+                            onClick={() => handleStatusChange(booking.id, "canceled")}
+                          >
+                            Cancel
+                          </Button>
+                        </>
+                      )}
+
+                      {booking.status === "pending_completion" && (
+                        <Button 
+                          size="sm" 
+                          variant="outline"
+                          disabled
+                        >
+                          Awaiting Customer Confirmation
+                        </Button>
+                      )}
+
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => setMessageTargetBooking(messageTargetBooking === booking.id ? null : booking.id)}
+                        className="ml-auto"
+                      >
+                        <MessageSquare className="h-4 w-4 mr-1" />
+                        Message
+                      </Button>
+                    </div>
+
+                    {messageTargetBooking === booking.id && (
+                      <div className="border-t pt-3 space-y-2">
+                        <Textarea
+                          placeholder="Type your message here..."
+                          value={messageText}
+                          onChange={(e) => setMessageText(e.target.value)}
+                          className="min-h-[80px]"
+                        />
+                        <div className="flex justify-end">
+                          <Button 
+                            size="sm"
+                            onClick={handleSendMessage}
+                            disabled={!messageText.trim()}
+                          >
+                            Send Message
+                          </Button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
           </TabsContent>
         </Tabs>
-        
-        <DialogFooter className="mt-6">
-          <Button variant="outline" onClick={onClose}>Close</Button>
-        </DialogFooter>
       </DialogContent>
     </Dialog>
   );

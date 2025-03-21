@@ -1,4 +1,47 @@
 import { supabase } from "@/integrations/supabase/client";
+import { generateFilePath, uploadFileWithFallback } from "./upload-helper";
+
+/**
+ * Downloads an image from a URL and stores it in Supabase storage
+ * Used for storing OAuth profile images locally
+ */
+export async function storeExternalProfileImage(imageUrl: string, userId: string): Promise<string | null> {
+  try {
+    if (!imageUrl || !userId) return null;
+    
+    console.log('Downloading external profile image:', imageUrl);
+    
+    // Download the image
+    const response = await fetch(imageUrl);
+    
+    if (!response.ok) {
+      throw new Error(`Failed to download image: ${response.status} ${response.statusText}`);
+    }
+    
+    // Get the image as a blob
+    const imageBlob = await response.blob();
+    
+    // Create a file from the blob
+    const filename = `profile-${Date.now()}.jpg`;
+    const file = new File([imageBlob], filename, { type: 'image/jpeg' });
+    
+    // Generate a path for the file
+    const filePath = generateFilePath(file, userId, 'profile');
+    
+    // Upload the file to Supabase
+    const { url, error } = await uploadFileWithFallback(file, filePath);
+    
+    if (error) {
+      throw error;
+    }
+    
+    console.log('Successfully stored profile image in Supabase:', url);
+    return url;
+  } catch (error) {
+    console.error('Error storing external profile image:', error);
+    return null;
+  }
+}
 
 /**
  * Creates or updates a user profile based on their auth data
@@ -24,7 +67,32 @@ export async function syncUserProfile() {
                     user.email?.split('@')[0] || 
                     'User';
                     
-    const avatarUrl = user.user_metadata?.avatar_url || null;
+    let avatarUrl = user.user_metadata?.avatar_url || null;
+    
+    // Check if the avatar URL is from an external provider (Google, GitHub, etc.)
+    const isExternalUrl = avatarUrl && (
+      avatarUrl.includes('googleusercontent.com') || 
+      avatarUrl.includes('github') ||
+      avatarUrl.includes('twitter') ||
+      avatarUrl.includes('facebook')
+    );
+    
+    // If external URL and we need to store it locally
+    if (isExternalUrl && user.id) {
+      const storedUrl = await storeExternalProfileImage(avatarUrl, user.id);
+      if (storedUrl) {
+        // Update the avatar URL to the stored one
+        avatarUrl = storedUrl;
+        
+        // Update the user's metadata with the new avatar URL
+        await supabase.auth.updateUser({
+          data: {
+            ...user.user_metadata,
+            avatar_url: storedUrl
+          }
+        });
+      }
+    }
     
     if (!existingProfile) {
       // Create new profile if it doesn't exist
@@ -55,6 +123,15 @@ export async function syncUserProfile() {
           .update(updates)
           .eq('id', user.id);
       }
+    } else if (isExternalUrl && avatarUrl && avatarUrl !== existingProfile.avatar_url) {
+      // If we have a new stored URL from an external provider, update the profile
+      await supabase
+        .from('profiles')
+        .update({
+          avatar_url: avatarUrl,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', user.id);
     }
     
     return user;

@@ -90,7 +90,7 @@ export default function Messages() {
   const [editMessageId, setEditMessageId] = useState<string | null>(null);
   const [editMessageContent, setEditMessageContent] = useState("");
   const [userRole, setUserRole] = useState<"business" | "customer" | null>(null);
-  
+
   // Client-side read status tracking to work around RLS policy restrictions
   const [readStatusMap, setReadStatusMap] = useState<Record<string, boolean>>({});
 
@@ -313,9 +313,9 @@ export default function Messages() {
         try {
           console.log("Attempting to update read status in database (may fail due to permissions)");
           for (const msgId of messagesToMarkAsRead) {
-            await supabase
-              .from('messages')
-              .update({ read: true })
+          await supabase
+            .from('messages')
+            .update({ read: true })
               .eq('id', msgId);
           }
         } catch (updateErr) {
@@ -456,7 +456,7 @@ export default function Messages() {
         groupMessagesByDate([...messages, newMsg]);
         
         // Clear the input field
-        setNewMessage("");
+      setNewMessage("");
         
         // Update conversation list
         setConversations(prev => 
@@ -653,19 +653,19 @@ export default function Messages() {
           {/* Conversations sidebar */}
           <div className={`w-full md:w-80 border-r border-white/10 flex flex-col ${selectedConversation ? 'hidden md:flex' : 'flex'}`}>
             <div className="p-4 border-b border-white/10">
-              <div className="relative">
+                  <div className="relative">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-white/40 h-4 w-4" />
-                <Input
+                    <Input
                   placeholder="Search conversations" 
-                  className="pl-9"
-                  value={searchQuery}
+                      className="pl-9"
+                      value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                />
-              </div>
-            </div>
+                    />
+                  </div>
+                </div>
 
             <div className="flex-1 overflow-y-auto">
-              {loading ? (
+                  {loading ? (
                 <div className="p-8 text-center text-white/60">
                   Loading conversations...
                 </div>
@@ -679,25 +679,18 @@ export default function Messages() {
                       }`}
                       onClick={() => handleSelectConversation(conversation)}
                     >
-                      <div onClick={(e) => {
-                        e.stopPropagation(); // Prevent triggering conversation selection
-                        handleProfileClick(conversation.id);
-                      }}>
-                        <ProfileImage 
-                          src={conversation.profile.avatar_url || conversation.profile.auth_metadata?.avatar_url} 
-                          alt={conversation.profile.username}
-                          className="w-12 h-12 rounded-full"
-                        />
-                      </div>
+                      <ProfileImage 
+                        src={conversation.profile.avatar_url || conversation.profile.auth_metadata?.avatar_url} 
+                        alt={conversation.profile.username}
+                        className="w-12 h-12 rounded-full"
+                        onClick={(e) => {
+                          e.stopPropagation(); // Prevent conversation selection
+                          handleProfileClick(conversation.id);
+                        }}
+                      />
                       <div className="flex-1 min-w-0">
                         <div className="flex justify-between items-center">
-                          <h3 
-                            className="font-medium truncate cursor-pointer hover:underline"
-                            onClick={(e) => {
-                              e.stopPropagation(); // Prevent triggering conversation selection
-                              handleProfileClick(conversation.id);
-                            }}
-                          >
+                          <h3 className="font-medium truncate">
                             {conversation.profile.username || conversation.profile.auth_metadata?.full_name || 'User'}
                           </h3>
                           {conversation.last_message_time && (
@@ -723,8 +716,8 @@ export default function Messages() {
               ) : (
                 <div className="p-8 text-center text-white/60">
                   {searchQuery ? 'No conversations found' : 'No conversations yet'}
-                </div>
-              )}
+              </div>
+            )}
             </div>
           </div>
           
@@ -733,14 +726,14 @@ export default function Messages() {
             {selectedConversation ? (
               <>
                 <div className="p-4 border-b border-white/10 flex items-center gap-3">
-                  <Button 
-                    variant="ghost" 
-                    size="icon" 
+                        <Button 
+                          variant="ghost" 
+                          size="icon" 
                     className="md:hidden"
                     onClick={() => setSelectedConversation(null)}
-                  >
+                        >
                     <ArrowLeft className="h-5 w-5" />
-                  </Button>
+                        </Button>
                   <div 
                     className="cursor-pointer" 
                     onClick={() => handleProfileClick(selectedConversation.id)}
@@ -770,7 +763,7 @@ export default function Messages() {
                           <div className="bg-white/10 rounded-full px-3 py-1 text-xs">
                             {group.formattedDate}
                           </div>
-                        </div>
+                    </div>
                         
                         {/* Messages for this date */}
                         {group.messages.map((message) => (
@@ -808,15 +801,15 @@ export default function Messages() {
                                 <div 
                                   className={`max-w-[75%] p-3 rounded-lg ${
                                     message.sender_id === currentUserId 
-                                      ? 'bg-primary justify-self-end text-white' 
-                                      : 'bg-white/10 justify-self-start'
+                                      ? 'bg-primary m-2 justify-self-end text-white' 
+                                      : 'bg-white/10 m-2 justify-self-start'
                                   }`}
                                 >
                                   {message.is_deleted ? (
                                     <p className="italic text-white/50">This message was deleted</p>
                                   ) : (
                                     <>
-                                      <p>{message.content}</p>
+                              <p>{message.content}</p>
                                       {message.is_edited && (
                                         <span className="text-xs opacity-70 italic">edited</span>
                                       )}
@@ -855,26 +848,26 @@ export default function Messages() {
                                     </div>
                                   </div>
                                 )}
-                              </div>
+                            </div>
                             )}
                           </div>
                         ))}
-                      </div>
-                    ))
-                  ) : (
+                          </div>
+                        ))
+                      ) : (
                     <div className="h-full flex items-center justify-center text-white/40">
                       <p>Start a conversation with {selectedConversation.profile.username}</p>
                     </div>
                   )}
                   <div ref={messagesEndRef} />
-                </div>
+                    </div>
 
                 <div className="p-4 border-t border-white/10 max-lg:mb-16">
-                  <div className="flex gap-2">
-                    <Input
-                      placeholder="Type a message..."
-                      value={newMessage}
-                      onChange={(e) => setNewMessage(e.target.value)}
+                      <div className="flex gap-2">
+                        <Input
+                          placeholder="Type a message..."
+                          value={newMessage}
+                          onChange={(e) => setNewMessage(e.target.value)}
                       onKeyDown={(e) => e.key === 'Enter' && handleSendMessage()}
                       className="flex-1"
                       ref={messageInputRef}
@@ -884,15 +877,15 @@ export default function Messages() {
                       disabled={!newMessage.trim() || sendingMessage}
                     >
                       <Send className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </div>
-              </>
-            ) : (
+                        </Button>
+                      </div>
+                    </div>
+                  </>
+                ) : (
               <div className="h-full flex items-center justify-center flex-col p-8 text-center">
                 <div className="bg-white/5 w-16 h-16 rounded-full flex items-center justify-center mb-4">
                   <Send className="h-8 w-8 text-white/40" />
-                </div>
+                  </div>
                 <h2 className="text-xl font-medium mb-2">Your Messages</h2>
                 <p className="text-white/60 max-w-md">
                   Select a conversation from the list or start a new one by visiting someone's profile

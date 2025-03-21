@@ -72,10 +72,49 @@ export default {
             transform: "translateY(0)",
           },
         },
+        "float": {
+          "0%, 100%": {
+            transform: "translateY(0)",
+          },
+          "50%": {
+            transform: "translateY(-10px)",
+          },
+        },
+        "float-slow": {
+          "0%, 100%": {
+            transform: "translateY(0)",
+          },
+          "50%": {
+            transform: "translateY(-15px)",
+          },
+        },
+        "particle-float": {
+          "0%": {
+            transform: "translateY(0) translateX(0)",
+            opacity: "0",
+          },
+          "50%": {
+            opacity: "1",
+          },
+          "100%": {
+            transform: "translateY(-100px) translateX(20px)",
+            opacity: "0",
+          },
+        },
       },
       animation: {
         "fade-up": "fade-up 0.5s ease-out",
         "fade-down": "fade-down 0.5s ease-out",
+        "float-slow": "float-slow 6s ease-in-out infinite",
+        "float-normal": "float 4s ease-in-out infinite",
+        "float-fast": "float 3s ease-in-out infinite",
+        "particle-float": "particle-float 15s ease-in-out infinite",
+      },
+      backgroundImage: {
+        'grid-white': 'linear-gradient(to right, rgba(255, 255, 255, 0.1) 1px, transparent 1px), linear-gradient(to bottom, rgba(255, 255, 255, 0.1) 1px, transparent 1px)',
+      },
+      backgroundSize: {
+        'grid-16': '16px 16px',
       },
     },
   },

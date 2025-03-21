@@ -34,7 +34,7 @@ export function MainLayout({
         if (session) {
           setIsAuthenticated(true);
           
-          // Get user profile data to check role
+          // Get user profile data to check role and onboarding status
           const { data, error } = await supabase
             .from('profiles')
             .select('*')
@@ -42,6 +42,13 @@ export function MainLayout({
             .single();
           
           if (!error && data) {
+            // Check if onboarding is completed
+            if (!data.onboarding_completed) {
+              // Redirect to onboarding if not completed
+              navigate('/onboarding');
+              return;
+            }
+            
             // If userRole prop is not provided (and hence setUserRole is also not provided),
             // we don't try to update it
             if (typeof userRole === 'undefined' && 'user_role' in data) {
@@ -59,7 +66,7 @@ export function MainLayout({
     };
     
     checkUserStatus();
-  }, [propIsAuthenticated, userRole]);
+  }, [propIsAuthenticated, userRole, navigate]);
 
   const handleOnboardingComplete = async () => {
     setShowOnboarding(false);

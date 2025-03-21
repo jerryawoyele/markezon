@@ -1,8 +1,8 @@
 import { useState, useEffect, useRef } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
-import { Avatar } from "@/components/ui/avatar";
+import { Card, CardContent } from "@/components/ui/card";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { 
@@ -36,7 +36,7 @@ import ProfileImage from "@/components/ProfileImage";
 import { useToast } from "@/components/ui/use-toast";
 import { AuthRequiredModal } from "@/components/auth/AuthRequiredModal";
 import { Badge } from "@/components/ui/badge";
-import { LikesModal } from "../profile/LikesModal";
+import { LikesModal } from "./LikesModal";
 import { createNotification } from "@/utils/notification-helper";
 
 interface Profile {
@@ -125,6 +125,7 @@ export function Post({
   const [lastTap, setLastTap] = useState<number>(0);
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [dropdownOpen, setDropdownOpen] = useState(false);
+  const [captionState, setCaptionState] = useState(caption || "");
   const navigate = useNavigate();
   const postCardRef = useRef<HTMLDivElement>(null);
   const location = useLocation();
@@ -160,6 +161,14 @@ export function Post({
 
   useEffect(() => {
     const fetchLikesAndComments = async () => {
+      // Skip fetching if post ID is undefined or null
+      if (!id) {
+        console.log('Skipping fetch because post ID is undefined');
+        setLikesCount(0);
+        setCommentsCount(0);
+        return;
+      }
+      
       try {
         const { data: likesData, error: likesError } = await supabase
           .from('likes')
@@ -186,14 +195,15 @@ export function Post({
           setLiked(currentUserId ? likesData.some(like => like.user_id === currentUserId) : false);
         }
         
+        // Only fetch comments if the post ID is valid
         const { data: commentsData, error: commentsError } = await supabase
           .from('comments')
           .select(`
             id,
             content,
-            created_at,
             user_id,
             post_id,
+            created_at,
             profile:profiles(
               username,
               avatar_url
@@ -543,11 +553,48 @@ export function Post({
   };
 
   const handleEdit = async () => {
-    if (editMode && onEdit) {
-      await onEdit(id, editedCaption);
-      setEditMode(false);
-    } else {
+    if (!editMode) {
       setEditMode(true);
+      return;
+    }
+    
+    // Now we're in edit mode and need to save
+    setLoading(true);
+    
+    try {
+      if (onEdit) {
+        // Use provided callback if available
+        await onEdit(id, editedCaption);
+      } else {
+        // Direct database update
+        const { error } = await supabase
+          .from('posts')
+          .update({ caption: editedCaption })
+          .eq('id', id);
+        
+        if (error) throw error;
+        
+        // Update local state with the edited caption
+        setCaptionState(editedCaption);
+      }
+      
+      // Close edit mode and modal
+      setEditMode(false);
+      setShowPostModal(false);
+      
+      toast({
+        title: "Post updated",
+        description: "Your post has been updated successfully."
+      });
+    } catch (error) {
+      console.error("Error updating post:", error);
+      toast({
+        title: "Update failed",
+        description: "There was an error updating your post. Please try again.",
+        variant: "destructive"
+      });
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -620,7 +667,37 @@ export function Post({
   };
 
   const isTextPost = () => {
-    return !image_url || image_url === 'text' || image_url === caption;
+    // Check if there's no image URL at all
+    if (!image_url) return true;
+    
+    // Check if it's explicitly marked as text
+    if (image_url === 'text') return true;
+    
+    // Check if image_url is exactly the same as caption (unlikely for real images)
+    if (image_url === caption) return true;
+    
+    // If image_url is a valid array of images
+    try {
+      if (image_url.startsWith('[') && image_url.endsWith(']')) {
+        const parsed = JSON.parse(image_url);
+        // If array is empty or contains empty strings, it's a text post
+        if (!Array.isArray(parsed) || parsed.length === 0 || parsed.every(url => !url)) {
+          return true;
+        }
+        return false;
+      }
+    } catch (e) {
+      // If parsing fails, continue with other checks
+    }
+    
+    // Check for common image URL patterns
+    const isImageUrl = 
+      image_url.startsWith('http') || 
+      image_url.startsWith('data:image') ||
+      image_url.includes('storage') ||
+      image_url.includes('://');
+    
+    return !isImageUrl;
   };
 
   const handleCardClick = () => {
@@ -644,6 +721,16 @@ export function Post({
     }, 100);
   };
 
+  // Update the caption state when the prop changes
+  useEffect(() => {
+    setCaptionState(caption || "");
+  }, [caption]);
+
+  // Update edited caption when captionState changes
+  useEffect(() => {
+    setEditedCaption(captionState);
+  }, [captionState]);
+
   return (
     <>
       <div className="max-w-2xl mx-auto w-full">
@@ -664,10 +751,9 @@ export function Post({
                   className="font-medium text-sm cursor-pointer hover:underline" 
                   onClick={handleProfileClick}
                 >
-                  {profiles?.username || 
-                    profiles?.auth_metadata?.full_name || 
+                  {"@" + (profiles?.username || 
                     profiles?.auth_metadata?.name || 
-                    "User"}
+                    "user")}
                 </h3>
                 <span className="text-muted-foreground text-xs">
                   {formatTimeAgo(created_at || new Date().toISOString())}
@@ -712,39 +798,81 @@ export function Post({
           
           {isTextPost() ? (
             <div className="p-6 bg-gradient-to-br from-gray-900 to-black flex items-center justify-center min-h-[200px]">
-              <p className="text-lg md:text-xl font-medium text-center line-clamp-5">{caption}</p>
+              <p className="text-lg md:text-xl font-medium text-center line-clamp-5">{captionState}</p>
             </div>
           ) : (
-            <div className="relative aspect-square overflow-hidden bg-black">
-              <img 
-                src={parsedImages[0]} 
-                alt={caption || 'Post image'}
-                className="w-full h-full object-cover"
-                onError={(e) => {
-                  (e.target as HTMLImageElement).src = 'https://source.unsplash.com/800x600/?abstract';
-                }}
-              />
+            <div className="relative overflow-hidden bg-black">
+              <div 
+                className="w-full flex transition-transform duration-300 ease-in-out" 
+                style={{ transform: `translateX(-${currentImageIndex * 100}%)` }}
+              >
+                {parsedImages.map((image, index) => (
+                  <div key={index} className="w-full flex-shrink-0 relative">
+                    <div className="pt-[75%] sm:pt-[100%] relative overflow-hidden">
+                      <img 
+                        src={image} 
+                        alt={caption || `Post image ${index + 1}`}
+                        className="absolute top-0 left-0 w-full h-full object-contain bg-black"
+                        onError={(e) => {
+                          (e.target as HTMLImageElement).src = 'https://source.unsplash.com/800x600/?abstract';
+                        }}
+                        onClick={handleImageTap}
+                      />
+                    </div>
+                  </div>
+                ))}
+              </div>
               
               {parsedImages.length > 1 && (
+                <>
+                  <button 
+                    className="absolute left-2 top-1/2 transform -translate-y-1/2 bg-black/30 hover:bg-black/50 p-1 rounded-full transition-colors duration-200"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handlePrevImage();
+                    }}
+                    disabled={currentImageIndex === 0}
+                    style={{ opacity: currentImageIndex === 0 ? 0.5 : 1 }}
+                  >
+                    <ChevronLeft className="h-5 w-5" />
+                  </button>
+                  <button 
+                    className="absolute right-2 top-1/2 transform -translate-y-1/2 bg-black/30 hover:bg-black/50 p-1 rounded-full transition-colors duration-200"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleNextImage();
+                    }}
+                    disabled={currentImageIndex === parsedImages.length - 1}
+                    style={{ opacity: currentImageIndex === parsedImages.length - 1 ? 0.5 : 1 }}
+                  >
+                    <ChevronRight className="h-5 w-5" />
+                  </button>
+                  
                   <div className="absolute bottom-2 left-1/2 transform -translate-x-1/2 flex gap-1">
                     {parsedImages.map((_, index) => (
                       <div 
                         key={index} 
-                      className={`w-2 h-2 rounded-full ${index === 0 ? 'bg-primary' : 'bg-white/30'}`}
+                        className={`w-2 h-2 rounded-full transition-colors duration-200 ${index === currentImageIndex ? 'bg-primary' : 'bg-white/30'}`}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setCurrentImageIndex(index);
+                        }}
+                        style={{ cursor: 'pointer' }}
                       />
                     ))}
                   </div>
+                </>
               )}
             </div>
           )}
           
           <div className="p-4">
-            {!isTextPost() && caption && (
+            {!isTextPost() && captionState && (
               <p className="mb-3 text-sm">
                 <span className="font-medium mr-1">
                   {profiles?.username || profiles?.auth_metadata?.full_name || 'User'}:
                 </span>
-                {caption}
+                {captionState}
               </p>
             )}
             
@@ -809,7 +937,7 @@ export function Post({
         </Card>
         
         <Dialog open={showCommentsModal} onOpenChange={setShowCommentsModal}>
-          <DialogContent className="sm:max-w-[500px] bg-black/90 border-white/10 max-h-[80vh]">
+          <DialogContent className="sm:max-w-[600px] bg-black/90 border-white/10 max-h-[90vh]">
             <DialogHeader>
               <DialogTitle>Comments</DialogTitle>
             </DialogHeader>
@@ -891,36 +1019,11 @@ export function Post({
           </DialogContent>
         </Dialog>
         
-        <Dialog open={showLikesModal} onOpenChange={setShowLikesModal}>
-          <DialogContent className="sm:max-w-[400px] bg-black/90 border-white/10 max-h-[80vh]">
-            <DialogHeader>
-              <DialogTitle>Likes</DialogTitle>
-            </DialogHeader>
-            
-            <div className="my-4 max-h-[60vh] overflow-y-auto">
-              {likes.length > 0 ? (
-                <div className="space-y-4">
-                  {likes.map((like) => (
-                    <div key={like.id} className="flex items-center gap-3">
-                      <ProfileImage 
-                        src={like.profile?.avatar_url || null} 
-                          alt={like.profile?.username || 'User'}
-                        className="w-10 h-10 rounded-full"
-                        />
-                      <div>
-                        <p className="font-medium">{like.profile?.username || 'User'}</p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="text-center py-8 text-white/60">
-                  No likes yet. Be the first to like this post!
-                </div>
-              )}
-            </div>
-          </DialogContent>
-        </Dialog>
+        <LikesModal 
+          open={showLikesModal} 
+          onOpenChange={setShowLikesModal} 
+          postId={id} 
+        />
         
         <Dialog open={showPostModal} onOpenChange={setShowPostModal}>
           <DialogContent className="sm:max-w-[650px] bg-black/90 border-white/10 h-[90vh] max-h-[90vh] p-0 overflow-hidden">
@@ -958,26 +1061,22 @@ export function Post({
                     <Button 
                       variant="ghost" 
                       onClick={() => {
-                        setEditedCaption(caption || "");
+                        setEditedCaption(captionState || "");
                         setEditMode(false);
                       }}
+                      disabled={loading}
                     >
                       Cancel
                     </Button>
                     <Button 
-                      onClick={async () => {
-                        if (onEdit) {
-                          await onEdit(id, editedCaption);
-                          setEditMode(false);
-                          setShowPostModal(false);
-                          toast({
-                            title: "Post updated",
-                            description: "Your post has been updated successfully."
-                          });
-                        }
-                      }}
+                      onClick={handleEdit}
+                      disabled={loading}
                     >
-                      Save Changes
+                      {loading ? (
+                        <><LoaderCircle className="mr-2 h-4 w-4 animate-spin" /> Saving...</>
+                      ) : (
+                        'Save Changes'
+                      )}
                     </Button>
                   </div>
                 </div>
@@ -985,38 +1084,46 @@ export function Post({
                 <>
                   {isTextPost() ? (
                     <div className="relative h-auto max-h-[60%] min-h-[200px] bg-black/40 flex items-center justify-center p-8">
-                      <p className="text-xl font-medium text-center">{caption}</p>
+                      <p className="text-xl font-medium text-center">{captionState}</p>
                     </div>
                   ) : parsedImages.length > 0 && (
-                    <div className="relative h-auto max-h-[60%] min-h-[200px] bg-black flex items-center justify-center">
-                      <img 
-                        src={parsedImages[currentImageIndex]} 
-                        alt={caption || 'Post image'}
-                        className="w-full h-auto object-contain"
-                        onError={(e) => {
-                          (e.target as HTMLImageElement).src = 'https://source.unsplash.com/800x600/?abstract';
-                        }}
-                      />
+                    <div className="relative h-auto flex-grow bg-black flex items-center justify-center overflow-hidden">
+                      <div className="w-full flex transition-transform duration-300 ease-in-out" style={{ transform: `translateX(-${currentImageIndex * 100}%)` }}>
+                        {parsedImages.map((image, index) => (
+                          <div key={index} className="w-full flex-shrink-0 flex items-center justify-center">
+                            <img 
+                              src={image}
+                              alt={caption || `Post image ${index + 1}`}
+                              className="max-w-full max-h-[60vh] object-contain"
+                              onError={(e) => {
+                                (e.target as HTMLImageElement).src = 'https://source.unsplash.com/800x600/?abstract';
+                              }}
+                            />
+                          </div>
+                        ))}
+                      </div>
                       
                       {parsedImages.length > 1 && (
                         <>
                           <button 
-                            className="absolute left-2 top-1/2 transform -translate-y-1/2 bg-black/30 p-1 rounded-full"
+                            className="absolute left-2 top-1/2 transform -translate-y-1/2 bg-black/30 hover:bg-black/50 p-1 rounded-full transition-colors duration-200"
                             onClick={(e) => {
                               e.stopPropagation();
                               handlePrevImage();
                             }}
                             disabled={currentImageIndex === 0}
+                            style={{ opacity: currentImageIndex === 0 ? 0.5 : 1 }}
                           >
                             <ChevronLeft className="h-6 w-6" />
                           </button>
                           <button 
-                            className="absolute right-2 top-1/2 transform -translate-y-1/2 bg-black/30 p-1 rounded-full"
+                            className="absolute right-2 top-1/2 transform -translate-y-1/2 bg-black/30 hover:bg-black/50 p-1 rounded-full transition-colors duration-200"
                             onClick={(e) => {
                               e.stopPropagation();
                               handleNextImage();
                             }}
                             disabled={currentImageIndex === parsedImages.length - 1}
+                            style={{ opacity: currentImageIndex === parsedImages.length - 1 ? 0.5 : 1 }}
                           >
                             <ChevronRight className="h-6 w-6" />
                           </button>
@@ -1025,7 +1132,12 @@ export function Post({
                             {parsedImages.map((_, index) => (
                               <div 
                                 key={index} 
-                                className={`w-2 h-2 rounded-full ${currentImageIndex === index ? 'bg-primary' : 'bg-white/30'}`}
+                                className={`w-2 h-2 rounded-full transition-colors duration-200 ${currentImageIndex === index ? 'bg-primary' : 'bg-white/30'}`}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setCurrentImageIndex(index);
+                                }}
+                                style={{ cursor: 'pointer' }}
                               />
                             ))}
                           </div>
@@ -1092,7 +1204,7 @@ export function Post({
 
                     {!isTextPost() && (
                       <div className="mb-4">
-                        <p className="text-sm">{caption}</p>
+                        <p className="text-sm">{captionState}</p>
                       </div>
                     )}
 

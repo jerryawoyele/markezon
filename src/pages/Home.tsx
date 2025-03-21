@@ -207,7 +207,7 @@ export default function Home() {
       const to = from + postsPerPage - 1;
       
       // Fetch posts from followed users and current user
-        const { data: postsData, error: postsError } = await supabase
+      const { data: postsData, error: postsError } = await supabase
           .from('posts')
           .select(`
             *,
@@ -338,19 +338,19 @@ export default function Home() {
         `)
         .order('created_at', { ascending: false })
         .limit(50);  // Fetch extra to ensure we have enough after filtering
-      
+
       if (randomPostsError) {
         console.error("Error fetching random posts:", randomPostsError);
         setLoadingRandomPosts(false);
         return;
       }
-      
+
       if (!randomPosts || randomPosts.length === 0) {
         setRandomPosts([]);
         setLoadingRandomPosts(false);
         return;
       }
-      
+
       // Filter out any posts from followed users or already displayed posts
       const finalFilteredPosts = randomPosts.filter(post => {
         // Skip if the post ID is in our exclusion set
@@ -698,7 +698,7 @@ export default function Home() {
           </div>
         </div>
       </div>
-        </div>
+    </div>
       )}
     </MainLayout>
   );

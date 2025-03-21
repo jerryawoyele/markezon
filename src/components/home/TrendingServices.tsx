@@ -1,9 +1,16 @@
+import React, { useState, useEffect } from "react";
+import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Search, X } from "lucide-react";
-import { useState, useEffect } from "react";
 import { SearchUsers } from "./SearchUsers";
 import { supabase } from "@/integrations/supabase/client";
 import { useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom";
+import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
+import { Badge } from "@/components/ui/badge";
+import { User } from "lucide-react";
+import { Package2 } from "lucide-react";
+import { formatPrice } from "@/lib/utils";
 
 interface TrendingService {
   id: string;
@@ -17,6 +24,16 @@ interface TrendingService {
     username: string;
     avatar_url: string;
   };
+  user_profile?: {
+    username: string;
+    avatar_url: string;
+  };
+  image_url?: string;
+  price?: number;
+  is_price_range?: boolean;
+  bookingCount?: number;
+  periodBookingCount?: number;
+  trendingScore?: number;
 }
 
 export function TrendingServices() {
@@ -49,88 +66,179 @@ export function TrendingServices() {
   const fetchTrendingServices = async () => {
     setLoading(true);
     try {
-      // Get trending services directly without trying to join with profiles
+      // First fetch just the services without any joins
       const { data: servicesData, error: servicesError } = await supabase
         .from('services')
         .select('*')
-        .order('created_at', { ascending: false })
-        .limit(10);
-        
-      if (servicesError) throw servicesError;
+        .order('created_at', { ascending: false });
       
+      if (servicesError) throw servicesError;
+
       if (!servicesData || servicesData.length === 0) {
-        // No services at all in the database
         setTrendingServices([]);
         setLoading(false);
         return;
       }
       
-      // Extract user IDs from services, handling both column names
-      const userIds: string[] = [];
-      servicesData.forEach(service => {
-        // Try to get the owner ID from either column
-        const ownerId = 'owner_id' in service 
-          ? (service as any).owner_id 
-          : (service as any).user_id;
-          
-        if (ownerId) {
-          userIds.push(ownerId);
+      // Then fetch booking data in a separate query
+      const { data: bookingsData, error: bookingsError } = await supabase
+        .from('bookings')
+        .select('id, service_id, created_at');
+      
+      if (bookingsError) throw bookingsError;
+      
+      // Group bookings by service ID
+      const bookingsByService = (bookingsData || []).reduce((acc, booking) => {
+        if (!booking.service_id) return acc;
+        if (!acc[booking.service_id]) {
+          acc[booking.service_id] = [];
         }
+        acc[booking.service_id].push(booking);
+        return acc;
+      }, {} as Record<string, any[]>);
+      
+      // Map services with their bookings
+      const servicesWithBookings = servicesData.map(service => {
+        const serviceBookings = bookingsByService[service.id] || [];
+        return {
+          ...service,
+          bookings: serviceBookings.map(booking => ({
+            id: booking.id,
+            created_at: booking.created_at
+          }))
+        };
       });
+
+      // Continue with the existing logic, using servicesWithBookings
+      const now = new Date();
       
-      // Remove duplicates
-      const uniqueUserIds = [...new Set(userIds)];
+      // Time periods to check, in days
+      const timePeriods = [7, 30, 90, 365, Infinity]; // 1 week, 1 month, 3 months, 1 year, all time
       
-      let profilesMap: Record<string, any> = {};
+      let selectedServices = [];
       
-      if (uniqueUserIds.length > 0) {
-        try {
-          const { data: profilesData } = await supabase
-            .from('profiles')
-            .select('id, username, avatar_url')
-            .in('id', uniqueUserIds);
+      // Prepare a fallback of services sorted by total booking count
+      const servicesWithTotalBookings = servicesWithBookings.map(service => {
+        const totalBookingCount = service.bookings ? service.bookings.length : 0;
+        return {
+          ...service,
+          bookingCount: totalBookingCount
+        };
+      }).sort((a, b) => b.bookingCount - a.bookingCount);
+      
+      const topServicesByBookingCount = servicesWithTotalBookings.slice(0, 10);
+      
+      // If there are any services with bookings, use those first
+      if (topServicesByBookingCount.some(service => service.bookingCount > 0)) {
+        console.log("Found services with bookings, using them directly");
+        selectedServices = topServicesByBookingCount;
+      } else {
+        // Try each time period until we find services with bookings
+        for (const periodDays of timePeriods) {
+          const servicesWithScores = servicesWithBookings.map(service => {
+            // Count bookings within the current time period
+            const periodStart = new Date();
+            periodStart.setDate(periodStart.getDate() - periodDays);
             
-          if (profilesData) {
-            // Create a map of user IDs to profile data
-            profilesMap = profilesData.reduce((acc, profile) => {
-              acc[profile.id] = profile;
-              return acc;
-            }, {} as Record<string, any>);
+            const periodBookings = service.bookings ? 
+              service.bookings.filter(booking => new Date(booking.created_at) >= periodStart) : 
+              [];
+            
+            const bookingCount = periodBookings.length;
+            
+            // Calculate recency factor (higher for more recent bookings)
+            let recencyFactor = 1;
+            if (bookingCount > 0) {
+              // Find most recent booking date
+              const mostRecentBooking = periodBookings.reduce((latest, booking) => {
+                const bookingDate = new Date(booking.created_at);
+                return bookingDate > latest ? bookingDate : latest;
+              }, new Date(0));
+              
+              // Calculate days since most recent booking
+              const daysSinceRecentBooking = Math.max(1, Math.floor((now.getTime() - mostRecentBooking.getTime()) / (1000 * 60 * 60 * 24)));
+              
+              // Recency factor gives higher weight to recent bookings
+              recencyFactor = periodDays === Infinity ? 1 : (periodDays / daysSinceRecentBooking);
+            }
+            
+            // For all-time, just use the total booking count
+            const totalBookingCount = service.bookings ? service.bookings.length : 0;
+            
+            // Calculate trending score: booking count weighted by recency
+            const trendingScore = periodDays === Infinity 
+              ? totalBookingCount 
+              : bookingCount * recencyFactor;
+            
+            return {
+              ...service,
+              bookingCount: totalBookingCount, // Always show total booking count
+              periodBookingCount: bookingCount, // Bookings within the period
+              trendingScore
+            };
+          });
+          
+          // Sort by trending score (descending)
+          const sortedServices = servicesWithScores
+            .sort((a, b) => b.trendingScore - a.trendingScore);
+          
+          // Check if we have any services with bookings in this period
+          const servicesWithPeriodBookings = sortedServices.filter(s => s.periodBookingCount > 0);
+          
+          if (servicesWithPeriodBookings.length > 0) {
+            selectedServices = servicesWithPeriodBookings.slice(0, 10);
+            break; // Found services with bookings in this period, exit the loop
           }
-        } catch (profileError) {
-          console.log('Error fetching profiles:', profileError);
+          
+          // If this is the last period (all time) and still no services with bookings
+          if (periodDays === Infinity) {
+            // Use the top services by booking count as fallback
+            selectedServices = topServicesByBookingCount;
+          }
         }
       }
       
-      // Apply a default engagement score based on recency and add profile data
-      const servicesWithEngagement = servicesData.map((service, index) => {
-        // Get the owner ID from either column
-        const ownerId = 'owner_id' in service 
-          ? (service as any).owner_id 
-          : (service as any).user_id;
-          
-        // Get the profile for this owner
-        const profile = ownerId && profilesMap[ownerId] 
-          ? {
-              username: profilesMap[ownerId].username || 'Business',
-              avatar_url: profilesMap[ownerId].avatar_url || ''
-            }
-          : {
-              username: 'Business',
-              avatar_url: ''
-            };
-            
+      // If we still don't have any services, use the most recent ones as a last resort
+      if (selectedServices.length === 0) {
+        console.log("No services with bookings found in any time period, using most recent services");
+        selectedServices = servicesWithBookings.slice(0, 10);
+      }
+      
+      console.log("Selected services after fallback logic:", selectedServices.length, 
+        selectedServices.map(s => ({ 
+          id: s.id, 
+          title: s.title, 
+          bookingCount: s.bookingCount 
+        }))
+      );
+      
+      // Get unique user IDs of service owners
+      const userIds = [...new Set(selectedServices.map(service => service.user_id))].filter(Boolean);
+      
+      // Fetch profile information for service owners if we have any user IDs
+      let profileData = [];
+      if (userIds.length > 0) {
+        const { data: profiles, error: profileError } = await supabase
+          .from('profiles')
+          .select('id, username, avatar_url')
+          .in('id', userIds);
+        
+        if (profileError) throw profileError;
+        profileData = profiles || [];
+      }
+      
+      // Map profile data to services
+      const servicesWithProfiles = selectedServices.map(service => {
+        const profileMatch = service.user_id ? 
+          profileData.find(profile => profile.id === service.user_id) : null;
+        
         return {
           ...service,
-          engagement_score: 100 - index, // Just for display purposes
-          profile,
-          // Ensure we have both IDs for compatibility
-          owner_id: ownerId,
-          user_id: ownerId
+          user_profile: profileMatch || null
         };
       });
       
-      setTrendingServices(servicesWithEngagement as TrendingService[]);
+      setTrendingServices(servicesWithProfiles as TrendingService[]);
     } catch (error) {
       console.error('Error fetching trending services:', error);
       setTrendingServices([]); // Set empty array in case of error
@@ -192,46 +300,87 @@ export function TrendingServices() {
         <div className="space-y-4">
           {loading ? (
             // Loading skeleton
-            Array(5).fill(0).map((_, index) => (
-              <div key={index} className="flex items-center justify-between p-3 rounded-lg bg-white/5 animate-pulse">
+            Array(3).fill(0).map((_, i) => (
+              <div key={i} className="flex items-center justify-between p-3 rounded-lg bg-white/5 animate-pulse">
                 <div className="flex gap-3">
-                  <span className="text-white/60 w-4">{index + 1}.</span>
+                  <div className="w-4 h-4 bg-white/10 rounded" />
                   <div>
-                    <div className="h-4 w-32 bg-white/10 rounded mb-2"></div>
-                    <div className="h-3 w-24 bg-white/5 rounded"></div>
+                    <div className="h-4 w-32 bg-white/10 rounded mb-2" />
+                    <div className="h-3 w-40 bg-white/10 rounded" />
                   </div>
                 </div>
-                <div className="h-3 w-16 bg-white/5 rounded"></div>
+                <div className="h-3 w-16 bg-white/10 rounded" />
               </div>
             ))
-          ) : trendingServices.length > 0 ? (
-            trendingServices.map((service, index) => (
-              <div 
-                key={service.id}
-                className="flex items-center justify-between p-3 rounded-lg bg-white/5 hover:bg-white/10 transition-colors cursor-pointer"
-                onClick={() => handleServiceClick(service.id, service.owner_id, service.profile?.username)}
-              >
-                <div className="flex gap-3">
-                  <span className="text-white/60">{index + 1}.</span>
-                  <div>
-                    <h3 className="font-medium">{service.title}</h3>
-                    <div className="flex items-center gap-2">
-                      <p className="text-sm text-white/60">{service.category || 'Service'}</p>
-                      <p className="text-sm text-white/60">by {service.profile?.username || 'Business'}</p>
+          ) : trendingServices && trendingServices.length > 0 ? (
+            <div className="space-y-4">
+              {trendingServices.map((service, index) => (
+                <Card key={service.id} className="rounded-lg overflow-hidden border-white/10 hover:border-white/20 bg-black/20 hover:bg-black/30 transition-all duration-200">
+                  <Link to={`/services/${service.id}`}>
+                    <div className="cursor-pointer flex flex-col md:flex-row">
+                      <div className="aspect-video w-full md:w-1/3 relative overflow-hidden">
+                        <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent z-10" />
+                        
+                        {service.image_url ? (
+                          <img 
+                            src={service.image_url}
+                            alt={service.title}
+                            className="w-full h-full object-cover"
+                            onError={(e) => {
+                              (e.target as HTMLImageElement).src = "/service-placeholder.jpg";
+                            }}
+                          />
+                        ) : (
+                          <div className="w-full h-full bg-gradient-to-br from-gray-900 to-black flex items-center justify-center">
+                            <Package2 className="h-1/3 w-1/3 text-white/20" />
+                          </div>
+                        )}
+                        
+                        <div className="absolute bottom-2 right-2 z-20">
+                          <Badge variant="secondary" className="bg-black/60 hover:bg-black/80">
+                            {(service.bookingCount || 0) > 0 ? `${service.bookingCount} ${service.bookingCount === 1 ? 'booking' : 'bookings'}` : 'New'}
+                          </Badge>
+                        </div>
+                      </div>
+                      
+                      <div className="p-4 flex-1">
+                        <div className="flex items-center gap-2 mb-2">
+                          <Avatar className="h-6 w-6">
+                            <AvatarImage 
+                              src={service.user_profile?.avatar_url || service.profiles?.avatar_url} 
+                              alt={service.user_profile?.username || service.profiles?.username || "Business"} 
+                            />
+                            <AvatarFallback>
+                              <User className="h-4 w-4" />
+                            </AvatarFallback>
+                          </Avatar>
+                          <span className="text-xs text-muted-foreground">
+                            {service.user_profile?.username || service.profiles?.username || "Business"}
+                          </span>
+                        </div>
+                        
+                        <h3 className="font-semibold text-base line-clamp-1">{service.title}</h3>
+                        
+                        <p className="text-sm text-muted-foreground mt-1 line-clamp-2">{service.description}</p>
+                      
+                        <div className="mt-3 flex items-center justify-between">
+                          <div className="text-primary font-medium">
+                            {service.price 
+                              ? service.is_price_range 
+                                ? `From ${formatPrice(service.price)}`
+                                : formatPrice(service.price)
+                              : 'Free'}
+                          </div>
+                        </div>
+                      </div>
                     </div>
-                  </div>
-                </div>
-                <span className="text-sm text-white/60">
-                  {service.engagement_score > 1000 
-                    ? `${(service.engagement_score / 1000).toFixed(1)}k` 
-                    : service.engagement_score} 
-                  {' '}views
-                </span>
-              </div>
-            ))
+                  </Link>
+                </Card>
+              ))}
+            </div>
           ) : (
             <div className="text-center text-white/60 py-4">
-              No service is currently trending
+              No services available at this time
             </div>
           )}
         </div>

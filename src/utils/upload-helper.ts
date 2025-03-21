@@ -2,30 +2,58 @@ import { supabase } from '@/integrations/supabase/client';
 
 // Create necessary storage buckets if they don't exist
 export async function ensureStorageBuckets() {
-  try {
-    // Check if the services bucket exists
-    const { data: publicBucket, error: publicBucketError } = await supabase.storage.getBucket('services');
-    
-    if (publicBucketError && publicBucketError.message.includes('not found')) {
-      console.log('services bucket not found, attempting to create it');
-      try {
-        // Create services bucket
-        const { data, error } = await supabase.storage.createBucket('services', {
-          public: true,
-          fileSizeLimit: 5 * 1024 * 1024, // 5MB limit
-        });
-        
-        if (error) {
-          console.error('Error creating services bucket:', error);
+  // List of buckets to ensure
+  const bucketsToCreate = ['profiles', 'services', 'posts'];
+  
+  for (const bucketName of bucketsToCreate) {
+    try {
+      // First check if bucket exists
+      const { data, error } = await supabase.storage.getBucket(bucketName);
+      
+      if (error) {
+        if (error.message.includes('not found') || error.status === 400 || error.status === 404) {
+          console.log(`${bucketName} bucket not found, attempting to create it`);
+          
+          try {
+            // Create the bucket
+            const { data: createData, error: createError } = await supabase.storage.createBucket(bucketName, {
+              public: true,
+              fileSizeLimit: 10 * 1024 * 1024, // 10MB limit
+            });
+            
+            if (createError) {
+              console.error(`Error creating ${bucketName} bucket:`, createError);
+              
+              // Try another approach if creation fails
+              try {
+                // Sometimes we need to try with different options
+                const { error: retryError } = await supabase.storage.createBucket(bucketName, {
+                  public: true,
+                });
+                
+                if (retryError) {
+                  console.error(`Error in retry attempt for ${bucketName} bucket:`, retryError);
+                } else {
+                  console.log(`Successfully created ${bucketName} bucket on retry`);
+                }
+              } catch (retryError) {
+                console.error(`Exception in retry for ${bucketName} bucket:`, retryError);
+              }
+            } else {
+              console.log(`Successfully created ${bucketName} bucket`);
+            }
+          } catch (createEx) {
+            console.error(`Exception creating ${bucketName} bucket:`, createEx);
+          }
         } else {
-          console.log('Successfully created services bucket');
+          console.error(`Error checking ${bucketName} bucket:`, error);
         }
-      } catch (createError) {
-        console.error('Error creating services bucket:', createError);
+      } else {
+        console.log(`${bucketName} bucket already exists`);
       }
+    } catch (e) {
+      console.warn(`Exception checking/creating ${bucketName} bucket:`, e);
     }
-  } catch (e) {
-    console.warn('Could not check or create storage buckets:', e);
   }
 }
 
@@ -40,15 +68,23 @@ export async function uploadFileWithFallback(
     buckets?: string[];
     uiCallback?: (status: 'uploading' | 'success' | 'error', message?: string) => void;
   }
-) {
-  // Try to ensure the services bucket exists
+): Promise<{ url: string, source: string, error?: Error }> {
+  // Try to ensure the buckets exist
   try {
     await ensureStorageBuckets();
   } catch (e) {
-    console.warn('Failed to check storage buckets:', e);
+    console.warn('Failed to ensure storage buckets:', e);
   }
   
-  const bucketOrder = ['services']; // Default to just using services bucket
+  // Parse the path to determine appropriate bucket
+  let bucketName = 'services'; // Default bucket
+  
+  if (path.includes('profile') || path.includes('avatar')) {
+    bucketName = 'profiles';
+  } else if (path.includes('post')) {
+    bucketName = 'posts';
+  }
+  
   const { uiCallback } = options || {};
   
   // Notify upload starting
@@ -57,16 +93,31 @@ export async function uploadFileWithFallback(
   // Determine correct content type for the file
   let contentType = file.type;
   
-  // Fix for BMP files which might not have correct content type
-  if (file.name.toLowerCase().endsWith('.bmp') && (!contentType || contentType === 'application/octet-stream')) {
-    contentType = 'image/bmp';
+  // Fix for files which might have incorrect content type
+  if (!contentType || contentType === 'application/octet-stream') {
+    // Map file extensions to content types
+    const extensionMap: Record<string, string> = {
+      'jpg': 'image/jpeg',
+      'jpeg': 'image/jpeg',
+      'png': 'image/png',
+      'gif': 'image/gif',
+      'webp': 'image/webp',
+      'bmp': 'image/bmp',
+      'svg': 'image/svg+xml',
+      'pdf': 'application/pdf',
+    };
+    
+    const ext = file.name.split('.').pop()?.toLowerCase() || '';
+    if (extensionMap[ext]) {
+      contentType = extensionMap[ext];
+    }
   }
   
   // Prepare the file and path
   let fileToUpload = file;
   let finalPath = path;
   
-  // Convert BMP to PNG if needed
+  // Convert BMP to PNG if needed (BMP files can cause issues)
   if (file.name.toLowerCase().endsWith('.bmp')) {
     try {
       // Create a temporary canvas to convert BMP to PNG
@@ -108,14 +159,15 @@ export async function uploadFileWithFallback(
   console.log('- File type:', fileToUpload.type);
   console.log('- File size:', Math.round(fileToUpload.size / 1024), 'KB');
   console.log('- Target path:', finalPath);
+  console.log('- Bucket:', bucketName);
   
-  // Try the main upload
+  // Try main upload to Supabase
   try {
     // Upload with explicit content type
     const { error, data } = await supabase.storage
-      .from('services')
+      .from(bucketName)
       .upload(finalPath, fileToUpload, {
-        contentType: fileToUpload.type || contentType || 'application/octet-stream',
+        contentType: contentType || 'application/octet-stream',
         upsert: true,
         cacheControl: '3600'
       });
@@ -127,13 +179,13 @@ export async function uploadFileWithFallback(
     
     // Get public URL
     const { data: urlData } = supabase.storage
-      .from('services')
+      .from(bucketName)
       .getPublicUrl(finalPath);
       
     console.log('Successfully uploaded file');
     console.log('Public URL:', urlData?.publicUrl);
     
-    // Test the URL before returning
+    // Verify the URL works
     try {
       const testFetch = await fetch(urlData?.publicUrl || '', { method: 'HEAD' });
       if (!testFetch.ok) {
@@ -145,36 +197,70 @@ export async function uploadFileWithFallback(
     }
     
     uiCallback?.('success', `File uploaded successfully`);
-    return { url: urlData?.publicUrl || '', source: 'supabase', bucket: 'services' };
+    return { url: urlData?.publicUrl || '', source: 'supabase', bucket: bucketName };
   } catch (uploadError) {
-    console.error('Upload failed:', uploadError);
+    console.error('Primary upload failed:', uploadError);
     
-    // Fall back to data URL
+    // Try alternate bucket as fallback
+    let alternateBucketName = bucketName === 'profiles' ? 'services' : 'profiles';
+    
     try {
-      console.log('Falling back to data URL');
-      const dataUrl = await new Promise<string>((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = () => resolve(reader.result as string);
-        reader.onerror = reject;
-        reader.readAsDataURL(file);
-      });
+      console.log(`Trying alternate bucket: ${alternateBucketName}`);
       
-      uiCallback?.('error', 'Cloud storage unavailable. Using local file instead.');
-      return { 
-        url: dataUrl, 
-        source: 'local',
-        error: uploadError as Error 
-      };
-    } catch (error) {
-      console.error('Error creating data URL:', error);
+      // Upload to alternate bucket
+      const { error, data } = await supabase.storage
+        .from(alternateBucketName)
+        .upload(finalPath, fileToUpload, {
+          contentType: contentType || 'application/octet-stream',
+          upsert: true,
+          cacheControl: '3600'
+        });
+        
+      if (error) {
+        console.warn(`Alternate upload failed:`, error.message);
+        throw error;
+      }
       
-      // Final fallback to SVG placeholder
-      const placeholder = getDefaultImageForEndpoint(path);
-      return { 
-        url: placeholder, 
-        source: 'placeholder',
-        error: error as Error
-      };
+      // Get public URL
+      const { data: urlData } = supabase.storage
+        .from(alternateBucketName)
+        .getPublicUrl(finalPath);
+        
+      console.log('Successfully uploaded file to alternate bucket');
+      console.log('Public URL:', urlData?.publicUrl);
+      
+      uiCallback?.('success', `File uploaded successfully to alternate storage`);
+      return { url: urlData?.publicUrl || '', source: 'supabase-alternate', bucket: alternateBucketName };
+    } catch (alternateError) {
+      console.error('Alternate upload also failed:', alternateError);
+      
+      // Fall back to data URL if all else fails
+      try {
+        console.log('Falling back to data URL');
+        const dataUrl = await new Promise<string>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(reader.result as string);
+          reader.onerror = reject;
+          reader.readAsDataURL(file);
+        });
+        
+        uiCallback?.('error', 'Cloud storage unavailable. Using local file instead.');
+        return { 
+          url: dataUrl, 
+          source: 'local',
+          error: uploadError as Error 
+        };
+      } catch (dataUrlError) {
+        console.error('Error creating data URL:', dataUrlError);
+        
+        // Final fallback to generated SVG placeholder
+        const placeholder = getDefaultImageForEndpoint(path);
+        return { 
+          url: placeholder || 'https://www.gravatar.com/avatar/00000000000000000000000000000000?d=mp&f=y', 
+          source: 'placeholder',
+          error: dataUrlError as Error
+        };
+      }
     }
   }
 }
@@ -214,7 +300,7 @@ export function generateFilePath(file: File, userId: string, type: 'profile' | '
   let path = '';
   switch (type) {
     case 'profile':
-      path = `profile/${userId}_${timestamp}_${randomId}.${fileExt}`;
+      path = `profiles/${userId}/${timestamp}_${randomId}.${fileExt}`;
       break;
     case 'service':
       path = `services/${userId}_${timestamp}_${randomId}.${fileExt}`;

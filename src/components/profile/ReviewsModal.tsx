@@ -40,33 +40,80 @@ export function ReviewsModal({ isOpen, onClose, userId, currentUserId }: Reviews
       setError(null);
       
       try {
-        // Fetch reviews
-        const { data, error } = await supabase
+        console.log("Fetching reviews for user:", userId);
+        
+        // First, fetch just the reviews
+        const { data: reviewsData, error: reviewsError } = await supabase
           .from('reviews')
-          .select(`
-            *,
-            reviewer:reviewer_id (
-              username,
-              avatar_url
-            )
-          `)
+          .select('*')
           .eq('user_id', userId)
           .order('created_at', { ascending: false });
           
-        if (error) throw error;
+        if (reviewsError) {
+          console.error("Error fetching reviews:", reviewsError);
+          throw reviewsError;
+        }
         
-        setReviews(data || []);
+        console.log("Reviews data:", reviewsData);
+        
+        if (!reviewsData || reviewsData.length === 0) {
+          setReviews([]);
+          setAverageRating(null);
+          setLoading(false);
+          return;
+        }
+        
+        // Get all reviewer IDs
+        const reviewerIds = reviewsData.map(review => review.reviewer_id);
+        
+        // Fetch profiles for those reviewers
+        const { data: profilesData, error: profilesError } = await supabase
+          .from('profiles')
+          .select('id, username, avatar_url')
+          .in('id', reviewerIds);
+          
+        if (profilesError) {
+          console.error("Error fetching reviewer profiles:", profilesError);
+          throw profilesError;
+        }
+        
+        // Create a map of profiles by ID for easy lookup
+        const profilesMap = (profilesData || []).reduce((acc, profile) => {
+          acc[profile.id] = profile;
+          return acc;
+        }, {});
+        
+        // Combine the data
+        const combinedReviews = reviewsData.map(review => ({
+          id: review.id,
+          rating: review.rating,
+          content: review.content,
+          created_at: review.created_at,
+          reviewer_id: review.reviewer_id,
+          reviewer: profilesMap[review.reviewer_id] || { 
+            username: "Anonymous", 
+            avatar_url: null 
+          }
+        }));
+        
+        setReviews(combinedReviews);
         
         // Calculate average rating
-        if (data && data.length > 0) {
-          const total = data.reduce((sum, review) => sum + review.rating, 0);
-          setAverageRating(total / data.length);
+        if (combinedReviews.length > 0) {
+          const total = combinedReviews.reduce((sum, review) => sum + review.rating, 0);
+          setAverageRating(total / combinedReviews.length);
         } else {
           setAverageRating(null);
         }
       } catch (error) {
         console.error("Error fetching reviews:", error);
-        setError("Failed to load reviews. Please try again later.");
+        let errorMessage = "Failed to load reviews. Please try again later.";
+        
+        if (error instanceof Error) {
+          errorMessage += ` (${error.message})`;
+        }
+        
+        setError(errorMessage);
       } finally {
         setLoading(false);
       }
@@ -110,7 +157,7 @@ export function ReviewsModal({ isOpen, onClose, userId, currentUserId }: Reviews
           <DialogTitle className="flex items-center gap-2">
             Reviews 
             {averageRating !== null && (
-              <span className="text-sm font-normal text-white/60">
+              <span className="flex flex-rowitems-center gap-1 text-sm font-normal text-white/60">
                 ({averageRating.toFixed(1)}) {renderStars(Math.round(averageRating))}
               </span>
             )}

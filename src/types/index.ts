@@ -4,7 +4,11 @@ export interface Profile {
   avatar_url: string | null;
   bio: string | null;
   updated_at: string | null;
+  user_role?: 'business' | 'customer' | null;
   about_business?: string | null;
+  business_name?: string | null;
+  kyc_verified?: boolean;
+  kyc_status?: string;
   followers_count?: number;
   following_count?: number;
   posts_count?: number;

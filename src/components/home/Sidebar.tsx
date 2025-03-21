@@ -10,7 +10,7 @@ import {
   LogIn,
   Bell as BellIcon,
   Briefcase as BriefcaseIcon,
-  ShoppingCart,
+  ShoppingCart
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -148,7 +148,10 @@ export function Sidebar({
   const desktopNav = (
     <div className="hidden lg:flex flex-col fixed left-0 top-0 h-screen w-64 bg-black border-r border-white/5 z-30">
       <div className="p-4 border-b border-white/10 mb-2">
-        <h1 className="text-2xl font-bold bg-gradient-to-r from-purple-500 to-blue-500 bg-clip-text text-transparent">
+        <h1 
+          className="text-2xl font-bold bg-gradient-to-r from-purple-500 to-blue-500 bg-clip-text text-transparent cursor-pointer"
+          onClick={() => navigate('/home')}
+        >
           Markezon
         </h1>
       </div>
@@ -166,6 +169,7 @@ export function Sidebar({
           ))}
         </div>
       </div>
+      
       <div className="p-2 w-full border-t border-white/10 mt-2">
         {isAuthenticated ? (
           <Button

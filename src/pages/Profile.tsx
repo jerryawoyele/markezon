@@ -16,7 +16,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { ServiceCard } from "@/components/services/ServiceCard";
 import { AddServiceModal } from "@/components/services/AddServiceModal";
 import { useToast } from "@/components/ui/use-toast";
-import { Star, PenLine, Users, FileImage, MessageSquare, Bell, User, Briefcase, Share2, PlusCircle, ShoppingCart } from "lucide-react";
+import { Star, PenLine, Users, FileImage, MessageSquare, Bell, User, Briefcase, Share2, PlusCircle, ShoppingCart, Settings } from "lucide-react";
 import type { Profile as ProfileType, Post as PostType } from "@/types";
 import ProfileImage from '@/components/ProfileImage';
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
@@ -32,6 +32,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { CreatePost } from "@/components/home/CreatePost";
 import { Badge } from "@/components/ui/badge";
 import { createNotification } from '@/utils/notification-helper';
+import { AvatarWithModal } from "@/components/profile/AvatarWithModal";
+import { ServiceModal } from "@/components/services/ServiceModal";
 
 // Define ServiceType locally since it's not exported from @/types
 interface ServiceType {
@@ -92,6 +94,10 @@ export function Profile() {
   // Add this state for the create post modal
   const [showCreatePostModal, setShowCreatePostModal] = useState(false);
 
+  // Add these state variables in the Profile component
+  const [selectedService, setSelectedService] = useState<ServiceType | null>(null);
+  const [showServiceModal, setShowServiceModal] = useState(false);
+
   useEffect(() => {
     const initializeProfile = async () => {
       setLoading(true);
@@ -107,17 +113,17 @@ export function Profile() {
     initializeProfile();
   }, []);
 
-  const getProfile = async () => {
-    try {
+    const getProfile = async () => {
+      try {
       setLoadingProfile(true);
       const { data: { session } } = await supabase.auth.getSession();
-
+        
       if (!session) {
         navigate('/auth');
           return;
         }
         
-        const { data, error } = await supabase
+      const { data, error } = await supabase
           .from('profiles')
           .select('*')
         .eq('id', session.user.id)
@@ -127,13 +133,19 @@ export function Profile() {
           throw error;
         }
         
+      // Check if onboarding is completed, if not redirect to onboarding
+      if (data && !data.onboarding_completed) {
+        navigate('/onboarding');
+        return;
+      }
+      
       // Update profile state with data
           setProfile(data);
           setUsername(data.username || "");
           setBio(data.bio || "");
           setAboutBusiness(data.about_business || "");
           setAvatarUrl(data.avatar_url || "");
-          setUserRole(data.user_role || "customer");
+      setUserRole(data.user_role || "customer");
       
       setLoadingProfile(false);
       
@@ -188,9 +200,9 @@ export function Profile() {
           user_role: userRole as "customer" | "business"
         })
         .eq('id', profile?.id || '');
-
-      if (error) throw error;
-      
+          
+        if (error) throw error;
+        
       setIsEditingProfile(false);
       toast({
         title: "Profile updated",
@@ -200,7 +212,7 @@ export function Profile() {
       // Refresh profile data
       getProfile();
       window.location.reload();
-    } catch (error) {
+      } catch (error) {
       console.error('Error updating profile:', error);
       toast({
         title: "Update failed",
@@ -280,6 +292,8 @@ export function Profile() {
         price: serviceData.price,
         category: serviceData.category || "Other", // Ensure category has a default
         image: serviceData.image || defaultImageDataURI, // Use data URI as fallback
+        location: serviceData.location || "",
+        duration_minutes: serviceData.duration || 60,
         owner_id: session.user.id
       };
 
@@ -395,11 +409,11 @@ export function Profile() {
         })
         .catch(err => {
           console.error('Failed to copy: ', err);
-          toast({
-            title: "Error",
+        toast({
+          title: "Error",
             description: "Failed to copy link",
-            variant: "destructive",
-          });
+          variant: "destructive",
+        });
         });
     }
   };
@@ -481,9 +495,9 @@ export function Profile() {
   const checkUsernameAvailability = async (username: string) => {
     if (!username || username === profile?.username) {
       setIsUsernameAvailable(null);
-      return;
-    }
-    
+        return;
+      }
+      
     setIsCheckingUsername(true);
     
     try {
@@ -533,7 +547,7 @@ export function Profile() {
       .from('posts')
       .update({ caption: newCaption })
       .eq('id', postId);
-      
+        
       if (error) throw error;
       
       
@@ -860,6 +874,82 @@ export function Profile() {
       });
     }
   };
+  
+  // Add this function to handle service clicks
+  const handleServiceClick = (service: ServiceType) => {
+    navigate(`/services/${service.id}`);
+  };
+
+  // Add a function to update followers count
+  const updateFollowersCount = (count: number) => {
+    if (profile) {
+      // Only update if the count is different to avoid unnecessary re-renders
+      if (profile.followers_count !== count) {
+        setProfile({
+          ...profile,
+          followers_count: count
+        });
+      }
+    }
+  };
+
+  // Add a function to update following count
+  const updateFollowingCount = (count: number) => {
+    if (profile) {
+      // Only update if the count is different to avoid unnecessary re-renders
+      if (profile.following_count !== count) {
+        setProfile({
+          ...profile,
+          following_count: count
+        });
+      }
+    }
+  };
+
+  // Add a function to sync follower and following counts
+  const syncFollowerCounts = async () => {
+    if (!profile?.id) return;
+    
+    try {
+      // Call the resync_follower_counts RPC function
+      const { error } = await supabase.rpc('resync_follower_counts', {
+        user_id: profile.id
+      });
+      
+      if (error) {
+        console.error("Error syncing follower counts:", error);
+        return;
+      }
+      
+      // Refresh the profile data to get the updated counts
+      const { data, error: profileError } = await supabase
+        .from('profiles')
+        .select('followers_count, following_count')
+        .eq('id', profile.id)
+        .single();
+      
+      if (profileError || !data) {
+        console.error("Error fetching updated profile:", profileError);
+        return;
+      }
+      
+      // Update the profile with new counts
+      setProfile({
+        ...profile,
+        followers_count: data.followers_count,
+        following_count: data.following_count
+      });
+    } catch (error) {
+      console.error("Error in syncFollowerCounts:", error);
+    }
+  };
+
+  // Call syncFollowerCounts after profile is loaded
+  useEffect(() => {
+    if (profile?.id) {
+      syncFollowerCounts();
+    }
+  }, [profile?.id]);
 
   if (loading && loadingProfile) {
     return (
@@ -895,29 +985,15 @@ export function Profile() {
             ) : (
               <div className="p-6">
                 <div className="flex flex-col md:flex-row gap-6">
-                  <div className="relative">
-                    <Avatar className="h-24 w-24 border-2 border-white/20">
-                      <AvatarImage src={profile?.avatar_url || undefined} />
-                      <AvatarFallback>{profile?.username?.[0] || 'U'}</AvatarFallback>
-                    </Avatar>
-                    {/* <Button
-                      className="absolute -bottom-2 -right-2 h-8 w-8 rounded-full p-0"
-                      size="sm" 
-                      onClick={() => fileInputRef.current?.click()}
-                    >
-                      <FileImage className="h-4 w-4" />
-                    </Button> */}
-                    <input
-                        type="file" 
-                      ref={fileInputRef}
-                      onChange={handleAvatarChange}
-                      className="hidden"
-                        accept="image/*" 
-                      />
-                  </div>
-                  
-                  <div className="flex-1">
-                    <div className="flex flex-col md:flex-row gap-4 justify-between mb-4">
+                  <AvatarWithModal
+                    size={100}
+                    className="h-full w-full border-2 border-white/20"
+                    avatarUrl={profile?.avatar_url}
+                    username={profile?.username}
+                  />
+              
+              <div className="flex-1">
+                    <div className="flex flex- md:flex-row gap-4 justify-between mb-4">
                       <div>
                         {isEditingProfile ? (
                           <div className="mb-4">
@@ -951,13 +1027,25 @@ export function Profile() {
                           </div>
                         ) : (
                           <>
-                            <h1 className="text-2xl font-bold mb-1">
-                              {profile?.username}
-                            </h1>
+                            {profile?.user_role === 'business' && profile?.business_name ? (
+                              <>
+                                <h1 className="text-2xl font-bold mb-1">
+                                  {profile.business_name}
+                                </h1>
+                                <p className="text-muted-foreground mb-1">@{profile?.username}</p>
+                              </>
+                            ) : (
+                              <>
+                                <h1 className="text-2xl font-bold mb-1">
+                                  {profile?.username}
+                                </h1>
+                                <p className="text-muted-foreground mb-1">@{profile?.username}</p>
+                              </>
+                            )}
                             <p className="text-white/60 mb-3">{profile?.bio}</p>
-                            <Button
-                              variant="outline"
-                              size="sm"
+                            <Button 
+                              variant="outline" 
+                              size="sm" 
                               onClick={() => setIsEditingProfile(true)}
                               className="mb-4"
                             >
@@ -965,8 +1053,8 @@ export function Profile() {
                             </Button>
                           </>
                         )}
-                  </div>
-                  
+                </div>
+                
                       <div>
                         <Button 
                         onClick={handleShareProfile} 
@@ -989,20 +1077,30 @@ export function Profile() {
                         {unreadNotifications > 0 && (
                           <span className="absolute -top-1 -right-1 bg-primary text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
                             {unreadNotifications > 9 ? '9+' : unreadNotifications}
-                          </span>
+                    </span>
                         )}
                       </Button>
-                      </div>
-                    </div>
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        onClick={() => navigate('/settings')}
+                        className="rounded-sm ml-2"
+                        title="Settings"
+                      >
+                        <Settings className="h-4 w-4" />
+                      </Button>
+                  </div>
+                  </div>
+                    
                     
                     <div className="grid grid-cols-3 md:grid-cols-4 gap-4 text-center">
                       <div className="bg-black/20 rounded-lg p-3">
                         <div className="flex items-center justify-center gap-1 mb-1">
                           <FileImage className="h-4 w-4 text-white/60" />
                           <span className="font-semibold">{userPosts.length}</span>
-                        </div>
+                  </div>
                         <p className="text-xs text-white/60">Posts</p>
-                      </div>
+                  </div>
                       
                       <div 
                         className="bg-black/20 rounded-lg p-3 cursor-pointer hover:bg-black/30 transition"
@@ -1013,8 +1111,8 @@ export function Profile() {
                           <span className="font-semibold">{profile?.followers_count || 0}</span>
                         </div>
                         <p className="text-xs text-white/60">Followers</p>
-                      </div>
-                      
+                </div>
+                
                       <div 
                         className="bg-black/20 rounded-lg p-3 cursor-pointer hover:bg-black/30 transition"
                         onClick={() => setShowFollowingModal(true)}
@@ -1022,10 +1120,10 @@ export function Profile() {
                         <div className="flex items-center justify-center gap-1 mb-1">
                           <Users className="h-4 w-4 text-white/60" />
                           <span className="font-semibold">{profile?.following_count || 0}</span>
-                        </div>
+              </div>
                         <p className="text-xs text-white/60">Following</p>
-                      </div>
-                      
+            </div>
+            
                       {profile?.user_role === "business" && (
                         <div 
                           className="bg-black/20 rounded-lg p-3 cursor-pointer hover:bg-black/30 transition"
@@ -1047,8 +1145,8 @@ export function Profile() {
                           <button>
                             <PenLine
                             size="20px"
-                            onClick={() => setIsEditingAboutBusiness(true)}
-                          >
+                  onClick={() => setIsEditingAboutBusiness(true)}
+                >
                             Edit
                           </PenLine>
                           </button>
@@ -1083,7 +1181,7 @@ export function Profile() {
                   >
                     <PlusCircle className="h-4 w-4" />
                     Create Post
-                  </Button>
+                </Button>
                 )}
               </div>
               
@@ -1097,7 +1195,7 @@ export function Profile() {
                         <div className="space-y-2">
                           <Skeleton className="h-4 w-32" />
                           <Skeleton className="h-3 w-24" />
-                        </div>
+            </div>
                       </div>
                       <Skeleton className="h-64 w-full" />
                       <div className="p-4 bg-black/20 space-y-2">
@@ -1122,7 +1220,7 @@ export function Profile() {
                     <Card className="p-8 text-center">
                       <p className="mb-4">You haven't created any posts yet</p>
                       <Button onClick={() => setShowCreatePostModal(true)}>Create Post</Button>
-                    </Card>
+          </Card>
                   </div>
                 )}
               </div>
@@ -1148,7 +1246,11 @@ export function Profile() {
                   ))
                 ) : services.length > 0 ? (
                   services.map((service) => (
-                    <Card key={service.id} className="overflow-hidden">
+                    <Card 
+                      key={service.id} 
+                      className="overflow-hidden cursor-pointer hover:shadow-md transition-shadow"
+                      onClick={() => handleServiceClick(service)}
+                    >
                       <div className="aspect-video bg-black/40 relative">
                         {service.image ? (
                           <img
@@ -1316,18 +1418,20 @@ export function Profile() {
           {/* Modals for followers, following, and reviews */}
           {profile?.id && (
             <>
-              <FollowersModal 
-                userId={profile.id}
+              <FollowersModal
                 isOpen={showFollowersModal}
                 onClose={() => setShowFollowersModal(false)}
-                currentUserId={profile.id}
+                userId={profile?.id || ''}
+                currentUserId={profile?.id || null}
+                onFollowersLoaded={updateFollowersCount}
               />
               
-              <FollowingModal
-                userId={profile.id}
-                isOpen={showFollowingModal}
-                onClose={() => setShowFollowingModal(false)}
-                currentUserId={profile.id}
+              <FollowingModal 
+                isOpen={showFollowingModal} 
+                onClose={() => setShowFollowingModal(false)} 
+                userId={profile?.id || ''}
+                currentUserId={profile?.id || null}
+                onFollowingLoaded={updateFollowingCount}
               />
               
               <ReviewsModal 
@@ -1354,25 +1458,25 @@ export function Profile() {
                 <div className="space-y-2">
                   <Label htmlFor="avatar">Profile Picture</Label>
                   <div className="flex items-center gap-4">
-                    <Avatar className="w-20 h-20">
-                      <AvatarImage src={avatarUrl || ""} alt={username} />
-                      <AvatarFallback>{username?.charAt(0)?.toUpperCase() || "U"}</AvatarFallback>
-                    </Avatar>
-                    <FileUpload
-                      endpoint="profilePicture"
-                      onChange={handleAvatarChange}
-                      className="w-full"
+                    <AvatarWithModal
+                      className="w-20 h-20"
+                      avatarUrl={avatarUrl}
+                      username={username}
                     />
-        </div>
-      </div>
-      
+                    <FileUpload
+                      endpoint="avatarUploader"
+                      onChange={handleAvatarChange} 
+                    />
+                  </div>
+                </div>
+                
                 {/* Username */}
                 <div className="space-y-2">
                   <Label htmlFor="username">Username</Label>
                   <div className="relative">
-                    <Input 
-                      id="username" 
-                      value={username} 
+                  <Input 
+                    id="username" 
+                    value={username} 
                       onChange={handleUsernameChange} 
                       className={`pr-10 ${isUsernameAvailable === false ? 'border-red-500' : ''}`}
                     />
@@ -1485,25 +1589,32 @@ export function Profile() {
               </DialogFooter>
             </DialogContent>
           </Dialog>
-
+          
           {/* Create Post Modal */}
           {profile?.id && (
             <Dialog open={showCreatePostModal} onOpenChange={setShowCreatePostModal}>
               <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-auto">
-                <DialogHeader>
+              <DialogHeader>
                   <DialogTitle>Create Post</DialogTitle>
-                  <DialogDescription>
+                <DialogDescription>
                     Share what's on your mind or upload images.
-                  </DialogDescription>
-                </DialogHeader>
+                </DialogDescription>
+              </DialogHeader>
                 <CreatePost 
                   onSubmit={handleCreatePost}
                 />
-              </DialogContent>
-            </Dialog>
+            </DialogContent>
+          </Dialog>
           )}
+
+          {/* Service Modal */}
+          <ServiceModal
+            service={selectedService}
+            isOpen={showServiceModal}
+            onClose={() => setShowServiceModal(false)}
+          />
+                </div>
         </div>
-    </div>
     </MainLayout>
   );
 }

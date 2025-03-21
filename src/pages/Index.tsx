@@ -6,7 +6,10 @@ import { ServiceCard } from "@/components/ServiceCard";
 import { Footer } from "@/components/Footer";
 import { supabase } from "@/integrations/supabase/client";
 import { Input } from "@/components/ui/input";
-import { toast } from "@/components/ui/use-toast";
+import { useToast } from "@/components/ui/use-toast";
+import { Hero3DModel } from "@/components/Hero3DModel";
+import { ServiceCategoryTabs } from "@/components/ServiceCategoryTabs";
+import { motion } from "framer-motion";
 
 // Define ServiceType locally
 interface ServiceType {
@@ -60,6 +63,7 @@ export default function Index() {
   const [user, setUser] = useState(null);
   const [email, setEmail] = useState("");
   const navigate = useNavigate();
+  const { toast } = useToast();
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data: { user } }) => {
@@ -94,117 +98,197 @@ export default function Index() {
     setEmail("");
   };
 
+  const handleServiceClick = () => {
+    navigate('/auth');
+  };
+
   return (
-    <div className="flex flex-col min-h-screen">
+    <div className="flex flex-col min-h-screen bg-gradient-to-b from-black via-gray-900 to-black">
       <Header />
 
       <main className="flex-1">
-        <section className="py-12 md:py-24 bg-gray-900 text-white relative overflow-hidden">
+        {/* Hero Section with 3D Model */}
+        <section className="py-16 md:py-24 relative overflow-hidden">
           <div className="absolute inset-0 z-0">
-            <img
-              src="https://images.unsplash.com/photo-1521737711867-e3b97375f902?q=80&w=1200"
-              alt="Background"
-              className="w-full h-full object-cover opacity-20"
-            />
+            <div className="absolute inset-0 bg-grid-white/5 bg-grid-16 [mask-image:radial-gradient(ellipse_at_center,white,transparent_70%)]"></div>
           </div>
+          
           <div className="container mx-auto px-4 md:px-8 text-center relative z-10">
-            <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold mb-6">
-              Find Local Services with Ease
-            </h1>
-            <p className="text-lg md:text-xl mb-8 max-w-2xl mx-auto">
-              Discover and connect with trusted service providers in your community.
-            </p>
-            <Link to="/auth">
-              <Button variant="secondary" size="lg" className="font-semibold">
-                Get Started
-              </Button>
-            </Link>
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5 }}
+            >
+              <h1 className="text-4xl md:text-5xl max-md:pt-8 lg:text-6xl font-bold mb-6 bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-purple-600">
+                Find Local Services with Ease
+              </h1>
+              <p className="text-lg md:text-xl mb-8 max-w-2xl mx-auto text-white/80">
+                Discover and connect with trusted service providers in your community.
+              </p>
+              <Link to="/auth">
+                <Button size="lg" className="font-semibold animate-pulse hover:animate-none bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700">
+                  Get Started
+                </Button>
+              </Link>
+            </motion.div>
+            
+            <div className="mt-12">
+              <Hero3DModel />
+            </div>
           </div>
         </section>
 
-        <section className="py-8 md:py-16 mt-8 md:mt-0">
+        {/* Service Categories Section */}
+        <section className="py-16 relative">
           <div className="container mx-auto px-4 md:px-8">
-            <h2 className="text-3xl font-bold mb-8 text-center">Featured Services</h2>
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5, delay: 0.2 }}
+              className="text-center mb-12"
+            >
+              <h2 className="text-3xl font-bold mb-4 text-white">Explore Service Categories</h2>
+              <p className="text-white/70 max-w-2xl mx-auto">
+                Browse through our wide range of service categories to find exactly what you need
+              </p>
+            </motion.div>
+            
+            <ServiceCategoryTabs />
+          </div>
+        </section>
+
+        <section className="py-16 bg-black/50 backdrop-blur-md">
+          <div className="container mx-auto px-4 md:px-8">
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5, delay: 0.3 }}
+              className="text-center mb-12"
+            >
+              <h2 className="text-3xl font-bold mb-4 text-white">Featured Services</h2>
+              <p className="text-white/70 max-w-2xl mx-auto">
+                Check out some of our most popular services that are highly rated by our users
+              </p>
+            </motion.div>
+            
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
               {featuredServices.map((service, index) => (
-                <div key={index} className="bg-white rounded-lg shadow-md overflow-hidden">
-                  <div className="aspect-video relative">
-                    <img
-                      src={service.image}
-                      alt={service.title}
-                      className="absolute inset-0 w-full h-full object-cover"
-                    />
-                  </div>
-                  <div className="p-6">
-                    <h3 className="text-xl font-semibold mb-2">{service.title}</h3>
-                    <p className="text-gray-600 mb-4">{service.description}</p>
-                    <div className="space-y-2">
-                      {service.features.map((feature, idx) => (
-                        <div key={idx} className="flex items-center text-sm text-gray-500">
-                          <span className="w-1.5 h-1.5 bg-primary rounded-full mr-2"></span>
-                          {feature}
-                        </div>
-                      ))}
+                <motion.div
+                  key={index}
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.5, delay: 0.3 + index * 0.1 }}
+                  onClick={handleServiceClick}
+                  whileHover={{ scale: 1.03 }}
+                  whileTap={{ scale: 0.98 }}
+                  className="cursor-pointer"
+                >
+                  <div className="bg-white/5 backdrop-blur-md rounded-lg shadow-lg overflow-hidden hover:bg-white/10 transition-colors">
+                    <div className="aspect-video relative">
+                      <img
+                        src={service.image}
+                        alt={service.title}
+                        className="absolute inset-0 w-full h-full object-cover"
+                      />
+                    </div>
+                    <div className="p-6">
+                      <h3 className="text-xl font-semibold mb-2 text-white">{service.title}</h3>
+                      <p className="text-white/70 mb-4">{service.description}</p>
+                      <div className="space-y-2">
+                        {service.features.map((feature, idx) => (
+                          <div key={idx} className="flex items-center text-sm text-white/60">
+                            <span className="w-1.5 h-1.5 bg-blue-400 rounded-full mr-2"></span>
+                            {feature}
+                          </div>
+                        ))}
+                      </div>
                     </div>
                   </div>
-                </div>
+                </motion.div>
               ))}
             </div>
           </div>
         </section>
 
-        <section className="py-8 md:py-16 bg-gray-700">
+        <section className="py-16 bg-gradient-to-b from-blue-900/30 to-purple-900/30">
           <div className="container mx-auto px-4 md:px-8">
-            <h2 className="text-3xl font-bold mb-12 text-center">Why Choose Us?</h2>
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5, delay: 0.4 }}
+              className="text-center mb-12"
+            >
+              <h2 className="text-3xl font-bold mb-4 text-white">Why Choose Us?</h2>
+              <p className="text-white/70 max-w-2xl mx-auto">
+                Markezon provides a seamless experience for finding and booking services
+              </p>
+            </motion.div>
+            
             <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-              <div className="text-center p-8 bg-white rounded-xl shadow-sm hover:shadow-md transition-shadow">
-                <div className="w-full h-60 mb-6 rounded-md bg-primary/10 flex items-center justify-center overflow-hidden">
-                  <img
-                    src="https://images.unsplash.com/photo-1460925895917-afdab827c52f?q=80&w=800"
-                    alt="Services"
-                    className="w-full h-full object-cover"
-                  />
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.5, delay: 0.5 }}
+                className="text-center p-8 bg-white/5 backdrop-blur-md rounded-xl shadow-lg hover:bg-white/10 transition-colors"
+              >
+                <div className="w-16 h-16 mx-auto mb-6 rounded-full bg-blue-500/20 flex items-center justify-center">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9" />
+                  </svg>
                 </div>
-                <h3 className="text-xl font-semibold mb-3">Wide Range of Services</h3>
-                <p className="text-gray-600">
+                <h3 className="text-xl font-semibold mb-3 text-white">Wide Range of Services</h3>
+                <p className="text-white/70">
                   From home repair to personal care, find everything you need in one place.
                 </p>
-              </div>
-              <div className="text-center p-8 bg-white rounded-xl shadow-sm hover:shadow-md transition-shadow">
-                <div className="w-full h-60 mb-6 rounded-lg bg-primary/10 flex items-center justify-center overflow-hidden">
-                  <img
-                    src="https://images.unsplash.com/photo-1582213782179-e0d53f98f2ca?q=80&w=800"
-                    alt="Trust"
-                    className="w-full h-full object-cover"
-                  />
+              </motion.div>
+              
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.5, delay: 0.6 }}
+                className="text-center p-8 bg-white/5 backdrop-blur-md rounded-xl shadow-lg hover:bg-white/10 transition-colors"
+              >
+                <div className="w-16 h-16 mx-auto mb-6 rounded-full bg-purple-500/20 flex items-center justify-center">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 text-purple-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+                  </svg>
                 </div>
-                <h3 className="text-xl font-semibold mb-3">Trusted Providers</h3>
-                <p className="text-gray-600">
+                <h3 className="text-xl font-semibold mb-3 text-white">Trusted Providers</h3>
+                <p className="text-white/70">
                   We carefully vet our service providers to ensure quality and reliability.
                 </p>
-              </div>
-              <div className="text-center p-8 bg-white rounded-xl shadow-sm hover:shadow-md transition-shadow">
-                <div className="w-full h-60 mb-6 rounded-lg bg-primary/10 flex items-center justify-center overflow-hidden">
-                  <img
-                    src="https://images.unsplash.com/photo-1586880244406-556ebe35f282?q=80&w=800"
-                    alt="Booking"
-                    className="w-full h-full object-cover"
-                  />
+              </motion.div>
+              
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.5, delay: 0.7 }}
+                className="text-center p-8 bg-white/5 backdrop-blur-md rounded-xl shadow-lg hover:bg-white/10 transition-colors"
+              >
+                <div className="w-16 h-16 mx-auto mb-6 rounded-full bg-green-500/20 flex items-center justify-center">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                  </svg>
                 </div>
-                <h3 className="text-xl font-semibold mb-3">Easy Booking</h3>
-                <p className="text-gray-600">
+                <h3 className="text-xl font-semibold mb-3 text-white">Easy Booking</h3>
+                <p className="text-white/70">
                   Our platform makes it simple to book services and manage your appointments.
                 </p>
-              </div>
+              </motion.div>
             </div>
           </div>
         </section>
 
-        <section className="py-12 bg-gray-900 text-white">
+        <section className="py-16 bg-black/60 backdrop-blur-md text-white">
           <div className="container mx-auto px-4 md:px-8">
-            <div className="max-w-2xl mx-auto text-center">
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5, delay: 0.8 }}
+              className="max-w-2xl mx-auto text-center"
+            >
               <h2 className="text-3xl font-bold mb-4">Stay Updated</h2>
-              <p className="text-gray-300 mb-6">
+              <p className="text-white/70 mb-6">
                 Subscribe to our newsletter for the latest services and exclusive offers.
               </p>
               <form onSubmit={handleSubscribe} className="flex flex-col sm:flex-row gap-4 justify-center">
@@ -213,13 +297,16 @@ export default function Index() {
                   placeholder="Enter your email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  className="min-w-[300px] bg-gray-800 border-gray-700 text-white placeholder:text-gray-400"
+                  className="min-w-[300px] bg-white/10 border-white/20 text-white placeholder:text-white/40 focus:border-blue-400"
                 />
-                <Button type="submit" variant="secondary" className="hover:bg-secondary/90">
+                <Button 
+                  type="submit" 
+                  className="bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700"
+                >
                   Subscribe
                 </Button>
               </form>
-            </div>
+            </motion.div>
           </div>
         </section>
       </main>

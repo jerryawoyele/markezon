@@ -1,209 +1,374 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { supabase, supabaseRedirectUrl } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/components/ui/use-toast";
+import { supabase } from "@/integrations/supabase/client";
+import { motion } from "framer-motion";
+
+const GoogleIcon = () => (
+  <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" fill="currentColor">
+    <path d="M12.545,10.239v3.821h5.445c-0.712,2.315-2.647,3.972-5.445,3.972c-3.332,0-6.033-2.701-6.033-6.032s2.701-6.032,6.033-6.032c1.498,0,2.866,0.549,3.921,1.453l2.814-2.814C17.503,2.988,15.139,2,12.545,2C7.021,2,2.543,6.477,2.543,12s4.478,10,10.002,10c8.396,0,10.249-7.85,9.426-11.748L12.545,10.239z"/>
+  </svg>
+);
+
+const GitHubIcon = () => (
+  <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" fill="currentColor">
+    <path d="M12 .297c-6.63 0-12 5.373-12 12 0 5.303 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61C4.422 18.07 3.633 17.7 3.633 17.7c-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23.96-.267 1.98-.399 3-.405 1.02.006 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.42.36.81 1.096.81 2.22 0 1.606-.015 2.896-.015 3.286 0 .315.21.69.825.57C20.565 22.092 24 17.592 24 12.297c0-6.627-5.373-12-12-12"/>
+  </svg>
+);
+
+const TwitterIcon = () => (
+  <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" fill="currentColor">
+    <path d="M23.953 4.57a10 10 0 01-2.825.775 4.958 4.958 0 002.163-2.723c-.951.555-2.005.959-3.127 1.184a4.92 4.92 0 00-8.384 4.482C7.69 8.095 4.067 6.13 1.64 3.162a4.822 4.822 0 00-.666 2.475c0 1.71.87 3.213 2.188 4.096a4.904 4.904 0 01-2.228-.616v.06a4.923 4.923 0 003.946 4.827 4.996 4.996 0 01-2.212.085 4.936 4.936 0 004.604 3.417 9.867 9.867 0 01-6.102 2.105c-.39 0-.779-.023-1.17-.067a13.995 13.995 0 007.557 2.209c9.053 0 13.998-7.496 13.998-13.985 0-.21 0-.42-.015-.63A9.935 9.935 0 0024 4.59z"/>
+  </svg>
+);
 
 export default function Auth() {
-  const [isLoading, setIsLoading] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [isSignUp, setIsSignUp] = useState(false);
+  const [name, setName] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [resetPassword, setResetPassword] = useState(false);
   const navigate = useNavigate();
   const { toast } = useToast();
 
   useEffect(() => {
-    if (!navigator.onLine) {
-      return;
-    }
-
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session) {
-        navigate('/home');
+    const checkUser = async () => {
+      const { data } = await supabase.auth.getUser();
+      if (data.user) {
+        navigate("/home");
       }
-    });
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      if (session) {
-        navigate('/home');
-      }
-    });
-
-    return () => subscription.unsubscribe();
+    };
+    checkUser();
   }, [navigate]);
 
-  const handleGoogleAuth = async (isSigningUp = false) => {
+  const handleSignUp = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    
     try {
-      const { error } = await supabase.auth.signInWithOAuth({
-        provider: 'google',
+      // First validate email format
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(email)) {
+        toast({
+          title: "Invalid email",
+          description: "Please enter a valid email address.",
+          variant: "destructive",
+        });
+        setLoading(false);
+        return;
+      }
+      
+      // Proceed with signup - Supabase will reject if email exists
+      const { error } = await supabase.auth.signUp({
+        email,
+        password,
         options: {
-          redirectTo: supabaseRedirectUrl,
-          queryParams: {
-            access_type: 'offline',
-            prompt: isSigningUp ? 'consent' : 'select_account',
-            app_name: 'Markezon'
-          }
-        }
+          data: {
+            name,
+          },
+        },
       });
       
-      if (error) throw error;
-    } catch (error: Error | unknown) {
+      // Handle specific error for existing user
+      if (error) {
+        if (error.message.includes("already registered") || 
+            error.message.toLowerCase().includes("user already registered") ||
+            error.message.toLowerCase().includes("already in use") ||
+            error.message.toLowerCase().includes("already exists") ||
+            error.status === 400) {
+          toast({
+            title: "Email already in use",
+            description: "This email address is already registered. Please sign in instead.",
+            variant: "destructive",
+          });
+        } else {
+          throw error;
+        }
+        return;
+      }
+      
       toast({
-        variant: "destructive",
-        title: "Error",
-        description: error instanceof Error ? error.message : "An unknown error occurred",
+        title: "Success!",
+        description: "Check your email for the confirmation link.",
       });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
     }
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
-    setIsLoading(true);
-
+    setLoading(true);
+    
     try {
-      const { error } = isSignUp
-        ? await supabase.auth.signUp({
-            email,
-            password,
-            options: {
-              emailRedirectTo: `${window.location.origin}/home`
-            }
-          })
-        : await supabase.auth.signInWithPassword({ email, password });
+      const { error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+      
+      if (error) throw error;
+      navigate("/home");
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handlePasswordReset = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: `${window.location.origin}/reset-password`,
+      });
 
       if (error) throw error;
 
       toast({
-        title: isSignUp ? "Account created!" : "Welcome back!",
-        description: isSignUp
-          ? "Please check your email to verify your account."
-          : "You have successfully logged in.",
+        title: "Success!",
+        description: "Check your email for the password reset link.",
       });
-
-      if (!isSignUp) navigate("/home");
-
-      const checkUserProfile = async (userId: string) => {
-        const { data } = await supabase
-          .from('profiles')
-          .select('user_role, onboarding_completed')
-          .eq('id', userId)
-          .single();
-        
-        if (!data || !data.user_role || !data.onboarding_completed) {
-          navigate('/profile');
-        } else {
-          navigate('/home');
-        }
-      };
-    } catch (error: Error | unknown) {
+      setResetPassword(false);
+    } catch (error) {
       toast({
-        variant: "destructive",
         title: "Error",
-        description: error instanceof Error ? error.message : "An unknown error occurred",
+        description: error.message,
+        variant: "destructive",
       });
     } finally {
-      setIsLoading(false);
+      setLoading(false);
+    }
+  };
+
+  const handleOAuthSignIn = async (provider: 'google' | 'github' | 'twitter') => {
+    try {
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider,
+        options: {
+          redirectTo: `${window.location.origin}/home`,
+        },
+      });
+      
+      if (error) throw error;
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
     }
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-background to-background/95 flex items-center justify-center p-4">
-      <div className="w-full max-w-md space-y-8 glass rounded-2xl p-8">
-        <div className="text-center">
-          <h2 className="text-3xl font-bold">{isSignUp ? "Create Account" : "Welcome Back"}</h2>
-          <p className="mt-2 text-muted-foreground">
-            {isSignUp ? "Sign up to get started" : "Sign in to your account"}
-          </p>
+    <div className="flex flex-col min-h-screen bg-gradient-to-b from-black via-gray-900 to-black">
+      <main className="flex-1 flex items-center justify-center p-4 md:p-8">
+        <div className="absolute inset-0 z-0">
+          <div className="absolute inset-0 bg-grid-white/5 bg-grid-16 [mask-image:radial-gradient(ellipse_at_center,white,transparent_70%)]"></div>
         </div>
 
-        <div className="space-y-6">
-        <div className="flex flex-col gap-3">
-            {!isSignUp && (
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5 }}
+          className="relative z-10 w-full max-w-md"
+        >
+          {resetPassword ? (
+            <Card className="bg-black/40 backdrop-blur-md border border-white/10">
+              <CardHeader>
+                <CardTitle className="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-purple-600">
+                  Reset Password
+                </CardTitle>
+                <CardDescription className="text-white/70">
+                  Enter your email to receive a password reset link
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <form onSubmit={handlePasswordReset} className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="email" className="text-white">Email</Label>
+                    <Input
+                      id="email"
+                      type="email"
+                      placeholder="Enter your email"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      required
+                      className="bg-white/10 border-white/20 text-white placeholder:text-white/40 focus:border-blue-400"
+                    />
+                  </div>
+            <Button 
+                    type="submit" 
+                    className="w-full font-semibold bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700"
+                    disabled={loading}
+                  >
+                    {loading ? "Processing..." : "Send Reset Link"}
+            </Button>
+                </form>
+              </CardContent>
+              <CardFooter className="flex justify-center">
               <Button 
-                type="button" 
-                variant="outline" 
-                className="w-full flex items-center justify-center gap-2"
-                onClick={() => handleGoogleAuth(false)}
-              >
-                <svg viewBox="0 0 24 24" width="24" height="24" xmlns="http://www.w3.org/2000/svg">
-                  <g transform="matrix(1, 0, 0, 1, 27.009001, -39.238998)">
-                    <path fill="#4285F4" d="M -3.264 51.509 C -3.264 50.719 -3.334 49.969 -3.454 49.239 L -14.754 49.239 L -14.754 53.749 L -8.284 53.749 C -8.574 55.229 -9.424 56.479 -10.684 57.329 L -10.684 60.329 L -6.824 60.329 C -4.564 58.239 -3.264 55.159 -3.264 51.509 Z"/>
-                    <path fill="#34A853" d="M -14.754 63.239 C -11.514 63.239 -8.804 62.159 -6.824 60.329 L -10.684 57.329 C -11.764 58.049 -13.134 58.489 -14.754 58.489 C -17.884 58.489 -20.534 56.379 -21.484 53.529 L -25.464 53.529 L -25.464 56.619 C -23.494 60.539 -19.444 63.239 -14.754 63.239 Z"/>
-                    <path fill="#FBBC05" d="M -21.484 53.529 C -21.734 52.809 -21.864 52.039 -21.864 51.239 C -21.864 50.439 -21.724 49.669 -21.484 48.949 L -21.484 45.859 L -25.464 45.859 C -26.284 47.479 -26.754 49.299 -26.754 51.239 C -26.754 53.179 -26.284 54.999 -25.464 56.619 L -21.484 53.529 Z"/>
-                    <path fill="#EA4335" d="M -14.754 43.989 C -12.984 43.989 -11.404 44.599 -10.154 45.789 L -6.734 42.369 C -8.804 40.429 -11.514 39.239 -14.754 39.239 C -19.444 39.239 -23.494 41.939 -25.464 45.859 L -21.484 48.949 C -20.534 46.099 -17.884 43.989 -14.754 43.989 Z"/>
-                  </g>
-                </svg>
-                Sign in with Google
+                  variant="link" 
+                  onClick={() => setResetPassword(false)}
+                  className="text-blue-400 hover:text-blue-300"
+                >
+                  Back to login
               </Button>
-            )}
-          </div>
-          <div className="flex flex-col gap-3">
-            {isSignUp && (
-              <Button 
-                type="button" 
-                variant="outline" 
-                className="w-full flex items-center justify-center gap-2"
-                onClick={() => handleGoogleAuth(true)}
-              >
-                <svg viewBox="0 0 24 24" width="24" height="24" xmlns="http://www.w3.org/2000/svg">
-                  <g transform="matrix(1, 0, 0, 1, 27.009001, -39.238998)">
-                    <path fill="#4285F4" d="M -3.264 51.509 C -3.264 50.719 -3.334 49.969 -3.454 49.239 L -14.754 49.239 L -14.754 53.749 L -8.284 53.749 C -8.574 55.229 -9.424 56.479 -10.684 57.329 L -10.684 60.329 L -6.824 60.329 C -4.564 58.239 -3.264 55.159 -3.264 51.509 Z"/>
-                    <path fill="#34A853" d="M -14.754 63.239 C -11.514 63.239 -8.804 62.159 -6.824 60.329 L -10.684 57.329 C -11.764 58.049 -13.134 58.489 -14.754 58.489 C -17.884 58.489 -20.534 56.379 -21.484 53.529 L -25.464 53.529 L -25.464 56.619 C -23.494 60.539 -19.444 63.239 -14.754 63.239 Z"/>
-                    <path fill="#FBBC05" d="M -21.484 53.529 C -21.734 52.809 -21.864 52.039 -21.864 51.239 C -21.864 50.439 -21.724 49.669 -21.484 48.949 L -21.484 45.859 L -25.464 45.859 C -26.284 47.479 -26.754 49.299 -26.754 51.239 C -26.754 53.179 -26.284 54.999 -25.464 56.619 L -21.484 53.529 Z"/>
-                    <path fill="#EA4335" d="M -14.754 43.989 C -12.984 43.989 -11.404 44.599 -10.154 45.789 L -6.734 42.369 C -8.804 40.429 -11.514 39.239 -14.754 39.239 C -19.444 39.239 -23.494 41.939 -25.464 45.859 L -21.484 48.949 C -20.534 46.099 -17.884 43.989 -14.754 43.989 Z"/>
-                  </g>
-                </svg>
-                Sign up with Google
-              </Button>
-            )}
-          </div>
-
-          <div className="relative">
-            <div className="absolute inset-0 flex items-center">
-              <span className="w-full border-t border-white/10" />
+              </CardFooter>
+            </Card>
+          ) : (
+            <Card className="bg-black/40 backdrop-blur-md border border-white/10">
+              <CardHeader>
+                <CardTitle className="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-purple-600">
+                  Welcome to Markezon
+                </CardTitle>
+                <CardDescription className="text-white/70">
+                  Sign in or create an account to continue
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <Tabs defaultValue="login" className="w-full">
+                  <TabsList className="grid w-full grid-cols-2 bg-white/10">
+                    <TabsTrigger value="login" className="text-white data-[state=active]:bg-white/10">Login</TabsTrigger>
+                    <TabsTrigger value="register" className="text-white data-[state=active]:bg-white/10">Register</TabsTrigger>
+                  </TabsList>
+                  
+                  <TabsContent value="login" className="mt-4">
+                    <form onSubmit={handleSignIn} className="space-y-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="login-email" className="text-white">Email</Label>
+                        <Input
+                          id="login-email"
+                          type="email"
+                          placeholder="Enter your email"
+                          value={email}
+                          onChange={(e) => setEmail(e.target.value)}
+                          required
+                          className="bg-white/10 border-white/20 text-white placeholder:text-white/40 focus:border-blue-400"
+                        />
             </div>
-            <div className="relative flex justify-center text-xs uppercase">
-              <span className="bg-background px-2 text-muted-foreground">
-                Or continue with email
-              </span>
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between">
+                          <Label htmlFor="login-password" className="text-white">Password</Label>
+                          <Button 
+                            variant="link" 
+                            onClick={() => setResetPassword(true)}
+                            className="p-0 h-auto text-sm text-blue-400 hover:text-blue-300"
+                          >
+                            Forgot password?
+                          </Button>
             </div>
+                        <Input
+                          id="login-password"
+                          type="password"
+                          placeholder="Enter your password"
+                          value={password}
+                          onChange={(e) => setPassword(e.target.value)}
+                          required
+                          className="bg-white/10 border-white/20 text-white placeholder:text-white/40 focus:border-blue-400"
+                        />
           </div>
-
-          <form onSubmit={handleSubmit} className="space-y-4">
+                      <Button 
+                        type="submit" 
+                        className="w-full font-semibold bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700"
+                        disabled={loading}
+                      >
+                        {loading ? "Signing in..." : "Sign In"}
+                      </Button>
+                    </form>
+                  </TabsContent>
+                  
+                  <TabsContent value="register" className="mt-4">
+                    <form onSubmit={handleSignUp} className="space-y-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="register-name" className="text-white">Full Name</Label>
+                        <Input
+                          id="register-name"
+                          type="text"
+                          placeholder="Enter your name"
+                          value={name}
+                          onChange={(e) => setName(e.target.value)}
+                          required
+                          className="bg-white/10 border-white/20 text-white placeholder:text-white/40 focus:border-blue-400"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="register-email" className="text-white">Email</Label>
             <Input
+                          id="register-email"
               type="email"
-              placeholder="Email"
+                          placeholder="Enter your email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
-              className="bg-white/5 border-white/10"
+                          className="bg-white/10 border-white/20 text-white placeholder:text-white/40 focus:border-blue-400"
             />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="register-password" className="text-white">Password</Label>
             <Input
+                          id="register-password"
               type="password"
-              placeholder="Password"
+                          placeholder="Create a password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
-              className="bg-white/5 border-white/10"
-            />
-
-            <Button type="submit" className="w-full" disabled={isLoading}>
-              {isLoading ? "Loading..." : isSignUp ? "Sign Up" : "Sign In"}
+                          className="bg-white/10 border-white/20 text-white placeholder:text-white/40 focus:border-blue-400"
+                        />
+                      </div>
+                      <Button 
+                        type="submit" 
+                        className="w-full font-semibold bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700"
+                        disabled={loading}
+                      >
+                        {loading ? "Creating account..." : "Create Account"}
             </Button>
           </form>
-
-          <div className="text-center">
+                  </TabsContent>
+                </Tabs>
+                
+                <div className="mt-6">
+                  <div className="relative">
+                    <div className="absolute inset-0 flex items-center">
+                      <div className="w-full border-t border-white/10"></div>
+                    </div>
+                    <div className="relative flex justify-center text-xs">
+                      <span className="px-2 bg-black/40 text-white/60">Or continue with</span>
+                    </div>
+                  </div>
+                  
+                  <div className="flex justify-center mt-4">
             <Button
-              variant="link"
-              className="text-white/60 hover:text-white"
-              onClick={() => setIsSignUp(!isSignUp)}
-            >
-              {isSignUp ? "Already have an account? Sign in" : "Need an account? Sign up"}
+                      variant="outline" 
+                      onClick={() => handleOAuthSignIn('google')}
+                      className="bg-white/5 border-white/10 text-white hover:bg-white/10 px-8"
+                    >
+                      <GoogleIcon />
+                      <span className="ml-2">Google</span>
             </Button>
           </div>
         </div>
-      </div>
+              </CardContent>
+            </Card>
+          )}
+        </motion.div>
+      </main>
     </div>
   );
 }

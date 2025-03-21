@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { 
   Dialog, 
@@ -6,9 +5,11 @@ import {
   DialogHeader, 
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Avatar } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
+import ProfileImage from "@/components/ProfileImage";
+import { User } from "lucide-react";
 
 interface LikesModalProps {
   open: boolean;
@@ -39,37 +40,36 @@ export function LikesModal({ open, onOpenChange, postId }: LikesModalProps) {
   }, [open, postId]);
 
   const fetchLikes = async () => {
+    if (!postId) {
+      console.log('Skipping fetch because post ID is undefined');
+      setLikes([]);
+      setLoading(false);
+      return;
+    }
+    
     try {
       setLoading(true);
       
-      // Mock likes data for now
-      // In a real app, you would fetch from your database
-      const mockLikes: Like[] = [
-        {
-          id: "1",
-          user_id: "user-1",
-          post_id: postId,
-          created_at: new Date().toISOString(),
-          profiles: {
-            username: "jane_doe",
-            avatar_url: "https://source.unsplash.com/100x100/?portrait"
-          }
-        },
-        {
-          id: "2",
-          user_id: "user-2",
-          post_id: postId,
-          created_at: new Date().toISOString(),
-          profiles: {
-            username: "john_smith",
-            avatar_url: "https://source.unsplash.com/100x100/?face"
-          }
-        }
-      ];
+      const { data, error } = await supabase
+        .from('likes')
+        .select(`
+          id,
+          user_id,
+          post_id,
+          created_at,
+          profiles:profiles(
+            username,
+            avatar_url
+          )
+        `)
+        .eq('post_id', postId);
       
-      setLikes(mockLikes);
+      if (error) throw error;
+      
+      setLikes(data || []);
     } catch (error) {
       console.error("Error fetching likes:", error);
+      setLikes([]);
     } finally {
       setLoading(false);
     }
@@ -105,14 +105,14 @@ export function LikesModal({ open, onOpenChange, postId }: LikesModalProps) {
                   className="flex items-center gap-3 w-full text-left hover:bg-white/5 p-2 rounded-md transition-colors"
                   onClick={() => handleUserClick(like.user_id)}
                 >
-                  <Avatar>
-                    <img 
-                      src={like.profiles.avatar_url || "https://source.unsplash.com/100x100/?portrait"} 
-                      alt={like.profiles.username || "User"}
-                      className="w-full h-full object-cover" 
+                <Avatar className="w-10 h-10">
+                    <ProfileImage 
+                      src={like.profiles?.avatar_url || null} 
+                      alt={like.profiles?.username || "User"}
+                      className="w-full h-full rounded-full object-cover"
                     />
                   </Avatar>
-                  <span className="font-medium">{like.profiles.username || "Anonymous"}</span>
+                  <span className="font-medium">{like.profiles?.username || "Anonymous"}</span>
                 </button>
               ))}
             </div>

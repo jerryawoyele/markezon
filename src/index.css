@@ -6,7 +6,7 @@
 
 @layer base {
   :root {
-    --background: 240 10% 7.5%; /* Lighter black for app background */
+    --background: 240 10% 10%; /* Lighter black for app background */
     --foreground: 0 0% 98%;
     --card: 240 10% 3.9%; /* Keep cards dark */
     --card-foreground: 0 0% 98%;

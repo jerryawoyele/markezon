@@ -145,8 +145,11 @@ export default function Auth() {
         password,
       });
 
-      if (error) throw error;
-      navigate("/home");
+      if (error) {
+        throw error
+      }else{
+        navigate("/home");
+      };
     } catch (error) {
       toast({
         title: "Error",
@@ -192,7 +195,7 @@ export default function Auth() {
       const { error } = await supabase.auth.signInWithOAuth({
         provider,
         options: {
-          redirectTo: `${window.location.origin}/home`,
+          redirectTo: `${window.location.origin}/auth/callback`,
         },
       });
 

@@ -812,7 +812,7 @@ export function Post({
                       <img 
                         src={image} 
                         alt={caption || `Post image ${index + 1}`}
-                        className="absolute top-0 left-0 w-full h-full object-contain bg-black"
+                        className="absolute top-0 left-0 w-full h-full object-fill bg-black"
                         onError={(e) => {
                           (e.target as HTMLImageElement).src = 'https://source.unsplash.com/800x600/?abstract';
                         }}

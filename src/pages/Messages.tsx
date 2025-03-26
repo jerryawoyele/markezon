@@ -736,7 +736,7 @@ export default function Messages() {
             {selectedConversation ? (
               <>
                 {/* Fixed header on mobile */}
-                <div className="p-2 border-b border-white/10 flex items-center gap-1 fixed top-0 z-10 bg-background">
+                <div className="p-2 border-b border-white/10 flex items-center gap-1 w-full fixed top-0 z-10 bg-background">
                         <Button 
                           variant="ghost" 
                           size="icon" 
@@ -766,7 +766,7 @@ export default function Messages() {
                 </div>
                 
                 {/* Message content area with padding to accommodate fixed elements */}
-                <div className="flex-1 overflow-y-auto p-4 space-y-4 pb-24 md:pb-4">
+                <div className="flex-1 overflow-y-auto p-4 space-y-4 pt-12 pb-20 md:pb-2">
                   {messageGroups.length > 0 ? (
                     messageGroups.map((group) => (
                       <div key={group.date} className="space-y-4">

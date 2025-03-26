@@ -324,7 +324,7 @@ export default function Discover() {
       {initialLoading ? (
         // Page-specific loading screen
         <div className="flex-1 min-h-screen flex flex-col">
-          <div className="max-w-7xl mx-auto w-full flex-1 pt-4 pb-20 px-4">
+          <div className="max-w-7xl mx-auto w-full flex-1 pt-4 pb-20">
             <div className="flex flex-col gap-6">
               <div className="flex-1 flex flex-col gap-6">
                 {/* Search skeleton */}

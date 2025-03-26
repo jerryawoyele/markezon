@@ -197,7 +197,7 @@ export function ReviewsModal({ isOpen, onClose, userId, currentUserId }: Reviews
                         )}
                       </Avatar>
                       <div>
-                        <h4 className="text-sm font-medium truncate">{review.reviewer?.username || "Anonymous"}</h4>
+                        <h4 className="text-sm font-medium truncate w-[80px]">{review.reviewer?.username || "Anonymous"}</h4>
                       </div>
                     </div>
                     

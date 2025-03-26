@@ -751,7 +751,7 @@ export function Post({
                   className="font-medium text-sm cursor-pointer hover:underline truncate max-w-[200px]" 
                   onClick={handleProfileClick}
                 >
-                  {"@" + (profiles?.username || 
+                  {(profiles?.username || 
                     profiles?.auth_metadata?.name || 
                     "user")}
                 </h3>

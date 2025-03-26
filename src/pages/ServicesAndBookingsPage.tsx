@@ -932,7 +932,7 @@ export default function ServicesAndBookingsPage() {
 
   return (
     <MainLayout activeTab={activeTab} setActiveTab={setActiveTab} userRole={userRole} isAuthenticated={isAuthenticated}>
-      <div className="container py-8">
+      <div>
         {pageType === "services" ? renderServicesContent() : renderBookingsContent()}
       </div>
     </MainLayout>

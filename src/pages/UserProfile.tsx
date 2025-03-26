@@ -883,7 +883,7 @@ export function UserProfile() {
       isAuthenticated={isAuthenticated}
     >
       <div className="min-h-screen bg-background">
-        <div className="container mx-auto max-w-7xl py-8 px-4">
+        <div>
           {/* Profile header with skeleton loader */}
           <Card className="rounded-lg overflow-hidden mb-8">
             {loadingProfile ? (

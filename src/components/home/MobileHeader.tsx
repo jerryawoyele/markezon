@@ -65,7 +65,7 @@ export function MobileHeader({ onSearch }: MobileHeaderProps) {
   };
 
   return (
-    <div className="flex items-center justify-between bg-black/80 backdrop-blur-md border-b border-white/10 p-4 lg:hidden fixed top-0 left-0 right-0 z-50">
+    <div className="flex flex-row justify-between bg-black/80 backdrop-blur-md border-b border-white/10 p-4 lg:hidden fixed top-0 left-0 right-0 z-50">
       <h1 
         className="text-xl font-bold bg-gradient-to-r from-purple-500 to-blue-500 bg-clip-text text-transparent cursor-pointer"
         onClick={() => navigate('/home')}
@@ -76,7 +76,7 @@ export function MobileHeader({ onSearch }: MobileHeaderProps) {
         <div className="relative">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-white/40 w-4 h-4" />
           <Input
-            placeholder="Search services..."
+            placeholder="Search..."
             className="pl-9 max-lg:w-[150px] pr-8 bg-white/5 border-white/10 focus:border-white/30 transition-colors"
             value={searchQuery}
             onChange={handleChange}

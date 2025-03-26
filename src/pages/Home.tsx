@@ -502,7 +502,7 @@ export default function Home() {
                 <Skeleton className="w-full h-32 rounded-lg" />
                 
                 {Array(3).fill(0).map((_, i) => (
-                  <div key={i} className="w-full rounded-lg overflow-hidden">
+                  <div key={i} className="w-full pb-6 rounded-lg overflow-hidden">
                     <div className="p-4 bg-black/20 flex items-center gap-3">
                       <Skeleton className="h-10 w-10 rounded-full" />
                       <div className="space-y-2">
@@ -532,18 +532,6 @@ export default function Home() {
             <MobileHeader />
             <CreatePost onSubmit={handlePostSubmit} className="mx-0 lg:mx-0" />
                 
-              {/* //Refresh posts button
-              <div className="flex justify-center">
-                <Button 
-                  variant="ghost" 
-                  size="sm" 
-                  onClick={refreshPosts}
-                  className="mb-2 text-primary/70 hover:text-secondary"
-                >
-                  <RefreshCw className="h-4 w-4 mr-2" />
-                  Refresh Feed
-                </Button>
-              </div> */}
               
               {/* Followed users posts section */}
               {loadingPosts ? (

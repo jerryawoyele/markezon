@@ -138,7 +138,7 @@ export function CreatePost({ onSubmit, className = "" }: CreatePostProps) {
             className="w-10 h-10 rounded-full"
           />
           <button
-            className="flex-1 bg-white/5 hover:bg-white/10 rounded-full px-4 py-3 text-left text-white/60 cursor-pointer"
+            className="flex-1 bg-white/5 hover:bg-white/10 rounded-md px-4 py-3 text-left text-white/60 cursor-pointer"
             onClick={() => setOpen(true)}
           >
             What's happening in your business?

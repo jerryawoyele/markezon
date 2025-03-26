@@ -90,6 +90,7 @@ export default function Messages() {
   const [editMessageId, setEditMessageId] = useState<string | null>(null);
   const [editMessageContent, setEditMessageContent] = useState("");
   const [userRole, setUserRole] = useState<"business" | "customer" | null>(null);
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
 
   // Client-side read status tracking to work around RLS policy restrictions
   const [readStatusMap, setReadStatusMap] = useState<Record<string, boolean>>({});
@@ -167,6 +168,12 @@ export default function Messages() {
     
     initializeUser();
   }, [navigate]);
+
+  useEffect(() => {
+    const handleResize = () => setIsMobile(window.innerWidth < 768);
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
 
   // Load conversations with client-side read status
   async function loadConversations(userId: string) {
@@ -644,7 +651,7 @@ export default function Messages() {
 
   return (
     <div className="lg:ml-64 min-h-screen overflow-x-hidden">
-      <div className={`${selectedConversation && window.innerWidth < 768 ? 'hidden md-flex':''}`}>
+       <div className={`${selectedConversation && isMobile ? "hidden md:flex" : ""}`}>
         <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} userRole={userRole} />
         </div>
       <div className="flex flex-col h-screen md:pt-0">

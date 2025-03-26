@@ -107,7 +107,7 @@ export function Sidebar({
   const handleLogout = async () => {
     await supabase.auth.signOut();
     setShowLogoutConfirm(false);
-    navigate("/auth");
+    navigate("/");
   };
   
   const handleLoginClick = () => {

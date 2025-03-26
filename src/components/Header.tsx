@@ -103,7 +103,7 @@ export function Header() {
               >
                 <Link to="/auth">
                   <Button 
-                    className="font-medium bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white border-none"
+                    className="font-medium bg-white/80  border-none"
                   >
                     Sign In
                   </Button>

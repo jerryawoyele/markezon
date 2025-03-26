@@ -126,7 +126,7 @@ export default function Index() {
                 Discover and connect with trusted service providers in your community.
               </p>
               <Link to="/auth">
-                <Button size="lg" className="font-semibold animate-pulse hover:animate-none bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700">
+                <Button size="lg" className="font-semibold animate-none bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700">
                   Get Started
                 </Button>
               </Link>

@@ -992,7 +992,7 @@ export function Profile() {
         title: "Logged out",
         description: "You have been successfully logged out",
       });
-      navigate('/auth');
+      navigate('/');
     } catch (error) {
       console.error('Error logging out:', error);
       toast({

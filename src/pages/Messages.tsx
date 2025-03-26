@@ -736,7 +736,7 @@ export default function Messages() {
             {selectedConversation ? (
               <>
                 {/* Fixed header on mobile */}
-                <div className="p-2 border-b border-white/10 flex items-center gap-1 sticky top-0 z-10 bg-background">
+                <div className="p-2 border-b border-white/10 flex items-center gap-1 fixed top-0 z-10 bg-background">
                         <Button 
                           variant="ghost" 
                           size="icon" 

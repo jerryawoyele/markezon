@@ -530,164 +530,165 @@ export default function Home() {
         <div className="flex flex-col md:flex-row gap-6">
           <div className="flex-1 flex flex-col">
             <MobileHeader />
-            <CreatePost onSubmit={handlePostSubmit} className="mx-0 lg:mx-0" />
+            <div className="mb-5">
+              <CreatePost onSubmit={handlePostSubmit} className="mx-0 lg:mx-0" />
+            </div>
                 
-              
-              {/* Followed users posts section */}
-              {loadingPosts ? (
-                <div className="space-y-4">
-                  {Array(2).fill(0).map((_, i) => (
-                    <div key={i} className="w-full rounded-lg overflow-hidden">
-                      <div className="p-4 bg-black/20 flex items-center gap-3">
-                        <Skeleton className="h-10 w-10 rounded-full" />
-                        <div className="space-y-2">
-                          <Skeleton className="h-4 w-32" />
-                          <Skeleton className="h-3 w-24" />
-                        </div>
-                      </div>
-                      <Skeleton className="h-48 w-full" />
-                      <div className="p-4 bg-black/20 space-y-2">
-                        <Skeleton className="h-4 w-3/4" />
-                        <Skeleton className="h-4 w-1/2" />
+            {/* Followed users posts section */}
+            {loadingPosts ? (
+              <div className="space-y-4">
+                {Array(2).fill(0).map((_, i) => (
+                  <div key={i} className="w-full rounded-lg overflow-hidden">
+                    <div className="p-4 bg-black/20 flex items-center gap-3">
+                      <Skeleton className="h-10 w-10 rounded-full" />
+                      <div className="space-y-2">
+                        <Skeleton className="h-4 w-32" />
+                        <Skeleton className="h-3 w-24" />
                       </div>
                     </div>
-                  ))}
-                </div>
-              ) : posts.length > 0 ? (
-                <div className="space-y-6">
-                  {/* <div className="bg-black/10 p-2 rounded-md text-center text-sm text-white/80">
-                    Posts from users you follow
-                  </div> */}
-                  
-            {posts.map((post) => (
-              <Post
-                key={post.id}
-                {...post}
-                      profiles={post.profiles}
-                      currentUserId={async () => user?.id} 
-                    />
-                  ))}
-                  
-                  {/* Load more button for followed posts */}
-                  {hasMorePosts && (
-                    <div className="flex justify-center mt-2">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={loadMorePosts}
-                        disabled={loadingMore}
-                        className="opacity-80 hover:opacity-100"
-                      >
-                        {loadingMore ? (
-                          <>
-                            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                            Loading...
-                          </>
-                        ) : (
-                          "Load more posts"
-                        )}
-                      </Button>
+                    <Skeleton className="h-48 w-full" />
+                    <div className="p-4 bg-black/20 space-y-2">
+                      <Skeleton className="h-4 w-3/4" />
+                      <Skeleton className="h-4 w-1/2" />
                     </div>
-                  )}
-                  
-                  {allRecentPostsViewed && (
-                    <Card className="p-6 text-center">
-                      <p className="text-sm mb-2 text-white/70">
-                        You've viewed all recent posts from users you follow
-                      </p>
-                    </Card>
-                  )}
+                  </div>
+                ))}
+              </div>
+            ) : posts.length > 0 ? (
+              <div className="space-y-6">
+                {/* <div className="bg-black/10 p-2 rounded-md text-center text-sm text-white/80">
+                  Posts from users you follow
+                </div> */}
+                
+                {posts.map((post) => (
+                  <Post
+                    key={post.id}
+                    {...post}
+                    profiles={post.profiles}
+                    currentUserId={async () => user?.id} 
+                  />
+                ))}
+                
+                {/* Load more button for followed posts */}
+                {hasMorePosts && (
+                  <div className="flex justify-center mt-2">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={loadMorePosts}
+                      disabled={loadingMore}
+                      className="opacity-80 hover:opacity-100"
+                    >
+                      {loadingMore ? (
+                        <>
+                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                          Loading...
+                        </>
+                      ) : (
+                        "Load more posts"
+                      )}
+                    </Button>
+                  </div>
+                )}
+                
+                {allRecentPostsViewed && (
+                  <Card className="p-6 text-center">
+                    <p className="text-sm mb-2 text-white/70">
+                      You've viewed all recent posts from users you follow
+                    </p>
+                  </Card>
+                )}
+              </div>
+            ) : followedUserIds.length > 0 ? (
+              <Card className="p-6 text-center">
+                <p className="text-lg font-semibold mb-2">No posts yet from users you follow</p>
+                <p className="text-sm mb-4 text-white/70">
+                  Users you follow haven't posted anything yet. Follow more users or create your own posts.
+                </p>
+                <div className="flex justify-center gap-3">
+                  <Button onClick={() => navigate('/discover')} variant="outline" size="sm">
+                    Discover Users
+                  </Button>
+                  <Button onClick={() => setActiveTab("Create")} size="sm">
+                    Create Post
+                  </Button>
                 </div>
-              ) : followedUserIds.length > 0 ? (
-                <Card className="p-6 text-center">
-                  <p className="text-lg font-semibold mb-2">No posts yet from users you follow</p>
-                  <p className="text-sm mb-4 text-white/70">
-                    Users you follow haven't posted anything yet. Follow more users or create your own posts.
-                  </p>
-                  <div className="flex justify-center gap-3">
-                    <Button onClick={() => navigate('/discover')} variant="outline" size="sm">
-                      Discover Users
-                    </Button>
-                    <Button onClick={() => setActiveTab("Create")} size="sm">
-                      Create Post
-                    </Button>
-                  </div>
-                </Card>
-              ) : (
-                <Card className="p-6 text-center">
-                  <p className="text-lg font-semibold mb-2">Your feed is empty</p>
-                  <p className="text-sm mb-4 text-white/70">
-                    Follow users to see their posts in your feed or create your own posts.
-                  </p>
-                  <div className="flex justify-center gap-3">
-                    <Button onClick={() => navigate('/discover')} variant="outline" size="sm">
-                      Discover Users
-                    </Button>
-                    <Button onClick={() => setActiveTab("Create")} size="sm">
-                      Create Post
-                    </Button>
-                  </div>
-                </Card>
-              )}
-              
-              {/* Random posts section */}
-              {(followedUserIds.length === 0 || !hasFollowedPosts || randomPosts.length > 0) && (
-                <div className="mt-8 space-y-6">
-                  <div className="border-b border-white/10 pb-2 mb-6"></div>
-                  
-                  <div className="bg-black/10 p-2 rounded-md text-center text-sm text-white/80">
-                    Discover more posts
-                  </div>
-                  
-                  {loadingRandomPosts && randomPosts.length === 0 ? (
-                    <div className="space-y-4">
-                      {Array(2).fill(0).map((_, i) => (
-                        <div key={i} className="w-full rounded-lg overflow-hidden">
-                          <div className="p-4 bg-black/20 flex items-center gap-3">
-                            <Skeleton className="h-10 w-10 rounded-full" />
-                            <div className="space-y-2">
-                              <Skeleton className="h-4 w-32" />
-                              <Skeleton className="h-3 w-24" />
-                            </div>
-                          </div>
-                          <Skeleton className="h-48 w-full" />
-                          <div className="p-4 bg-black/20 space-y-2">
-                            <Skeleton className="h-4 w-3/4" />
-                            <Skeleton className="h-4 w-1/2" />
+              </Card>
+            ) : (
+              <Card className="p-6 text-center">
+                <p className="text-lg font-semibold mb-2">Your feed is empty</p>
+                <p className="text-sm mb-4 text-white/70">
+                  Follow users to see their posts in your feed or create your own posts.
+                </p>
+                <div className="flex justify-center gap-3">
+                  <Button onClick={() => navigate('/discover')} variant="outline" size="sm">
+                    Discover Users
+                  </Button>
+                  <Button onClick={() => setActiveTab("Create")} size="sm">
+                    Create Post
+                  </Button>
+                </div>
+              </Card>
+            )}
+            
+            {/* Random posts section */}
+            {(followedUserIds.length === 0 || !hasFollowedPosts || randomPosts.length > 0) && (
+              <div className="mt-8 space-y-6">
+                <div className="border-b border-white/10 pb-2 mb-6"></div>
+                
+                <div className="bg-black/10 p-2 rounded-md text-center text-sm text-white/80">
+                  Discover more posts
+                </div>
+                
+                {loadingRandomPosts && randomPosts.length === 0 ? (
+                  <div className="space-y-4">
+                    {Array(2).fill(0).map((_, i) => (
+                      <div key={i} className="w-full rounded-lg overflow-hidden">
+                        <div className="p-4 bg-black/20 flex items-center gap-3">
+                          <Skeleton className="h-10 w-10 rounded-full" />
+                          <div className="space-y-2">
+                            <Skeleton className="h-4 w-32" />
+                            <Skeleton className="h-3 w-24" />
                           </div>
                         </div>
-                      ))}
-                    </div>
-                  ) : randomPosts.length > 0 ? (
-                    <>
-                      {randomPosts.map((post) => (
-                        <Post 
-                          key={post.id}
-                          {...post}
-                          profiles={post.profiles}
-                          currentUserId={async () => user?.id} 
-              />
-            ))}
-                    </>
-                  ) : (
-                    <Card className="p-6 text-center">
-                      <p className="text-sm mb-2 text-white/70">
-                        No additional posts to display at this time
-                      </p>
-                    </Card>
-                  )}
-                </div>
-              )}
+                        <Skeleton className="h-48 w-full" />
+                        <div className="p-4 bg-black/20 space-y-2">
+                          <Skeleton className="h-4 w-3/4" />
+                          <Skeleton className="h-4 w-1/2" />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : randomPosts.length > 0 ? (
+                  <>
+                    {randomPosts.map((post) => (
+                      <Post 
+                        key={post.id}
+                        {...post}
+                        profiles={post.profiles}
+                        currentUserId={async () => user?.id} 
+                  />
+                ))}
+                  </>
+                ) : (
+                  <Card className="p-6 text-center">
+                    <p className="text-sm mb-2 text-white/70">
+                      No additional posts to display at this time
+                    </p>
+                  </Card>
+                )}
+              </div>
+            )}
           </div>
           
-            <div className="hidden lg:block w-80">
-              <div className="sticky top-14">
-            <TrendingServices />
+          <div className="hidden lg:block w-80">
+            <div className="sticky top-14">
+              <TrendingServices />
+            </div>
           </div>
         </div>
       </div>
-    </div>
-      )}
+    )}
     </MainLayout>
   );
 }

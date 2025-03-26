@@ -130,7 +130,7 @@ export function CreatePost({ onSubmit, className = "" }: CreatePostProps) {
 
   return (
     <>
-      <Card className={`p-6 bg-black/20 border-white/5 ${className}`}>
+      <Card className={`p-6 bg-black/60 border-white/5 ${className}`}>
         <div className="flex items-center gap-3">
           <ProfileImage 
             src={userProfile?.avatar_url || user?.user_metadata?.avatar_url}

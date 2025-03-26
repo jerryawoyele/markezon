@@ -123,20 +123,20 @@ export function Sidebar({
 
   // Mobile Bottom Navigation
   const mobileNav = (
-    <nav className="fixed bottom-0 left-0 w-full bg-background border-t border-white/10 px-2 py-3 lg:hidden z-50">
-      <ul className="flex justify-around">
+    <nav className="fixed bottom-0 left-0 right-0 w-full bg-background border-t border-white/10 px-2 py-3 lg:hidden z-50">
+      <ul className="flex justify-around max-w-screen-xl mx-auto">
         {navItems.map((item) => (
           <li key={item.label}>
             <Button
               variant="ghost"
               className={cn(
-                "flex flex-col items-center p-2",
-                activeTab === item.label && "bg-primary text-white"
+                "flex flex-col items-center justify-center p-2",
+                activeTab === item.label && "bg-primary/10 text-primary"
               )}
               onClick={() => handleNavigation(item.label, item.path)}
             >
               <item.icon className="w-5 h-5" />
-              <span className="text-xs sr-only">{item.label}</span>
+              <span className="sr-only">{item.label}</span>
             </Button>
           </li>
         ))}

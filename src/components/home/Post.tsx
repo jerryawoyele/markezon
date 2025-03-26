@@ -735,7 +735,7 @@ export function Post({
     <>
       <div className="max-w-2xl mx-auto w-full">
         <Card 
-          className="bg-black/20 hover:bg-black/30 border-white/5 transition-colors duration-200 overflow-hidden"
+          className="bg-black/60 hover:bg-black/70 border-white/5 transition-colors duration-200 overflow-hidden"
           onClick={handleCardClick}
         >
           <div className="p-4 flex items-start gap-3" onClick={(e) => e.stopPropagation()}>
@@ -748,7 +748,7 @@ export function Post({
             <div className="flex-1">
               <div className="flex flex-col items-start gap-2">
                 <h3 
-                  className="font-medium text-sm cursor-pointer hover:underline" 
+                  className="font-medium text-sm cursor-pointer hover:underline truncate max-w-[200px]" 
                   onClick={handleProfileClick}
                 >
                   {"@" + (profiles?.username || 

@@ -295,7 +295,7 @@ export default function Notifications() {
 
   return (
     <MainLayout activeTab={activeTab} setActiveTab={setActiveTab} userRole={userRole} isAuthenticated={true}>
-      <div className="container py-8">
+      <div>
         <div className="flex items-center gap-4 mb-6">
           <Button
             variant="ghost"

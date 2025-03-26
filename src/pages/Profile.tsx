@@ -16,7 +16,28 @@ import { supabase } from "@/integrations/supabase/client";
 import { ServiceCard } from "@/components/services/ServiceCard";
 import { AddServiceModal } from "@/components/services/AddServiceModal";
 import { useToast } from "@/components/ui/use-toast";
-import { Star, PenLine, Users, FileImage, MessageSquare, Bell, User, Briefcase, Share2, PlusCircle, ShoppingCart, Settings } from "lucide-react";
+import { 
+  Star, 
+  PenLine, 
+  Users, 
+  FileImage, 
+  MessageSquare, 
+  Bell, 
+  User, 
+  Briefcase, 
+  Share2, 
+  PlusCircle, 
+  ShoppingCart, 
+  Settings, 
+  MoreVertical, 
+  LogOut 
+} from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import type { Profile as ProfileType, Post as PostType } from "@/types";
 import ProfileImage from '@/components/ProfileImage';
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
@@ -97,6 +118,18 @@ export function Profile() {
   // Add these state variables in the Profile component
   const [selectedService, setSelectedService] = useState<ServiceType | null>(null);
   const [showServiceModal, setShowServiceModal] = useState(false);
+
+  // State to track window width
+  const [windowWidth, setWindowWidth] = useState<number>(window.innerWidth);
+
+  useEffect(() => {
+    const handleResize = () => {
+      setWindowWidth(window.innerWidth);
+    };
+
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   useEffect(() => {
     const initializeProfile = async () => {
@@ -951,6 +984,25 @@ export function Profile() {
     }
   }, [profile?.id]);
 
+  // Function to handle user logout
+  const handleLogout = async () => {
+    try {
+      await supabase.auth.signOut();
+      toast({
+        title: "Logged out",
+        description: "You have been successfully logged out",
+      });
+      navigate('/auth');
+    } catch (error) {
+      console.error('Error logging out:', error);
+      toast({
+        title: "Error",
+        description: "Failed to log out. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
+
   if (loading && loadingProfile) {
     return (
       <div className="flex min-h-screen">
@@ -964,7 +1016,7 @@ export function Profile() {
 
   return (
     <MainLayout activeTab={activeTab} setActiveTab={setActiveTab} userRole={profile?.user_role}>
-      <div className="min-h-screen bg-background">
+      <div className="w-full overflow-x-hidden pb-16 md:pb-0">
         <div>
           {/* Profile header with skeleton loader */}
           <Card className="rounded-lg overflow-hidden mb-8">
@@ -983,17 +1035,45 @@ export function Profile() {
                 </div>
               </div>
             ) : (
-              <div className="p-6">
+              <div className="p-6 relative">
+                {/* Options dropdown for mobile - fixed to top right of the user card */}
+                {windowWidth < 1024 && !isEditingProfile && (
+                  <div className="absolute top-4 right-4 z-10">
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="icon" className="h-8 w-8">
+                          <MoreVertical className="h-4 w-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem onClick={handleShareProfile}>
+                          <Share2 className="mr-2 h-4 w-4" />
+                          <span>Share Profile</span>
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => navigate('/settings')}>
+                          <Settings className="mr-2 h-4 w-4" />
+                          <span>Settings</span>
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={handleLogout}>
+                          <LogOut className="mr-2 h-4 w-4" />
+                          <span>Logout</span>
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </div>
+                )}
+                
                 <div className="flex flex-col md:flex-row gap-6">
+                  <div className="flex flex-col sm:flex-row items-start gap-4 w-full">
                   <AvatarWithModal
-                    size={100}
-                    className="h-full w-full border-2 border-white/20"
+                      size={100}
+                      className="h-full w-full border-2 border-white/20"
                     avatarUrl={profile?.avatar_url}
                     username={profile?.username}
                   />
               
               <div className="flex-1">
-                    <div className="flex flex- md:flex-row gap-4 justify-between mb-4">
+                      <div className="flex flex-col justify-between mb-4">
                       <div>
                         {isEditingProfile ? (
                           <div className="mb-4">
@@ -1025,136 +1105,114 @@ export function Profile() {
                               </Button>
                             </div>
                           </div>
+                          ) :
+                            <>
+                              <div className="flex justify-between items-start">
+                                <div>
+                                  {profile?.user_role === 'business' && profile?.business_name ? (
+                                    <>
+                                      <h1 className="text-2xl font-bold mb-1">
+                                        {profile.business_name}
+                                      </h1>
+                                      <p className="text-muted-foreground mb-1">@{profile?.username}</p>
+                                    </>
                         ) : (
                           <>
-                            {profile?.user_role === 'business' && profile?.business_name ? (
-                              <>
-                                <h1 className="text-2xl font-bold mb-1">
-                                  {profile.business_name}
-                                </h1>
-                                <p className="text-muted-foreground mb-1">@{profile?.username}</p>
-                              </>
-                            ) : (
-                              <>
-                                <h1 className="text-2xl font-bold mb-1">
-                                  {profile?.username}
-                                </h1>
-                                <p className="text-muted-foreground mb-1">@{profile?.username}</p>
-                              </>
-                            )}
+                            <h1 className="text-2xl font-bold mb-1">
+                              {profile?.username}
+                            </h1>
+                                      <p className="text-muted-foreground mb-1">@{profile?.username}</p>
+                                    </>
+                                  )}
                             <p className="text-white/60 mb-3">{profile?.bio}</p>
-                            <Button 
-                              variant="outline" 
-                              size="sm" 
-                              onClick={() => setIsEditingProfile(true)}
-                              className="mb-4"
-                            >
-                              Edit Profile
-                            </Button>
-                          </>
-                        )}
-                </div>
+                                </div>
+                              </div>
+                              
+                              {/* Only show buttons on desktop */}
+                              <div className="flex flex-wrap gap-2 mb-4">
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    onClick={() => setIsEditingProfile(true)}
+                  >
+                    Edit Profile
+                  </Button>
                 
-                      <div>
+                                {/* Only show these buttons on desktop */}
+                                {windowWidth >= 1024 && (
+                                  <>
                         <Button 
                         onClick={handleShareProfile} 
                         size="sm" 
                         variant="ghost"
-                        className="text-primary/70 hover:text-primary hover:bg-primary/10 h-10"
+                                      className="text-primary/70 hover:text-primary hover:bg-primary/10"
                       >
                         <Share2 className="h-4 w-4 mr-2" />
-                        Share Profile
-                      </Button>
-                      <Button 
-                        onClick={() => navigate('/notifications')} 
-                        size="sm" 
-                        variant="ghost"
-                        className="text-primary/70 hover:text-primary hover:bg-primary/10 h-10 relative ml-2"
-                        aria-label="Notifications"
-                        title="View notifications"
-                      >
-                        <Bell className="h-4 w-4 " />
-                        {unreadNotifications > 0 && (
-                          <span className="absolute -top-1 -right-1 bg-primary text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
-                            {unreadNotifications > 9 ? '9+' : unreadNotifications}
-                    </span>
-                        )}
+                                      Share
                       </Button>
                       <Button
                         size="icon"
                         variant="ghost"
                         onClick={() => navigate('/settings')}
-                        className="rounded-sm ml-2"
+                                      className="rounded-sm text-primary/70 hover:text-primary hover:bg-primary/10"
                         title="Settings"
                       >
                         <Settings className="h-4 w-4" />
                       </Button>
+                                  </>
+                                )}
+                  </div>
+                            </>
+                          }
                   </div>
                   </div>
-                    
-                    
-                    <div className="grid grid-cols-3 md:grid-cols-4 gap-4 text-center">
-                      <div className="bg-black/20 rounded-lg p-3">
-                        <div className="flex items-center justify-center gap-1 mb-1">
-                          <FileImage className="h-4 w-4 text-white/60" />
-                          <span className="font-semibold">{userPosts.length}</span>
+                    </div>
                   </div>
-                        <p className="text-xs text-white/60">Posts</p>
                   </div>
                       
+                {/* Stats row in a column under */}
+                <div className="mt-4 flex flex-row flex-wrap justify-around">
                       <div 
-                        className="bg-black/20 rounded-lg p-3 cursor-pointer hover:bg-black/30 transition"
                         onClick={() => setShowFollowersModal(true)}
-                      >
-                        <div className="flex items-center justify-center gap-1 mb-1">
-                          <Users className="h-4 w-4 text-white/60" />
-                          <span className="font-semibold">{profile?.followers_count || 0}</span>
-                        </div>
-                        <p className="text-xs text-white/60">Followers</p>
+                    className="text-center cursor-pointer hover:bg-black/20 px-4 py-2 rounded-md transition-colors"
+                  >
+                    <p className="font-semibold">{profile?.followers_count || 0}</p>
+                    <p className="text-white/60 text-sm">Followers</p>
                 </div>
                 
                       <div 
-                        className="bg-black/20 rounded-lg p-3 cursor-pointer hover:bg-black/30 transition"
                         onClick={() => setShowFollowingModal(true)}
+                    className="text-center cursor-pointer hover:bg-black/20 px-4 py-2 rounded-md transition-colors"
                       >
-                        <div className="flex items-center justify-center gap-1 mb-1">
-                          <Users className="h-4 w-4 text-white/60" />
-                          <span className="font-semibold">{profile?.following_count || 0}</span>
+                    <p className="font-semibold">{profile?.following_count || 0}</p>
+                    <p className="text-white/60 text-sm">Following</p>
               </div>
-                        <p className="text-xs text-white/60">Following</p>
+                
+                  <div className="text-center cursor-pointer hover:bg-black/20 px-4 py-2 rounded-md transition-colors">
+                    <p className="font-semibold">{userPosts.length}</p>
+                    <p className="text-white/60 text-sm">Posts</p>
             </div>
             
                       {profile?.user_role === "business" && (
                         <div 
-                          className="bg-black/20 rounded-lg p-3 cursor-pointer hover:bg-black/30 transition"
                           onClick={() => setShowReviewsModal(true)}
-                        >
-                          <div className="flex items-center justify-center gap-1 mb-1">
-                            <Star className="h-4 w-4 text-white/60" />
-                            <span className="font-semibold">{profile?.reviews_rating?.toFixed(1) || '0.0'}</span>
+                      className="text-center cursor-pointer hover:bg-black/20 px-4 py-2 rounded-md transition-colors"
+                    >
+                      <div className="flex items-center justify-center gap-1">
+                        <Star className="w-4 h-4 text-yellow-400" />
+                        <p className="font-semibold">
+                          {profile?.reviews_count && profile.reviews_count > 0
+                            ? (profile?.reviews_rating?.toFixed(1) || '0.0')
+                            : '-'}
+                        </p>
                           </div>
-                          <p className="text-xs text-white/60">Rating ({profile?.reviews_count || 0})</p>
+                      <p className="text-white/60 text-sm">
+                        {profile?.reviews_count && profile.reviews_count > 0
+                          ? `Reviews (${profile?.reviews_count})`
+                          : 'No reviews'}
+                      </p>
                         </div>
                       )}
-                    </div>
-                    
-                    {profile?.user_role === "business" && (
-                      <div className="mt-4 p-4 bg-black/10 rounded-lg">
-                        <div className="flex justify-between items-center mb-2">
-                          <h3 className="font-medium">About Business</h3>
-                          <button>
-                            <PenLine
-                            size="20px"
-                  onClick={() => setIsEditingAboutBusiness(true)}
-                >
-                            Edit
-                          </PenLine>
-                          </button>
-                        </div>
-                        <p className="text-sm text-white/80">{profile?.about_business || "Add information about your business"}</p>
-                      </div>
-                    )}
-                  </div>
                 </div>
               </div>
             )}

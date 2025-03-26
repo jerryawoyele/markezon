@@ -303,7 +303,7 @@ export function ServiceBookingForm({ service, onBookingSuccess }: ServiceBooking
             <div className="space-y-3">
               <div className="flex justify-between items-start">
                 <h3 className="font-medium">{service.title}</h3>
-                <Badge>{getStatusDisplay(existingBooking.status)}</Badge>
+                <Badge className="max-w-[110px] truncate">{getStatusDisplay(existingBooking.status)}</Badge>
               </div>
               
               {bookingDetails.date && (

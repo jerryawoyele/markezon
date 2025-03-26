@@ -14,7 +14,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { KYCVerification } from "@/components/kyc/KYCVerification";
 import { MainLayout } from "@/layouts/MainLayout";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Bell, CreditCard, Globe, Lock, LogOut, Save, Shield, User, Wallet, AlertCircle, ExternalLink, CheckCircle, AlertTriangle, Briefcase, Info, Loader2 } from "lucide-react";
+import { Bell, CreditCard, Globe, Lock, LogOut, Save, Shield, User, Wallet, AlertCircle, ExternalLink, CheckCircle, AlertTriangle, Briefcase, Info, Loader2, ArrowLeft } from "lucide-react";
 import { KYCVerificationService } from "@/utils/kyc-verification-service";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { ProfileAvatar } from "@/components/profile/ProfileAvatar";
@@ -97,8 +97,8 @@ const PaymentForm: React.FC<PaymentFormProps> = ({ onSuccess, userId }) => {
   // Get preferred payment provider based on user's location
   useEffect(() => {
     const getPaymentProvider = async () => {
-      setIsLoadingProvider(true);
-      try {
+        setIsLoadingProvider(true);
+        try {
         // Try to get from API first
         try {
           const response = await fetch(`/api/payment-provider`);
@@ -107,7 +107,7 @@ const PaymentForm: React.FC<PaymentFormProps> = ({ onSuccess, userId }) => {
             if (data.provider) {
               setPaymentProvider(data.provider as 'stripe' | 'paystack');
               setIsLoadingProvider(false);
-              return;
+            return;
             }
           }
         } catch (error) {
@@ -126,8 +126,8 @@ const PaymentForm: React.FC<PaymentFormProps> = ({ onSuccess, userId }) => {
               userLanguage.includes('KE') || userLanguage.includes('ZA')) {
             setPaymentProvider('paystack');
           } else {
-            setPaymentProvider('stripe');
-          }
+          setPaymentProvider('stripe');
+        }
         }
       } catch (e) {
         console.error("Error determining payment provider:", e);
@@ -137,7 +137,7 @@ const PaymentForm: React.FC<PaymentFormProps> = ({ onSuccess, userId }) => {
         setIsLoadingProvider(false);
       }
     };
-    
+
     getPaymentProvider();
   }, []);
 
@@ -172,19 +172,19 @@ const PaymentForm: React.FC<PaymentFormProps> = ({ onSuccess, userId }) => {
       setError("Stripe has not been properly initialized");
       return;
     }
-
-    const cardElement = elements.getElement(CardElement);
-    if (!cardElement) {
+    
+        const cardElement = elements.getElement(CardElement);
+        if (!cardElement) {
       setError("Card information is incomplete");
       return;
-    }
-
+        }
+        
     // Create the payment method - properly typed for Stripe API v3
     const { paymentMethod, error: stripeError } = await stripe.createPaymentMethod({
-      type: 'card',
-      card: cardElement,
-    });
-
+          type: 'card',
+          card: cardElement,
+        });
+        
     if (stripeError) {
       console.error('Error creating payment method:', stripeError);
       setError(stripeError.message || 'Failed to process your card. Please try again.');
@@ -192,7 +192,7 @@ const PaymentForm: React.FC<PaymentFormProps> = ({ onSuccess, userId }) => {
     }
 
     // Handle successful result
-    if (!paymentMethod) {
+        if (!paymentMethod) {
       setError('Failed to create payment method. Please try again.');
       return;
     }
@@ -303,9 +303,9 @@ const PaymentForm: React.FC<PaymentFormProps> = ({ onSuccess, userId }) => {
       const last4 = cardNumber.slice(-4);
       const cardBrand = getCardBrand(cardNumber);
       
-      const { error: saveError } = await supabase.from('payment_methods').insert([
-        {
-          user_id: userId,
+        const { error: saveError } = await supabase.from('payment_methods').insert([
+          {
+            user_id: userId,
           id: `pstk_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
           provider: 'paystack',
           card_brand: cardBrand,
@@ -314,17 +314,17 @@ const PaymentForm: React.FC<PaymentFormProps> = ({ onSuccess, userId }) => {
           card_exp_year: expYearNum,
           is_default: true,
           created_at: new Date().toISOString()
+          }
+        ]);
+
+        if (saveError) {
+          throw saveError;
         }
-      ]);
-      
-      if (saveError) {
-        throw saveError;
-      }
-      
+
       // Clear form
       formElement.reset();
-      
-      toast({
+
+        toast({
         title: "Payment method added",
         description: `Card ending in ${last4} has been added to your account.`,
       });
@@ -379,7 +379,7 @@ const PaymentForm: React.FC<PaymentFormProps> = ({ onSuccess, userId }) => {
   if (isLoadingProvider) {
     return <div className="flex items-center justify-center py-6"><Loader2 className="h-6 w-6 animate-spin" /></div>;
   }
-  
+
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
       <div className="space-y-2 mb-4">
@@ -396,7 +396,7 @@ const PaymentForm: React.FC<PaymentFormProps> = ({ onSuccess, userId }) => {
               <div className="flex items-center">
                 <img src="/stripe-logo.svg" alt="Stripe" className="h-4 mr-2" />
                 Stripe
-              </div>
+        </div>
             </SelectItem>
             <SelectItem value="paystack">
               <div className="flex items-center">
@@ -415,9 +415,9 @@ const PaymentForm: React.FC<PaymentFormProps> = ({ onSuccess, userId }) => {
             <div className="mt-1 p-3 border rounded-md">
               <StyledCardElement 
                 id="card-element"
-                className="w-full"
+            className="w-full"
               />
-            </div>
+        </div>
             <div className="flex gap-2 mt-2">
               <img src="/visa-logo.svg" alt="Visa" className="h-6" />
               <img src="/mastercard-logo.svg" alt="Mastercard" className="h-6" />
@@ -445,7 +445,7 @@ const PaymentForm: React.FC<PaymentFormProps> = ({ onSuccess, userId }) => {
                 className="mt-1"
                 required
               />
-            </div>
+        </div>
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <Label htmlFor="expiryDate" className="font-medium">Expiry Date</Label>
@@ -489,7 +489,7 @@ const PaymentForm: React.FC<PaymentFormProps> = ({ onSuccess, userId }) => {
       {error && (
         <div className="p-3 bg-red-50 border border-red-200 rounded-md text-sm text-red-600">
           {error}
-        </div>
+      </div>
       )}
       
       <Button
@@ -715,7 +715,7 @@ export default function Settings() {
     
     initializeUserData();
   }, [navigate]);
-  
+
   const checkUsernameAvailability = async (username: string) => {
     if (!username || username.trim() === "" || username === userProfile?.username) {
       setUsernameAvailable(true);
@@ -940,7 +940,7 @@ export default function Settings() {
         setSaving(false);
         return;
       }
-      
+
       const result = await KYCVerificationService.startVerification(userId);
 
       if (result.status === 'success' && result.url) {
@@ -1202,11 +1202,22 @@ export default function Settings() {
 
   return (
     <MainLayout activeTab="settings" setActiveTab={setActiveTab} userRole={userProfile?.user_role}>
-      <div className="py-6">
-        <h1 className="text-3xl font-bold mb-6">Account Settings</h1>
+      <div className="py-6 w-full overflow-x-hidden pb-16 md:pb-6">
+        <div className="flex items-center mb-6">
+          <Button 
+            variant="outline" 
+            size="sm" 
+            onClick={() => navigate('/profile')}
+            className="mr-4"
+          >
+            <ArrowLeft className="h-4 w-4 mr-2" />
+            Back to Profile
+          </Button>
+          <h1 className="text-3xl font-bold">Account Settings</h1>
+        </div>
 
         <Tabs defaultValue="profile" value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="mb-6 bg-background border-b w-full justify-start rounded-none gap-4 h-auto p-0">
+          <TabsList className="mb-6 bg-background border-b w-full justify-start rounded-none gap-4 h-auto p-0 overflow-x-auto whitespace-nowrap">
             <TabsTrigger value="profile" className="data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none py-2 px-1">
               <User className="h-4 w-4 mr-2" />
               Profile

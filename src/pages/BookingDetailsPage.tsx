@@ -261,7 +261,7 @@ export default function BookingDetailsPage() {
   if (loading) {
     return (
       <MainLayout activeTab="Bookings" setActiveTab={() => {}} userRole="customer" isAuthenticated={true}>
-        <div className="container py-8">
+        <div>
           <Card className="p-8">
             <div className="flex items-center justify-center space-x-2">
               <Loader2 className="h-5 w-5 animate-spin" />

@@ -95,12 +95,14 @@ export function MainLayout({
   }
 
   return (
-    <div className="min-h-screen bg-background flex">
+    <div className="min-h-screen bg-background flex flex-col">
+      {/* Desktop sidebar - remains hidden on mobile */}
       <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} userRole={userRole} isAuthenticated={isAuthenticated} />
       
-      <div className="flex-1 lg:ml-64">
+      {/* Main content area */}
+      <div className="flex-1 lg:ml-64 w-full overflow-x-hidden">
         <MobileHeader />
-        <div className="container mx-auto pt-16 lg:pt-8 pb-20 lg:pb-8 px-4">
+        <div className="container mx-auto pt-16 lg:pt-8 pb-24 lg:pb-8 px-4">
           {children}
         </div>
       </div>

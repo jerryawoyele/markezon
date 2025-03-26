@@ -3,7 +3,6 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Search } from "lucide-react";
 import { Sidebar } from "@/components/home/Sidebar";
-import { MobileHeader } from "@/components/home/MobileHeader";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/components/ui/use-toast";
 import { useNavigate, useLocation } from "react-router-dom";
@@ -17,7 +16,6 @@ import { AuthRequiredModal } from "@/components/auth/AuthRequiredModal";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { SearchUsers } from "@/components/home/SearchUsers";
-import { TrendingServices } from "@/components/home/TrendingServices";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { MapPin, DollarSign, Clock, Star } from "lucide-react";
@@ -344,10 +342,9 @@ export default function Discover() {
         </div>
       ) : (
         <div>
-          
-          <div className="flex flex-col gap-8">
+          <div className="flex flex-col gap-4">
             <div className="flex-1">
-              <div className="relative mb-6">
+              <div className="relative mb-4">
                 <div className="relative">
                   <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-white/40 w-5 h-5" />
                   <Input
@@ -608,11 +605,11 @@ export default function Discover() {
                                 />
                               </div>
                             ) : (
-                              <div className="flex-1 p-2 flex items-center justify-center bg-gradient-to-br from-black/40 to-black/20">
-                                <p className="text-sm font-medium line-clamp-3 text-center">
-                                  {preview.content}
-                                </p>
-                              </div>
+                              <div className="flex-1 p-4 flex items-center justify-center bg-gradient-to-br bg-grey-200 ">
+                                  <p className="text-sm font-small truncate text-white line-clamp-4 text-center">
+                                    {preview.content}
+                                  </p>
+                                </div>
                             )}
                           </CardContent>
                         </Card>

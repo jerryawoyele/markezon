@@ -539,7 +539,8 @@ export default function ServicesAndBookingsPage() {
         {userRole === "business" && (
           <Button onClick={() => setShowAddModal(true)}>
             <Plus className="h-4 w-4 mr-2" />
-            Add Service
+            <span className="hidden sm:inline">Add Service</span>
+            <span className="sm:hidden">Add</span>
           </Button>
         )}
       </div>
@@ -616,9 +617,9 @@ export default function ServicesAndBookingsPage() {
             </div>
           </div>
 
-          <Tabs value={statusTab} onValueChange={setStatusTab} className="mb-6">
-            <TabsList>
-              <TabsTrigger value="pending">Pending</TabsTrigger>
+          <Tabs value={statusTab} onValueChange={setStatusTab} className="mb-6 overflow-hidden">
+            <TabsList className="overflow-x-auto whitespace-nowrap w-full pl-4 flex ">
+              <TabsTrigger value="pending" className="ml-32">Pending</TabsTrigger>
               <TabsTrigger value="confirmed">Confirmed</TabsTrigger>
               <TabsTrigger value="completed">Completed</TabsTrigger>
               <TabsTrigger value="canceled">Canceled</TabsTrigger>
@@ -932,7 +933,7 @@ export default function ServicesAndBookingsPage() {
 
   return (
     <MainLayout activeTab={activeTab} setActiveTab={setActiveTab} userRole={userRole} isAuthenticated={isAuthenticated}>
-      <div>
+      <div className="w-full overflow-x-hidden pb-16 md:pb-0">
         {pageType === "services" ? renderServicesContent() : renderBookingsContent()}
       </div>
     </MainLayout>

@@ -459,7 +459,7 @@ export default function ServiceDetailPage() {
 
   return (
     <MainLayout activeTab={navbarTab} setActiveTab={setNavbarTab} userRole={userRole} isAuthenticated={isAuthenticated}>
-      <div className="container py-8">
+      <div>
         <Button 
           variant="ghost" 
           size="sm" 
@@ -523,7 +523,7 @@ export default function ServiceDetailPage() {
             </div>
 
             <Tabs value={activeTab} onValueChange={setActiveTab}>
-              <TabsList className="mb-4">
+              <TabsList className="mb-4 overflow-x-auto whitespace-nowrap w-full flex pl-12">
                 {isServiceOwner() && (
                   <TabsTrigger value="bookings">Bookings</TabsTrigger>
                 )}
@@ -841,18 +841,21 @@ export default function ServiceDetailPage() {
                                     {booking.customer?.username?.charAt(0).toUpperCase() || "?"}
                                   </AvatarFallback>
                                 </Avatar>
+                                <div className="flex flex-col">
                                 <div>
-                                  <p className="font-medium">{booking.customer?.username || "Anonymous"}</p>
+                                  <p className="font-medium truncate max-w-[150px]">{booking.customer?.username || "Anonymous"}</p>
                                   <p className="text-sm text-muted-foreground">
                                     Booked on {formatDate(booking.created_at)}
                                   </p>
                                 </div>
-                              </div>
-                              <div className="flex items-center">
-                                <Badge className={getStatusColor(booking.status)}>
+                                <div className="flex items-center">
+                                <Badge className={`${getStatusColor(booking.status)} max-w-[110px] mt-2 truncate`}>
                                   {booking.status.charAt(0).toUpperCase() + booking.status.slice(1)}
                                 </Badge>
                               </div>
+                              </div>
+                              </div>
+
                             </div>
                             
                             <div className="grid grid-cols-2 gap-2 my-2 text-sm">
@@ -890,13 +893,7 @@ export default function ServiceDetailPage() {
                                 );
                               })()}
                             </div>
-                            
-                            {/* {booking.notes && (
-                              <div className="mb-3 mt-2">
-                                <p className="text-sm font-medium">Notes:</p>
-                                <p className="text-sm text-muted-foreground">{booking.notes}</p>
-                              </div>
-                            )} */}
+                          
                             
                             <div className="flex justify-end items-center gap-2 mt-4 border-t pt-3">
                               {getStatusActions(booking)}

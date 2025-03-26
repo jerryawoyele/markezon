@@ -28,6 +28,7 @@ import {
   DollarSign,
   MapPin,
   Star,
+  Plus,
   TrendingUp,
   Users,
   Activity,
@@ -475,7 +476,12 @@ export function ServiceDashboard({ services, loading, userRole, onRefresh }: Ser
                 Manage your services and view bookings
               </CardDescription>
             </div>
-            <Button onClick={handleAddService}>Add Service</Button>
+            {/* <Button onClick={handleAddService}>Add Service</Button> */}
+            <Button onClick={handleAddService}>
+            <Plus className="h-4 w-4 mr-2" />
+            <span className="hidden sm:inline">Add Service</span>
+            <span className="sm:hidden">Add</span>
+          </Button>
           </CardHeader>
           <CardContent>
             <div className="space-y-4">

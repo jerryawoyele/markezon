@@ -643,11 +643,14 @@ export default function Messages() {
   }
 
   return (
-    <div className="flex min-h-screen w-full">
-      <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} userRole={userRole} />
-
-      <div className="flex-1 lg:ml-64 flex flex-col h-screen max-h-screen">
-        <MobileHeader />
+    <div className="min-h-screen overflow-x-hidden">
+      <div className={`${selectedConversation && 'hidden md-flex' }`}>
+        <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} userRole={userRole} />
+        </div>
+      <div className="flex flex-col h-screen md:pt-0">
+        
+        {/* Always show the mobile header on the Messages page */}
+        <MobileHeader className="block" />
         
         <div className="flex flex-1 overflow-hidden">
           {/* Conversations sidebar */}
@@ -725,14 +728,15 @@ export default function Messages() {
           <div className={`flex-1 flex flex-col ${!selectedConversation ? 'hidden md:flex' : 'flex'}`}>
             {selectedConversation ? (
               <>
-                <div className="p-4 border-b border-white/10 flex items-center gap-3">
+                {/* Fixed header on mobile */}
+                <div className="p-2 border-b border-white/10 flex items-center gap-1 sticky top-0 z-10 bg-background">
                         <Button 
                           variant="ghost" 
                           size="icon" 
-                    className="md:hidden"
-                    onClick={() => setSelectedConversation(null)}
+                          className="md:hidden"
+                          onClick={() => setSelectedConversation(null)}
                         >
-                    <ArrowLeft className="h-5 w-5" />
+                          <ArrowLeft className="h-5 w-5" />
                         </Button>
                   <div 
                     className="cursor-pointer" 
@@ -741,12 +745,12 @@ export default function Messages() {
                     <ProfileImage 
                       src={selectedConversation.profile.avatar_url || selectedConversation.profile.auth_metadata?.avatar_url} 
                       alt={selectedConversation.profile.username}
-                      className="w-10 h-10 rounded-full"
+                      className="w-8 h-8 rounded-full"
                     />
                   </div>
-                  <div>
+                  <div className="min-w-0 flex-1">
                     <h2 
-                      className="font-medium cursor-pointer hover:underline"
+                      className="font-medium cursor-pointer hover:underline truncate max-w-[200px]"
                       onClick={() => handleProfileClick(selectedConversation.id)}
                     >
                       {selectedConversation.profile.username || selectedConversation.profile.auth_metadata?.full_name || 'User'}
@@ -754,7 +758,8 @@ export default function Messages() {
                   </div>
                 </div>
                 
-                <div className="flex-1 overflow-y-auto p-4 space-y-4">
+                {/* Message content area with padding to accommodate fixed elements */}
+                <div className="flex-1 overflow-y-auto p-4 space-y-4 pb-24 md:pb-4">
                   {messageGroups.length > 0 ? (
                     messageGroups.map((group) => (
                       <div key={group.date} className="space-y-4">
@@ -862,24 +867,24 @@ export default function Messages() {
                   <div ref={messagesEndRef} />
                     </div>
 
-                <div className="p-4 border-t border-white/10 max-lg:mb-16">
-                      <div className="flex gap-2">
+                <div className="p-2 border-t border-white/10 fixed bottom-0 left-0 right-0 md:static bg-background max-sm:z-50">
+                      <div className="flex gap-2 md:max-w-full mx-auto">
                         <Input
                           placeholder="Type a message..."
                           value={newMessage}
                           onChange={(e) => setNewMessage(e.target.value)}
-                      onKeyDown={(e) => e.key === 'Enter' && handleSendMessage()}
-                      className="flex-1"
-                      ref={messageInputRef}
-                    />
-                    <Button 
-                      onClick={handleSendMessage}
-                      disabled={!newMessage.trim() || sendingMessage}
-                    >
-                      <Send className="h-4 w-4" />
+                          onKeyDown={(e) => e.key === 'Enter' && handleSendMessage()}
+                          className="flex-1"
+                          ref={messageInputRef}
+                        />
+                        <Button 
+                          onClick={handleSendMessage}
+                          disabled={!newMessage.trim() || sendingMessage}
+                        >
+                          <Send className="h-4 w-4" />
                         </Button>
                       </div>
-                    </div>
+                </div>
                   </>
                 ) : (
               <div className="h-full flex items-center justify-center flex-col p-8 text-center">

@@ -102,7 +102,7 @@ export function MainLayout({
       {/* Main content area */}
       <div className="flex-1 lg:ml-64 lg:w-4/5 overflow-x-hidden">
         <MobileHeader />
-        <div className="container mx-auto pt-16 lg:pt-8 pb-24 lg:pb-8 px-4">
+        <div className="container mx-auto pt-4 lg:pt-8 pb-24 lg:pb-8 px-4">
           {children}
         </div>
       </div>

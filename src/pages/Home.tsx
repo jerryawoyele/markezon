@@ -526,7 +526,7 @@ export default function Home() {
           </div>
         </div>
       ) : (
-      <div className="flex-1 mx-auto pt-4 pb-20">
+      <div className="flex-1 mx-auto pt-16 pb-20">
         <div className="flex flex-col md:flex-row gap-6">
           <div className="flex-1 flex flex-col">
             <MobileHeader />

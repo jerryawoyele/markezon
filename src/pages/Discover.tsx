@@ -343,7 +343,7 @@ export default function Discover() {
           </div>
         </div>
       ) : (
-        <div className="container mx-4 my-8">
+        <div className="container">
           
           <div className="flex flex-col gap-8">
             <div className="flex-1">

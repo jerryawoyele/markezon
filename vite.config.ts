@@ -10,7 +10,7 @@ export default defineConfig(({ mode }) => ({
     port: 8080,
     proxy: {
       '/api': {
-        target: 'https://markezon.vercel.app/',
+        target: 'http://localhost:3001/',
         changeOrigin: true,
         secure: true
       }

@@ -343,7 +343,7 @@ export default function Discover() {
           </div>
         </div>
       ) : (
-        <div className="container mx-auto px-4 py-8">
+        <div className="container mx-auto">
           <MobileHeader />
           
           <div className="flex flex-col gap-8">

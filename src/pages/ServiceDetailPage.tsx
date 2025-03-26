@@ -523,7 +523,7 @@ export default function ServiceDetailPage() {
             </div>
 
             <Tabs value={activeTab} onValueChange={setActiveTab}>
-              <TabsList className="mb-4 overflow-x-auto whitespace-nowrap w-full flex pl-12">
+              <TabsList className="mb-4 overflow-x-auto whitespace-nowrap w-full flex">
                 {isServiceOwner() && (
                   <TabsTrigger value="bookings">Bookings</TabsTrigger>
                 )}

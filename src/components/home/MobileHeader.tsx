@@ -77,7 +77,7 @@ export function MobileHeader({ onSearch }: MobileHeaderProps) {
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-white/40 w-4 h-4" />
           <Input
             placeholder="Search..."
-            className="pl-9 w-[150px] sm:w-[200px] pr-8 bg-white/5 border-white/10 focus:border-white/30 transition-colors"
+            className="pl-9 max-md:w-[200px] md:[320px] pr-8 bg-white/5 border-white/10 focus:border-white/30 transition-colors"
             value={searchQuery}
             onChange={handleChange}
             onKeyPress={handleSearch}

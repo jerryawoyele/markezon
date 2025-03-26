@@ -643,8 +643,8 @@ export default function Messages() {
   }
 
   return (
-    <div className="min-h-screen overflow-x-hidden">
-      <div className={`${selectedConversation && 'hidden md-flex' }`}>
+    <div className="lg:ml-64 min-h-screen overflow-x-hidden">
+      <div className={`${selectedConversation && window.innerWidth < 768 ? 'hidden md-flex':''}`}>
         <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} userRole={userRole} />
         </div>
       <div className="flex flex-col h-screen md:pt-0">

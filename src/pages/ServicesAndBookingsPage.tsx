@@ -618,8 +618,8 @@ export default function ServicesAndBookingsPage() {
           </div>
 
           <Tabs value={statusTab} onValueChange={setStatusTab} className="mb-6 overflow-hidden">
-            <TabsList className="overflow-x-auto whitespace-nowrap w-full pl-4 flex ">
-              <TabsTrigger value="pending" className="ml-32">Pending</TabsTrigger>
+            <TabsList className="overflow-x-auto whitespace-nowrap w-full flex ">
+              <TabsTrigger value="pending">Pending</TabsTrigger>
               <TabsTrigger value="confirmed">Confirmed</TabsTrigger>
               <TabsTrigger value="completed">Completed</TabsTrigger>
               <TabsTrigger value="canceled">Canceled</TabsTrigger>

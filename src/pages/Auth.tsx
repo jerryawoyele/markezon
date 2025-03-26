@@ -233,7 +233,7 @@ export default function Auth() {
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <form onSubmit={handlePasswordReset} className="space-y-4">
+                <form onSubmit={handleSignIn} className="space-y-4">
                   <div className="space-y-2">
                     <Label htmlFor="email" className="text-white">
                       Email
@@ -341,7 +341,7 @@ export default function Auth() {
                           </Label>
                           <Button
                             variant="link"
-                            onClick={() => setResetPassword(true)}
+                            onClick={() => handleSignIn}
                             className="p-0 h-auto text-sm text-blue-400 hover:text-blue-300"
                           >
                             Forgot password?

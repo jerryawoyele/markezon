@@ -766,7 +766,7 @@ export default function Messages() {
                 </div>
                 
                 {/* Message content area with padding to accommodate fixed elements */}
-                <div className="flex-1 overflow-y-auto p-4 space-y-4 pt-12 pb-20 md:pb-2">
+                <div className="flex-1 overflow-y-auto p-1 space-y-4 pt-12 pb-20 md:pb-2">
                   {messageGroups.length > 0 ? (
                     messageGroups.map((group) => (
                       <div key={group.date} className="space-y-4">

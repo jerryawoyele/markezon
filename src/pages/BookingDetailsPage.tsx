@@ -149,51 +149,9 @@ export default function BookingDetailsPage() {
   const handleMakePayment = async () => {
     if (!booking) return;
 
-    setMakingPayment(true);
-    try {
-      // If there's an existing payment record, update it
-      if (booking.escrow_payments && booking.escrow_payments.length > 0) {
-        const { error } = await supabase
-          .from('escrow_payments')
-          .update({ 
-            status: 'completed',
-            amount: booking.services?.price || 0
-          })
-          .eq('id', booking.escrow_payments[0].id);
-          
-        if (error) throw error;
-      } else {
-        // Create a new payment record
-        const { error } = await supabase
-          .from('escrow_payments')
-          .insert({
-            booking_id: booking.id,
-            amount: booking.services?.price || 0,
-            status: 'completed',
-            customer_id: booking.customer_id,
-            provider_id: booking.provider_id
-          });
-          
-        if (error) throw error;
-      }
-
-      toast({
-        title: "Payment Successful",
-        description: "Your payment has been processed successfully and held in escrow until service completion.",
-      });
-
-      fetchBookingDetails(); // Refresh booking data
-    } catch (error) {
-      console.error("Error processing payment:", error);
-      toast({
-        title: "Payment Failed",
-        description: "Failed to process payment. Please try again.",
-        variant: "destructive",
-      });
-    } finally {
-      setMakingPayment(false);
-      setShowPaymentModal(false);
-    }
+    // Since payments are handled outside the app, we'll redirect to chat
+    setShowPaymentModal(false);
+    navigate(`/messages?user=${booking.provider_id}`);
   };
 
   const getStatusBadgeVariant = (status: string) => {
@@ -218,7 +176,7 @@ export default function BookingDetailsPage() {
 
   const getPaymentStatusBadge = () => {
     if (!booking?.escrow_payments || booking.escrow_payments.length === 0) {
-      return <Badge variant="outline" className="bg-red-50 text-red-700 hover:bg-red-50">Payment Required</Badge>;
+      return <Badge variant="outline" className="bg-amber-900 text-amber-70 hover:bg-amber-50">Payment Discussion Needed</Badge>;
     }
     
     const payment = booking.escrow_payments[0];
@@ -226,7 +184,7 @@ export default function BookingDetailsPage() {
       case 'pending':
         return <Badge variant="outline" className="bg-yellow-50 text-yellow-700 hover:bg-yellow-50">Payment Pending</Badge>;
       case 'completed':
-        return <Badge variant="outline" className="bg-blue-50 text-blue-700 hover:bg-blue-50">Payment in Escrow</Badge>;
+        return <Badge variant="outline" className="bg-blue-50 text-blue-700 hover:bg-blue-50">Payment Arranged</Badge>;
       case 'released':
         return <Badge variant="outline" className="bg-green-50 text-green-700 hover:bg-green-50">Payment Released</Badge>;
       case 'refunded':
@@ -239,6 +197,11 @@ export default function BookingDetailsPage() {
   };
 
   const isPaymentNeeded = () => {
+    // External payment mode means no in-app payments needed
+    if (EscrowService.isExternalPaymentMode) {
+      return false;
+    }
+    
     // If booking is confirmed and no payment has been made or payment is in pending status
     if (booking.status === 'confirmed') {
       if (!booking.escrow_payments || booking.escrow_payments.length === 0) {
@@ -360,6 +323,17 @@ export default function BookingDetailsPage() {
                     </AlertDescription>
                   </Alert>
                 )}
+
+                {isCustomer() && EscrowService.isExternalPaymentMode && (
+                  <Alert className="mt-2 bg-blue-900">
+                    <MessageSquare className="h-4 w-4 text-blue-600" />
+                    <AlertTitle>Payment Information</AlertTitle>
+                    <AlertDescription>
+                      Payments are currently handled directly between you and the service provider. 
+                      Please use the chat to discuss payment details. The service price is ${booking.services?.price}.
+                    </AlertDescription>
+                  </Alert>
+                )}
               </CardContent>
             </Card>
 
@@ -419,14 +393,14 @@ export default function BookingDetailsPage() {
                 )}
 
                 {needsConfirmation && (
-                  <div className="p-4 border rounded-lg border-yellow-200 bg-yellow-50 mb-4">
+                  <div className="p-4 border rounded-lg border-yellow-200 bg-yellow-900 mb-4">
                     <div className="flex items-start gap-3">
                       <div className="text-yellow-500 mt-0.5">
                         <AlertTriangle size={18} />
                       </div>
                       <div>
-                        <h4 className="font-medium text-yellow-800">Service Completion Pending</h4>
-                        <p className="text-sm text-yellow-700 mt-1">
+                        <h4 className="font-medium text-yellow-80">Service Completion Pending</h4>
+                        <p className="text-sm text-yellow-70 mt-1">
                           The service provider has marked this service as completed. Please confirm if you are satisfied with the service.
                         </p>
                         <div className="mt-3 flex gap-2">
@@ -530,20 +504,21 @@ export default function BookingDetailsPage() {
           booking={booking}
           onConfirm={handleConfirmCompletion}
           onDispute={handleDisputeCompletion}
+          user={user}
         />
 
         {/* Payment Modal */}
         <Dialog open={showPaymentModal} onOpenChange={setShowPaymentModal}>
           <DialogContent>
             <DialogHeader>
-              <DialogTitle>Make Payment</DialogTitle>
+              <DialogTitle>Payment Information</DialogTitle>
               <DialogDescription>
-                Your payment will be securely held in escrow until the service is completed.
+                Payments are currently handled directly between you and the service provider.
               </DialogDescription>
             </DialogHeader>
             <div className="space-y-4 py-4">
               <div className="p-4 border rounded-lg">
-                <h3 className="font-medium mb-2">Payment Details</h3>
+                <h3 className="font-medium mb-2">Service Details</h3>
                 <div className="space-y-2">
                   <div className="flex justify-between">
                     <span>Service:</span>
@@ -557,28 +532,23 @@ export default function BookingDetailsPage() {
               </div>
               
               <div className="flex items-center gap-2">
-                <AlertTriangle className="h-5 w-5 text-amber-500" />
+                <MessageSquare className="h-5 w-5 text-blue-500" />
                 <p className="text-sm text-muted-foreground">
-                  Payment will be held securely until you confirm service completion.
+                  Please use the chat feature to discuss payment methods and details with the service provider.
                 </p>
               </div>
             </div>
             <DialogFooter>
               <Button variant="outline" onClick={() => setShowPaymentModal(false)}>
-                Cancel
+                Close
               </Button>
               <Button
-                onClick={handleMakePayment}
-                disabled={makingPayment}
+                onClick={() => {
+                  setShowPaymentModal(false);
+                  navigate(`/messages?user=${booking.provider_id}`);
+                }}
               >
-                {makingPayment ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Processing...
-                  </>
-                ) : (
-                  "Make Payment"
-                )}
+                Contact Provider
               </Button>
             </DialogFooter>
           </DialogContent>

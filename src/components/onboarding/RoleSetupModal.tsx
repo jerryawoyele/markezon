@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -20,6 +20,10 @@ export function RoleSetupModal({ isOpen, onComplete }: RoleSetupModalProps) {
   const [usernameError, setUsernameError] = useState("");
   const { toast } = useToast();
 
+  // Add state for checking username availability
+  const [isCheckingUsername, setIsCheckingUsername] = useState(false);
+  const [usernameTimeout, setUsernameTimeout] = useState<NodeJS.Timeout | null>(null);
+
   const validateUsername = (value: string) => {
     if (!value.trim()) {
       setUsernameError("Username is required");
@@ -28,6 +32,11 @@ export function RoleSetupModal({ isOpen, onComplete }: RoleSetupModalProps) {
     
     if (value.length < 3) {
       setUsernameError("Username must be at least 3 characters");
+      return false;
+    }
+    
+    if (value.includes(" ")) {
+      setUsernameError("Username cannot contain spaces");
       return false;
     }
     
@@ -40,25 +49,55 @@ export function RoleSetupModal({ isOpen, onComplete }: RoleSetupModalProps) {
     return true;
   };
 
+  // Check username availability when typing
+  useEffect(() => {
+    const checkUsernameAvailability = async () => {
+      if (!username || username.length < 3) return;
+      
+      setIsCheckingUsername(true);
+      try {
+        // Get current user
+        const { data: { user } } = await supabase.auth.getUser();
+        
+        const { data, error } = await supabase
+          .from('profiles')
+          .select('id')
+          .ilike('username', username)
+          .neq('id', user?.id || '')
+          .limit(1);
+          
+        if (error) throw error;
+        
+        if (data && data.length > 0) {
+          setUsernameError("This username is already taken");
+        }
+      } catch (error) {
+        console.error("Error checking username:", error);
+      } finally {
+        setIsCheckingUsername(false);
+      }
+    };
+    
+    if (usernameTimeout) clearTimeout(usernameTimeout);
+    
+    if (username.length >= 3 && !username.includes(" ") && /^[a-zA-Z0-9_]+$/.test(username)) {
+      const timeout = setTimeout(() => {
+        checkUsernameAvailability();
+      }, 500);
+      
+      setUsernameTimeout(timeout);
+    }
+    
+    return () => {
+      if (usernameTimeout) clearTimeout(usernameTimeout);
+    };
+  }, [username]);
+
   const handleSubmit = async () => {
     if (!validateUsername(username)) return;
     
     setLoading(true);
     try {
-      // Check if username is available
-      const { data: existingUsers, error: checkError } = await supabase
-        .from('profiles')
-        .select('username')
-        .eq('username', username)
-        .limit(1);
-        
-      if (checkError) throw checkError;
-      
-      if (existingUsers && existingUsers.length > 0) {
-        setUsernameError("This username is already taken");
-        return;
-      }
-      
       // Get current user
       const { data: { user } } = await supabase.auth.getUser();
       
@@ -109,18 +148,29 @@ export function RoleSetupModal({ isOpen, onComplete }: RoleSetupModalProps) {
         <div className="space-y-6 py-4">
           <div className="space-y-2">
             <Label htmlFor="username">Choose a username</Label>
-            <Input
-              id="username"
-              placeholder="e.g., john_doe"
-              value={username}
-              onChange={(e) => {
-                setUsername(e.target.value);
-                validateUsername(e.target.value);
-              }}
-            />
+            <div className="relative">
+              <Input
+                id="username"
+                placeholder="e.g., john_doe"
+                value={username}
+                onChange={(e) => {
+                  setUsername(e.target.value);
+                  validateUsername(e.target.value);
+                }}
+                className={usernameError ? "border-red-500" : ""}
+              />
+              {isCheckingUsername && (
+                <div className="absolute right-3 top-2.5">
+                  <div className="animate-spin h-5 w-5 border-2 border-primary rounded-full border-t-transparent"></div>
+                </div>
+              )}
+            </div>
             {usernameError && (
               <p className="text-red-500 text-sm">{usernameError}</p>
             )}
+            <p className="text-xs text-muted-foreground">
+              No spaces allowed. Username must be unique and will be used in your profile URL.
+            </p>
           </div>
           
           <div className="space-y-2">

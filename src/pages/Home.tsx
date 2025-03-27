@@ -526,7 +526,7 @@ export default function Home() {
           </div>
         </div>
       ) : (
-      <div className="flex-1 mx-auto pt-16 pb-20">
+      <div className="flex-1 mx-auto max-lg:pt-16 pb-20">
         <div className="flex flex-col md:flex-row gap-6">
           <div className="flex-1 flex flex-col">
             <MobileHeader />
@@ -609,9 +609,9 @@ export default function Home() {
                   <Button onClick={() => navigate('/discover')} variant="outline" size="sm">
                     Discover Users
                   </Button>
-                  <Button onClick={() => setActiveTab("Create")} size="sm">
+                  {/* <Button onClick={() => <CreatePost onSubmit={handlePostSubmit} className="mx-0 lg:mx-0" />} size="sm">
                     Create Post
-                  </Button>
+                  </Button> */}
                 </div>
               </Card>
             ) : (

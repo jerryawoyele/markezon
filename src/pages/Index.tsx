@@ -98,8 +98,9 @@ export default function Index() {
     setEmail("");
   };
 
-  const handleServiceClick = () => {
-    navigate('/auth');
+  const handleServiceClick = (serviceTitle: string) => {
+    // Navigate to discover page with search query
+    navigate(`/discover?search=${encodeURIComponent(serviceTitle)}`);
   };
 
   return (
@@ -178,7 +179,7 @@ export default function Index() {
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ duration: 0.5, delay: 0.3 + index * 0.1 }}
-                  onClick={handleServiceClick}
+                  onClick={() => handleServiceClick(service.title)}
                   whileHover={{ scale: 1.03 }}
                   whileTap={{ scale: 0.98 }}
                   className="cursor-pointer"

@@ -150,7 +150,7 @@ export function Sidebar({
       <div className="p-4 border-b border-white/10 mb-2">
         <h1 
           className="text-2xl font-bold bg-gradient-to-r from-purple-500 to-blue-500 bg-clip-text text-transparent cursor-pointer"
-          onClick={() => navigate('/home')}
+          onClick={() => navigate('/')}
         >
           Markezon
         </h1>

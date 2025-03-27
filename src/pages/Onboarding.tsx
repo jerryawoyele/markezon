@@ -23,6 +23,7 @@ export function Onboarding() {
   const [avatarUrl, setAvatarUrl] = useState("");
   const [userRole, setUserRole] = useState<"business" | "customer">("customer");
   const [aboutBusiness, setAboutBusiness] = useState("");
+  const [businessName, setBusinessName] = useState("");
   
   // Validation
   const [usernameError, setUsernameError] = useState("");
@@ -72,7 +73,7 @@ export function Onboarding() {
         const { data, error } = await supabase
           .from('profiles')
           .select('id')
-          .eq('username', username)
+          .ilike('username', username)
           .neq('id', userId || '')
           .limit(1);
           
@@ -117,7 +118,7 @@ export function Onboarding() {
     }
     
     if (!/^[a-zA-Z0-9_]+$/.test(value)) {
-      setUsernameError("Username can only contain letters, numbers, and underscores");
+      setUsernameError("Username can only contain letters, numbers, and underscores (no spaces)");
       return false;
     }
     
@@ -151,6 +152,7 @@ export function Onboarding() {
           avatar_url: avatarUrl,
           user_role: userRole,
           about_business: aboutBusiness,
+          business_name: businessName,
           onboarding_completed: true
         });
         
@@ -162,6 +164,7 @@ export function Onboarding() {
             avatar_url: avatarUrl,
             user_role: userRole,
             about_business: aboutBusiness,
+            business_name: businessName,
             onboarding_completed: true,
             updated_at: new Date().toISOString()
           })
@@ -257,6 +260,7 @@ export function Onboarding() {
       if (avatarUrl) updates.avatar_url = avatarUrl;
       if (userRole) updates.user_role = userRole;
       if (aboutBusiness !== undefined) updates.about_business = aboutBusiness;
+      if (businessName !== undefined) updates.business_name = businessName;
       
       console.log("Saving progress with updates:", updates);
       const { error } = await supabase
@@ -311,8 +315,8 @@ export function Onboarding() {
           {currentStep === 1 && (
             <div className="space-y-6">
               <div className="text-center mb-6">
-                <h1 className="text-2xl font-bold mb-2">Welcome to Markezon!</h1>
-                <p className="text-white/60">Let's set up your profile</p>
+                <h1 className="text-2xl font-bold mb-2">Let's create your profile</h1>
+                <p className="text-white/60">Tell us a bit about yourself</p>
               </div>
               
               <div className="space-y-4">
@@ -321,68 +325,74 @@ export function Onboarding() {
                   <div className="relative">
                     <Input
                       id="username"
-                      placeholder="Choose a username"
+                      placeholder="Enter your username"
                       value={username}
                       onChange={handleUsernameChange}
-                      className={usernameError ? "border-red-500" : ""}
+                      className={`${usernameError ? "border-red-500" : ""} pr-10`}
                     />
                     {isCheckingUsername && (
-                      <div className="absolute right-3 top-2.5">
-                        <div className="animate-spin h-5 w-5 border-2 border-primary rounded-full border-t-transparent"></div>
+                      <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
+                        <div className="animate-spin h-4 w-4 border-2 border-primary border-t-transparent rounded-full" />
                       </div>
                     )}
-                    {!isCheckingUsername && username.length >= 3 && !usernameError && (
-                      <div className="absolute right-3 top-2.5 text-green-500">
-                        <CheckCircle size={20} />
-                      </div>
+                    {!isCheckingUsername && username && !usernameError && (
+                      <CheckCircle className="absolute right-3 top-1/2 transform -translate-y-1/2 text-green-500 h-4 w-4" />
                     )}
                   </div>
-                  {usernameError && (
-                    <p className="text-red-500 text-sm">{usernameError}</p>
-                  )}
-                  <p className="text-xs text-white/60">
-                    This will be your public identifier. You can change it later.
-                  </p>
-                </div>
-                
-                <div className="space-y-2">
-                  <Label htmlFor="profile-picture">Profile Picture</Label>
-                  <div className="flex items-center gap-4">
-                    <div className="h-20 w-20 rounded-full bg-white/10 overflow-hidden">
-                      {avatarUrl ? (
-                        <img 
-                          src={avatarUrl} 
-                          alt="Profile preview" 
-                          className="h-full w-full object-cover"
-                        />
-                      ) : (
-                        <div className="h-full w-full flex items-center justify-center text-white/40">
-                          <Image size={24} />
-                        </div>
+                  {usernameError ? (
+                    <p className="text-sm text-red-500">{usernameError}</p>
+                  ) : (
+                    <>
+                      <p className="text-xs text-white/60">
+                        Username can only contain letters, numbers, and underscores (no spaces)
+                      </p>
+                      {username && (
+                        <p className="text-xs text-primary">
+                          Your profile URL will be: markezon.com/@{username}
+                        </p>
                       )}
-                    </div>
-                    <FileUpload
-                      endpoint="avatarUploader"
-                      onChange={handleAvatarChange}
-                    />
-                  </div>
-                  <p className="text-xs text-white/60">
-                    Add a photo to personalize your profile
-                  </p>
+                    </>
+                  )}
                 </div>
                 
                 <div className="space-y-2">
                   <Label htmlFor="bio">Bio</Label>
                   <Textarea
                     id="bio"
-                    placeholder="Tell us a bit about yourself"
+                    placeholder="Write a short bio to tell others about yourself..."
                     value={bio}
                     onChange={(e) => setBio(e.target.value)}
                     className="min-h-24"
                   />
-                  <p className="text-xs text-white/60">
-                    {bio.length}/160 characters
-                  </p>
+                </div>
+                
+                <div className="space-y-2">
+                  <Label>Profile Picture</Label>
+                  <FileUpload
+                    maxSizeMB={2}
+                    onUpload={handleAvatarChange}
+                    folder="avatars"
+                    accept="image/*"
+                  >
+                    <div className="border-2 border-dashed border-white/20 rounded-lg p-8 text-center cursor-pointer hover:border-white/40 transition-colors">
+                      {avatarUrl ? (
+                        <div className="flex flex-col items-center">
+                          <img 
+                            src={avatarUrl} 
+                            alt="Profile" 
+                            className="w-20 h-20 rounded-full object-cover mb-4"
+                          />
+                          <span className="text-sm text-white/60">Click to change</span>
+                        </div>
+                      ) : (
+                        <div className="flex flex-col items-center">
+                          <Image className="w-12 h-12 mb-2 text-white/40" />
+                          <p className="text-white/80 mb-1">Upload profile picture</p>
+                          <p className="text-sm text-white/60">Max 2MB</p>
+                        </div>
+                      )}
+                    </div>
+                  </FileUpload>
                 </div>
               </div>
             </div>
@@ -447,6 +457,19 @@ export function Onboarding() {
               </div>
               
               <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="business-name">Business Name</Label>
+                  <Input
+                    id="business-name"
+                    placeholder="Enter your business name"
+                    value={businessName}
+                    onChange={(e) => setBusinessName(e.target.value)}
+                  />
+                  <p className="text-xs text-white/60">
+                    This will be displayed prominently on your profile
+                  </p>
+                </div>
+                
                 <div className="space-y-2">
                   <Label htmlFor="about-business">About Your Business</Label>
                   <Textarea

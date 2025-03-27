@@ -68,7 +68,7 @@ export function MobileHeader({ onSearch }: MobileHeaderProps) {
     <div className="flex flex-row items-center justify-between bg-black/80 backdrop-blur-md border-b border-white/10 p-4 lg:hidden fixed top-0 left-0 right-0 z-50">
       <h1 
         className="text-xl font-bold bg-gradient-to-r from-purple-500 to-blue-500 bg-clip-text text-transparent cursor-pointer mr-2"
-        onClick={() => navigate('/home')}
+        onClick={() => navigate('/')}
       >
         Markezon
       </h1>

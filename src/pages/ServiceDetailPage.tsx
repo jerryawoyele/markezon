@@ -225,7 +225,7 @@ export default function ServiceDetailPage() {
         description: "Please log in to contact the service provider",
         variant: "destructive",
       });
-      navigate("/login");
+      navigate("/auth");
       return;
     }
 
@@ -523,7 +523,7 @@ export default function ServiceDetailPage() {
             </div>
 
             <Tabs value={activeTab} onValueChange={setActiveTab}>
-              <TabsList className="mb-4 overflow-x-auto whitespace-nowrap w-full flex">
+              <TabsList className="mb-4 overflow-x-auto whitespace-nowrap w-fit flex">
                 {isServiceOwner() && (
                   <TabsTrigger value="bookings">Bookings</TabsTrigger>
                 )}
@@ -960,14 +960,14 @@ export default function ServiceDetailPage() {
                     </p>
                     <Button 
                       className="w-full mb-2" 
-                      onClick={() => navigate("/login")}
+                      onClick={() => navigate("/auth")}
                     >
                       Log In
                     </Button>
                     <Button 
                       variant="outline" 
                       className="w-full" 
-                      onClick={() => navigate("/signup")}
+                      onClick={() => navigate("/auth")}
                     >
                       Sign Up
                     </Button>

@@ -33,6 +33,9 @@ export interface EscrowPayment {
  * Service class for handling escrow payments
  */
 export class EscrowService {
+  // Flag to indicate that payments are handled outside the app for now
+  static isExternalPaymentMode = true;
+
   /**
    * Create a new escrow payment for a booking
    */
@@ -44,15 +47,14 @@ export class EscrowService {
     serviceId: string
   ): Promise<EscrowPayment | null> {
     try {
-      // In a real implementation, this would integrate with a payment processor
-      // For now, we'll simulate by creating a record in the database
-      
+      // Since payments are handled outside the app for now,
+      // we mark the payment as completed immediately while storing the price information
       const { data, error } = await supabase
         .from('escrow_payments')
         .insert({
           booking_id: bookingId,
           amount,
-          status: EscrowStatus.PENDING,
+          status: EscrowStatus.COMPLETED, // Mark as completed since payment is handled outside
           customer_id: customerId,
           provider_id: providerId,
           service_id: serviceId,
@@ -70,7 +72,7 @@ export class EscrowService {
       // Also update the booking status to reflect payment
       await supabase
         .from('bookings')
-        .update({ payment_status: 'paid', status: 'confirmed' })
+        .update({ payment_status: 'external', status: 'confirmed' })
         .eq('id', bookingId);
       
       return data;
@@ -117,7 +119,7 @@ export class EscrowService {
   /**
    * Refund payment to customer (e.g., if service provider cancels)
    */
-  static async refundPayment(paymentId: string, bookingId: string): Promise<boolean> {
+  static async refundPayment(paymentId: string, bookingId?: string): Promise<boolean> {
     try {
       // In a real implementation, this would integrate with a payment processor
       
@@ -134,11 +136,13 @@ export class EscrowService {
         return false;
       }
       
-      // Update booking status
-      await supabase
-        .from('bookings')
-        .update({ status: 'canceled', payment_status: 'refunded' })
-        .eq('id', bookingId);
+      // Update booking status if booking ID is provided
+      if (bookingId) {
+        await supabase
+          .from('bookings')
+          .update({ status: 'canceled', payment_status: 'refunded' })
+          .eq('id', bookingId);
+      }
       
       return true;
     } catch (error) {
@@ -152,10 +156,11 @@ export class EscrowService {
    */
   static async createDispute(
     paymentId: string, 
-    bookingId: string, 
-    reason: string, 
-    evidenceUrl?: string
-  ): Promise<boolean> {
+    reason: string,
+    userId: string,
+    providerId: string,
+    bookingId?: string
+  ): Promise<{ error?: any }> {
     try {
       // First mark the payment as disputed
       const { error: paymentError } = await supabase
@@ -168,7 +173,7 @@ export class EscrowService {
       
       if (paymentError) {
         console.error("Error marking payment as disputed:", paymentError);
-        return false;
+        return { error: paymentError };
       }
       
       // Create dispute record
@@ -178,25 +183,28 @@ export class EscrowService {
           payment_id: paymentId,
           booking_id: bookingId,
           reason,
-          evidence_url: evidenceUrl,
+          user_id: userId,
+          provider_id: providerId,
           status: 'open'
         });
       
       if (disputeError) {
         console.error("Error creating payment dispute:", disputeError);
-        return false;
+        return { error: disputeError };
       }
       
-      // Update booking status
-      await supabase
-        .from('bookings')
-        .update({ status: 'disputed' })
-        .eq('id', bookingId);
+      // Update booking status if booking ID is provided
+      if (bookingId) {
+        await supabase
+          .from('bookings')
+          .update({ status: 'disputed' })
+          .eq('id', bookingId);
+      }
       
-      return true;
+      return {};
     } catch (error) {
       console.error("Error in createDispute:", error);
-      return false;
+      return { error };
     }
   }
   

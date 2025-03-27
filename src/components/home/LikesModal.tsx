@@ -75,9 +75,14 @@ export function LikesModal({ open, onOpenChange, postId }: LikesModalProps) {
     }
   };
 
-  const handleUserClick = (userId: string) => {
+  const handleUserClick = (userId: string, username: string) => {
     onOpenChange(false);
-    navigate(`/user/${userId}`);
+    
+    if (username) {
+      navigate(`/@${username}`);
+    } else {
+      navigate(`/user/${userId}`);
+    }
   };
 
   return (
@@ -103,7 +108,7 @@ export function LikesModal({ open, onOpenChange, postId }: LikesModalProps) {
                 <button
                   key={like.id}
                   className="flex items-center gap-3 w-full text-left hover:bg-white/5 p-2 rounded-md transition-colors"
-                  onClick={() => handleUserClick(like.user_id)}
+                  onClick={() => handleUserClick(like.user_id, like.profiles?.username || "")}
                 >
                 <Avatar className="w-10 h-10">
                     <ProfileImage 

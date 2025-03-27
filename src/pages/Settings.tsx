@@ -522,6 +522,7 @@ export default function Settings() {
 
   // Profile settings
   const [username, setUsername] = useState("");
+  const [displayName, setDisplayName] = useState("");
   const [email, setEmail] = useState("");
   const [bio, setBio] = useState("");
   const [aboutBusiness, setAboutBusiness] = useState("");
@@ -609,7 +610,7 @@ export default function Settings() {
         
         if (userError || !user) {
           console.error("Error getting authenticated user:", userError);
-          navigate('/login');
+          navigate('/auth');
           return;
         }
         
@@ -633,6 +634,7 @@ export default function Settings() {
           // Set profile data to state
           setUserProfile(profileData);
           setUsername(profileData.username || "");
+          setDisplayName(profileData.display_name || profileData.username || "");
           setBio(profileData.bio || "");
           setAboutBusiness(profileData.about_business || "");
           setBusinessName(profileData.business_name || "");
@@ -773,8 +775,10 @@ export default function Settings() {
     try {
       const updateData: any = {
         username,
+        display_name: displayName.trim() || username.trim(),
         bio,
         about_business: aboutBusiness,
+        business_name: businessName,
         updated_at: new Date().toISOString(),
       };
 
@@ -1356,23 +1360,37 @@ export default function Settings() {
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div className="space-y-2">
                         <Label htmlFor="username">Username</Label>
-                        <div className="relative">
-                          <Input
-                            id="username"
-                            value={username}
-                            onChange={handleUsernameChange}
-                            className={`${!usernameAvailable ? "border-red-500 focus:ring-red-500" : ""}`}
-                            placeholder="Your unique username"
-                          />
-                          {isCheckingUsername && (
-                            <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
-                              <div className="animate-spin h-4 w-4 border-2 border-primary border-opacity-50 border-t-primary rounded-full"></div>
-                            </div>
-                          )}
+                        <div className="flex items-center gap-2">
+                          <div className="relative flex-1">
+                            <Input
+                              id="username"
+                              value={username}
+                              onChange={handleUsernameChange}
+                              placeholder="Your username"
+                              className={`pr-10 ${!usernameAvailable ? 'border-red-500' : ''}`}
+                            />
+                            {isCheckingUsername && (
+                              <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
+                                <LoaderIcon className="h-4 w-4 animate-spin text-primary" />
+                              </div>
+                            )}
+                          </div>
                         </div>
-                        {!usernameAvailable && (
-                          <p className="text-sm text-red-500">This username is already taken</p>
-                        )}
+                        <p className="text-xs text-muted-foreground">
+                          Your unique username for @mentions and profile URL
+                        </p>
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="displayName">Display Name</Label>
+                        <Input
+                          id="displayName"
+                          value={displayName}
+                          onChange={(e) => setDisplayName(e.target.value)}
+                          placeholder="Your display name"
+                        />
+                        <p className="text-xs text-muted-foreground">
+                          The name displayed on your profile and posts
+                        </p>
                       </div>
                       <div className="space-y-2">
                         <Label htmlFor="email">Email</Label>

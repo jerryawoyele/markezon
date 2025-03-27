@@ -630,8 +630,12 @@ export default function Messages() {
   }
   
   // Navigate to user profile
-  function handleProfileClick(userId: string) {
-    navigate(`/user/${userId}`);
+  function handleProfileClick(userId: string, username?: string) {
+    if (username) {
+      navigate(`/@${username}`);
+    } else {
+      navigate(`/user/${userId}`);
+    }
   }
 
   // Filter conversations based on search
@@ -657,7 +661,7 @@ export default function Messages() {
       <div className="flex flex-col h-screen md:pt-0">
         
         {/* Always show the mobile header on the Messages page */}
-        <MobileHeader className="block" />
+        <MobileHeader />
         
         <div className="flex flex-1 overflow-hidden">
           {/* Conversations sidebar */}
@@ -695,7 +699,7 @@ export default function Messages() {
                         className="w-12 h-12 rounded-full"
                         onClick={(e) => {
                           e.stopPropagation(); // Prevent conversation selection
-                          handleProfileClick(conversation.id);
+                          handleProfileClick(conversation.id, conversation.profile.username);
                         }}
                       />
                       <div className="flex-1 min-w-0">
@@ -747,7 +751,7 @@ export default function Messages() {
                         </Button>
                   <div 
                     className="cursor-pointer" 
-                    onClick={() => handleProfileClick(selectedConversation.id)}
+                    onClick={() => handleProfileClick(selectedConversation.id, selectedConversation.profile.username)}
                   >
                     <ProfileImage 
                       src={selectedConversation.profile.avatar_url || selectedConversation.profile.auth_metadata?.avatar_url} 
@@ -758,7 +762,7 @@ export default function Messages() {
                   <div className="min-w-0 flex-1">
                     <h2 
                       className="font-medium cursor-pointer hover:underline truncate max-w-[200px]"
-                      onClick={() => handleProfileClick(selectedConversation.id)}
+                      onClick={() => handleProfileClick(selectedConversation.id, selectedConversation.profile.username)}
                     >
                       {selectedConversation.profile.username || selectedConversation.profile.auth_metadata?.full_name || 'User'}
                     </h2>

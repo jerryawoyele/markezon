@@ -18,9 +18,10 @@ interface SearchUsersProps {
   searchQuery: string;
   show: boolean;
   onClose: () => void;
+  onUserClick?: (userId: string) => void;
 }
 
-export function SearchUsers({ searchQuery, show, onClose }: SearchUsersProps) {
+export function SearchUsers({ searchQuery, show, onClose, onUserClick }: SearchUsersProps) {
   const [results, setResults] = useState<SearchResult[]>([]);
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
@@ -101,7 +102,7 @@ export function SearchUsers({ searchQuery, show, onClose }: SearchUsersProps) {
     }
   }, [searchQuery, show]);
 
-  const handleUserClick = (userId: string, username: string | null, e: React.MouseEvent) => {
+  const handleUserClick = (userId: string, username: string, e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
     
@@ -110,16 +111,13 @@ export function SearchUsers({ searchQuery, show, onClose }: SearchUsersProps) {
     
     // Then navigate after a slight delay to ensure clean UI transition
     setTimeout(() => {
-      // Navigate to user profile - use /user/userId format for consistency
-      navigate(`/user/${userId}`);
+      // Navigate to user profile using the @username format
+      navigate(`/@${username}`);
       
-      // Note: We're not using the @username format to keep consistency with the app navigation
-      // But could be uncommented if that format is preferred:
-      // if (username) {
-      //   navigate(`/@${username}`);
-      // } else {
-      //   navigate(`/user/${userId}`);
-      // }
+      // Also call the onUserClick callback if provided
+      if (onUserClick) {
+        onUserClick(userId);
+      }
     }, 50);
   };
 

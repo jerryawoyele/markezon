@@ -48,6 +48,7 @@ interface Profile {
     avatar_url?: string;
     name?: string;
   };
+  display_name?: string;
 }
 
 interface Comment {
@@ -59,7 +60,7 @@ interface Comment {
   profile?: {
     username: string | null;
     avatar_url: string | null;
-  };
+  } | { username: any; avatar_url: any; }[];
 }
 
 interface Like {
@@ -70,7 +71,7 @@ interface Like {
   profile?: {
     username: string | null;
     avatar_url: string | null;
-  };
+  } | { username: any; avatar_url: any; }[];
 }
 
 interface PostProps {
@@ -506,7 +507,11 @@ export function Post({
 
   const handleProfileClick = (e: React.MouseEvent) => {
     e.stopPropagation();
-    navigate(`/user/${user_id}`);
+    if (profiles?.username) {
+      navigate(`/@${profiles.username}`);
+    } else {
+      navigate(`/user/${user_id}`);
+    }
   };
 
   const handleDelete = async () => {
@@ -731,6 +736,18 @@ export function Post({
     setEditedCaption(captionState);
   }, [captionState]);
 
+  // Helper function to get initials from a name
+  const getInitials = (name: string): string => {
+    if (!name || typeof name !== 'string') return '?';
+    
+    return name
+      .split(' ')
+      .map(word => word.charAt(0))
+      .join('')
+      .toUpperCase()
+      .substring(0, 2); // Limit to 2 characters
+  };
+
   return (
     <>
       <div className="max-w-2xl mx-auto w-full">
@@ -738,27 +755,24 @@ export function Post({
           className="bg-black/60 hover:bg-black/70 border-white/5 transition-colors duration-200 overflow-hidden"
           onClick={handleCardClick}
         >
-          <div className="p-4 flex items-start gap-3" onClick={(e) => e.stopPropagation()}>
-            <ProfileImage 
-              src={profiles?.avatar_url || profiles?.auth_metadata?.avatar_url} 
-              alt={profiles?.username || profiles?.auth_metadata?.full_name || "User"}
-              className="w-10 h-10 rounded-full shrink-0 cursor-pointer"
-              onClick={handleProfileClick}
-            />
-            <div className="flex-1">
-              <div className="flex flex-col items-start gap-2">
-                <h3 
-                  className="font-medium text-sm cursor-pointer hover:underline truncate max-w-[200px]" 
-                  onClick={handleProfileClick}
-                >
-                  {(profiles?.username || 
-                    profiles?.auth_metadata?.name || 
-                    "user")}
-                </h3>
-                <span className="text-muted-foreground text-xs">
-                  {formatTimeAgo(created_at || new Date().toISOString())}
-                </span>
+          <div className="px-3 pt-3 pb-1 flex items-start gap-3" onClick={(e) => e.stopPropagation()}>
+            <Avatar className="h-8 w-8" onClick={handleProfileClick} style={{ cursor: 'pointer' }}>
+              <AvatarImage 
+                src={profiles?.avatar_url || profiles?.auth_metadata?.avatar_url}
+                alt={profiles?.username || profiles?.auth_metadata?.full_name || "User"}
+              />
+              <AvatarFallback>{getInitials(profiles?.username || profiles?.auth_metadata?.full_name || "User")}</AvatarFallback>
+            </Avatar>
+            <div>
+              <div className="font-medium text-sm cursor-pointer hover:underline" onClick={handleProfileClick}>
+                {profiles?.username || 
+                  profiles?.auth_metadata?.name ||
+                  profiles?.auth_metadata?.full_name ||
+                  "User"}
               </div>
+              <span className="text-xs text-white/60">
+                {formatTimeAgo(created_at || new Date().toISOString())}
+              </span>
             </div>
             
             {/* Post Options Menu - Only visible for post owner */}
@@ -1150,21 +1164,18 @@ export function Post({
                     <div className="flex items-center gap-3 mb-4">
                       <ProfileImage 
                         src={profiles?.avatar_url || profiles?.auth_metadata?.avatar_url} 
-                        alt={profiles?.username || "User"}
-                        className="w-8 h-8 rounded-full"
+                        alt={profiles?.username || profiles?.auth_metadata?.full_name || "User"}
+                        className="w-8 h-8 rounded-full cursor-pointer"
                         onClick={handleProfileClick}
                       />
                       <div>
-                        <h3 
-                          className="font-medium text-sm hover:underline cursor-pointer"
-                          onClick={handleProfileClick}
-                        >
-                          {profiles?.username || 
-                            profiles?.auth_metadata?.full_name || 
-                            profiles?.auth_metadata?.name || 
+                        <div className="font-medium text-sm cursor-pointer hover:underline" onClick={handleProfileClick}>
+                          {profiles?.username ||
+                            profiles?.auth_metadata?.name ||
+                            profiles?.auth_metadata?.full_name ||
                             "User"}
-                        </h3>
-                        <span className="text-muted-foreground text-xs">
+                        </div>
+                        <span className="text-xs text-white/60">
                           {formatTimeAgo(created_at || new Date().toISOString())}
                         </span>
                       </div>

@@ -149,16 +149,6 @@ export function ServiceBookingForm({ service, onBookingSuccess }: ServiceBooking
       return;
     }
 
-    // Check KYC verification before proceeding
-    if (!providerKycVerified) {
-      toast({
-        title: "Service Provider Verification Required",
-        description: "The service provider has not completed verification yet. Please check back later or choose another service.",
-        variant: "destructive",
-      });
-      return;
-    }
-
     setIsSubmitting(true);
 
     try {
@@ -204,6 +194,7 @@ export function ServiceBookingForm({ service, onBookingSuccess }: ServiceBooking
       if (bookingError) throw bookingError;
 
       // Create an escrow payment for this booking
+      // This will be marked as completed automatically if payments are disabled
       const escrowPayment = await EscrowService.createPayment(
         bookingData.id,
         service.price,
@@ -340,42 +331,6 @@ export function ServiceBookingForm({ service, onBookingSuccess }: ServiceBooking
     );
   }
 
-  if (!providerKycVerified) {
-    return (
-      <Card>
-        <CardHeader>
-          <CardTitle>Service Provider Verification Required</CardTitle>
-          <CardDescription>
-            The service provider has not completed verification yet. Please check back later or choose another service.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <Alert>
-            <AlertTriangle className="h-4 w-4" />
-            <AlertTitle>Verification Required</AlertTitle>
-            <AlertDescription>
-              The service provider has not completed their identity verification yet.
-              Please check back later or choose another service.
-            </AlertDescription>
-          </Alert>
-          
-          <div className="flex items-center gap-2 p-4 border rounded-lg bg-muted/20">
-            <Shield className="h-5 w-5 text-muted-foreground" />
-            <p className="text-sm">
-              KYC verification protects both customers and service providers by 
-              ensuring everyone on the platform has been properly identified.
-            </p>
-          </div>
-        </CardContent>
-        <CardFooter className="flex justify-center">
-          <Button onClick={() => navigate(`/discover?tab=services`)}>
-            Browse Other Services
-          </Button>
-        </CardFooter>
-      </Card>
-    );
-  }
-
   if (bookingComplete) {
     return (
       <Card>
@@ -411,6 +366,15 @@ export function ServiceBookingForm({ service, onBookingSuccess }: ServiceBooking
         </CardDescription>
       </CardHeader>
       <CardContent>
+        {!providerKycVerified && (
+          <Alert className="mb-4 bg-amber-50 border-amber-200">
+            <AlertTriangle className="h-4 w-4 text-amber-600" />
+            <AlertTitle>Unverified Service Provider</AlertTitle>
+            <AlertDescription>
+              This service provider hasn't completed verification yet. You can still book their service, but proceed with caution.
+            </AlertDescription>
+          </Alert>
+        )}
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
           <div className="space-y-2">
             <Label htmlFor="service">Service</Label>
@@ -529,8 +493,12 @@ export function ServiceBookingForm({ service, onBookingSuccess }: ServiceBooking
 
           <div className="py-2 px-3 bg-muted/30 rounded-md text-sm">
             <p className="font-medium mb-1">Payment Information</p>
+            <p className="text-muted-foreground mb-2">
+              The price for this service is ${service.price}. 
+            </p>
             <p className="text-muted-foreground">
-              Your payment of ${service.price} will be held securely in escrow until the service is completed.
+              Currently, payments are handled directly between you and the service provider. 
+              You can discuss payment details in the chat after booking is confirmed.
             </p>
           </div>
 

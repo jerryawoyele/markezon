@@ -60,8 +60,8 @@ const App = () => {
             <Route path="/notifications" element={<Notifications />} />
             <Route path="/profile" element={<Profile />} />
             <Route path="/settings" element={<Settings />} />
-            <Route path="/@:username" element={<UserProfile />} />
-            <Route path="/@:username/:postId" element={<UserProfile />} />
+            <Route path="/:username" element={<UserProfile />} />
+            <Route path="/:username/:postId" element={<UserProfile />} />
             <Route path="/user/:userId" element={<UserProfile />} />
             <Route path="/user/:userId/:postId" element={<UserProfile />} />
             <Route path="/userprofile/:userId" element={<UserProfile />} />

@@ -4,6 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ServiceType } from "@/types";
 import { formatCurrency } from "@/lib/utils";
+import { useNavigate } from 'react-router-dom';
 
 interface ServiceCardProps {
   service: ServiceType;
@@ -11,6 +12,14 @@ interface ServiceCardProps {
 }
 
 export function ServiceCard({ service, onClick }: ServiceCardProps) {
+  const navigate = useNavigate();
+  
+  const handleCategoryClick = (e: React.MouseEvent, category: string) => {
+    e.stopPropagation();
+    e.preventDefault();
+    navigate(`/discover?search=${encodeURIComponent(category)}&tab=services`);
+  };
+  
   return (
     <Card className="overflow-hidden hover:shadow-lg transition-all flex flex-col h-full">
       <div 
@@ -24,7 +33,14 @@ export function ServiceCard({ service, onClick }: ServiceCardProps) {
         />
       </div>
       <CardContent className="p-4 flex-grow cursor-pointer" onClick={() => onClick(service)}>
-        <Badge className="mb-2">{service.category}</Badge>
+        {service.category && (
+          <Badge 
+            className="mb-2 cursor-pointer hover:bg-primary/10"
+            onClick={(e) => handleCategoryClick(e, service.category)}
+          >
+            {service.category}
+          </Badge>
+        )}
         <h3 className="text-lg font-bold mb-1">{service.title}</h3>
         <p className="text-sm text-gray-500 line-clamp-2">{service.description}</p>
         {service.price && (

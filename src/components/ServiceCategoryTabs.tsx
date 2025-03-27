@@ -97,8 +97,9 @@ export function ServiceCategoryTabs() {
   const [activeTab, setActiveTab] = useState(categories[0].id);
   const navigate = useNavigate();
 
-  const handleServiceClick = () => {
-    navigate('/auth');
+  const handleServiceClick = (service: string) => {
+    // Navigate to discover page with the service as search query
+    navigate(`/discover?search=${encodeURIComponent(service)}`);
   };
 
   return (
@@ -138,7 +139,7 @@ export function ServiceCategoryTabs() {
                 whileHover={{ scale: 1.03 }}
                 whileTap={{ scale: 0.98 }}
                 className="w-full"
-                onClick={handleServiceClick}
+                onClick={() => handleServiceClick(service)}
               >
                 <Card className="h-full bg-white/5 backdrop-blur-md border-white/10 hover:bg-white/10 transition-colors cursor-pointer shadow-lg">
                   <CardContent className="p-4 md:p-6">

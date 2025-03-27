@@ -15,6 +15,7 @@ import {
 import { useToast } from "@/components/ui/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { motion } from "framer-motion";
+import { Loader2 } from "lucide-react";
 
 const GoogleIcon = () => (
   <svg
@@ -76,6 +77,17 @@ export default function Auth() {
     setLoading(true);
 
     try {
+      // Validate name
+      if (!name.trim()) {
+        toast({
+          title: "Name required",
+          description: "Please enter your name.",
+          variant: "destructive",
+        });
+        setLoading(false);
+        return;
+      }
+
       // First validate email format
       const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
       if (!emailRegex.test(email)) {
@@ -87,6 +99,39 @@ export default function Auth() {
         setLoading(false);
         return;
       }
+
+      // Check password strength
+      if (password.length < 8) {
+        toast({
+          title: "Weak password",
+          description: "Password must be at least 8 characters long.",
+          variant: "destructive",
+        });
+        setLoading(false);
+        return;
+      }
+      
+      // Additional password strength check
+      const hasUpperCase = /[A-Z]/.test(password);
+      const hasLowerCase = /[a-z]/.test(password);
+      const hasNumbers = /\d/.test(password);
+      const hasSpecialChar = /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]+/.test(password);
+      
+      if (!(hasUpperCase && hasLowerCase && hasNumbers) && !hasSpecialChar) {
+        toast({
+          title: "Weak password",
+          description: "Password must contain uppercase, lowercase, numbers, or special characters.",
+          variant: "destructive",
+        });
+        setLoading(false);
+        return;
+      }
+
+      // Show loading feedback
+      toast({
+        title: "Creating account...",
+        description: "Please wait while we set up your account.",
+      });
 
       // Proceed with signup - Supabase will reject if email exists
       const { error } = await supabase.auth.signUp({
@@ -127,7 +172,7 @@ export default function Auth() {
     } catch (error) {
       toast({
         title: "Error",
-        description: error.message,
+        description: error.message || "An unexpected error occurred. Please try again.",
         variant: "destructive",
       });
     } finally {
@@ -140,22 +185,64 @@ export default function Auth() {
     setLoading(true);
 
     try {
-      const { error } = await supabase.auth.signInWithPassword({
+      // Validate email and password are not empty
+      if (!email.trim() || !password) {
+        toast({
+          title: "Missing information",
+          description: "Please enter both email and password.",
+          variant: "destructive",
+        });
+        setLoading(false);
+        return;
+      }
+
+      // First validate email format
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(email)) {
+        toast({
+          title: "Invalid email",
+          description: "Please enter a valid email address.",
+          variant: "destructive",
+        });
+        setLoading(false);
+        return;
+      }
+
+      // Show loading feedback
+      toast({
+        title: "Signing in...",
+        description: "Verifying your credentials.",
+      });
+
+      const { error, data } = await supabase.auth.signInWithPassword({
         email,
         password,
       });
 
       if (error) {
-        throw error
-      }else{
+        if (error.message.includes("Invalid login credentials")) {
+          toast({
+            title: "Authentication failed",
+            description: "Invalid email or password. Please try again.",
+            variant: "destructive",
+          });
+        } else {
+          throw error;
+        }
+      } else {
+        toast({
+          title: "Welcome back!",
+          description: "Successfully signed in.",
+        });
         navigate("/home");
-      };
+      }
     } catch (error) {
       toast({
         title: "Error",
-        description: error.message,
+        description: "An unexpected error occurred. Please try again later.",
         variant: "destructive",
       });
+      console.error("Sign in error:", error);
     } finally {
       setLoading(false);
     }
@@ -211,225 +298,242 @@ export default function Auth() {
 
   return (
     <div className="flex flex-col min-h-screen bg-gradient-to-b from-black via-gray-900 to-black">
+      {/* Header with logo */}
+      <header className="w-full p-4 flex justify-center z-10">
+        <div className="container flex justify-between items-center">
+          <a href="/" className="flex items-center">
+            <h1 className="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-purple-600">
+              Markezon
+            </h1>
+          </a>
+        </div>
+      </header>
+
       <main className="flex-1 flex items-center justify-center p-4 md:p-8">
         <div className="absolute inset-0 z-0">
           <div className="absolute inset-0 bg-grid-white/5 bg-grid-16 [mask-image:radial-gradient(ellipse_at_center,white,transparent_70%)]"></div>
         </div>
 
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5 }}
-          className="relative z-10 w-full max-w-md"
-        >
-          {resetPassword ? (
-            <Card className="bg-black/40 backdrop-blur-md border border-white/10">
+        {resetPassword ? (
+          <div className="z-10 relative w-full max-w-md">
+            <Card className="border-none bg-black/60 backdrop-blur-sm">
               <CardHeader>
-                <CardTitle className="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-purple-600">
-                  Reset Password
-                </CardTitle>
-                <CardDescription className="text-white/70">
-                  Enter your email to receive a password reset link
+                <CardTitle className="text-center">Reset your password</CardTitle>
+                <CardDescription className="text-center">
+                  Enter your email address and we will send you a link to reset your password.
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <form onSubmit={handleSignIn} className="space-y-4">
+                <form onSubmit={handlePasswordReset} className="space-y-4">
                   <div className="space-y-2">
-                    <Label htmlFor="email" className="text-white">
-                      Email
-                    </Label>
+                    <Label htmlFor="email">Email</Label>
                     <Input
                       id="email"
-                      type="email"
-                      placeholder="Enter your email"
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
+                      placeholder="Enter your email"
+                      autoComplete="email"
+                      className="border border-gray-700 bg-black/40"
                       required
-                      className="bg-white/10 border-white/20 text-white placeholder:text-white/40 focus:border-blue-400"
                     />
                   </div>
                   <Button
                     type="submit"
-                    className="w-full font-semibold bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700"
+                    className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 transition-all"
                     disabled={loading}
                   >
-                    {loading ? "Processing..." : "Send Reset Link"}
+                    {loading ? (
+                      <span className="flex items-center">
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Processing
+                      </span>
+                    ) : (
+                      "Send Reset Link"
+                    )}
                   </Button>
+                  <div className="text-center">
+                    <Button
+                      variant="link"
+                      onClick={() => setResetPassword(false)}
+                      className="text-white/70 hover:text-white"
+                    >
+                      Back to login
+                    </Button>
+                  </div>
                 </form>
               </CardContent>
-              <CardFooter className="flex justify-center">
-                <Button
-                  variant="link"
-                  onClick={() => setResetPassword(false)}
-                  className="text-blue-400 hover:text-blue-300"
-                >
-                  Back to login
-                </Button>
-              </CardFooter>
             </Card>
-          ) : (
-            <Card className="bg-black/40 backdrop-blur-md border border-white/10">
+          </div>
+        ) : (
+          <div className="z-10 relative w-full max-w-md">
+            <Card className="border-none bg-black/60 backdrop-blur-sm">
               <CardHeader>
-                <CardTitle className="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-purple-600">
-                  Welcome to Markezon
+                <CardTitle className="text-center text-2xl font-bold mb-1">
+                  <span className="bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-purple-600">
+                    Welcome to Markezon
+                  </span>
                 </CardTitle>
-                <CardDescription className="text-white/70">
-                  Sign in or create an account to continue
+                <CardDescription className="text-center text-white/70">
+                  Sign in to your account or create a new one
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <Tabs defaultValue="login" className="w-full">
-                  <TabsList className="grid mb-4 w-full grid-cols-2 bg-white/10">
-                    <TabsTrigger
-                      value="login"
-                      className="text-white data-[state=active]:bg-white/10"
-                    >
-                      Login
-                    </TabsTrigger>
-                    <TabsTrigger
-                      value="register"
-                      className="text-white data-[state=active]:bg-white/10"
-                    >
-                      Register
-                    </TabsTrigger>
+                <Tabs defaultValue="login">
+                  <TabsList className="grid w-full grid-cols-2 mb-6">
+                    <TabsTrigger value="login">Login</TabsTrigger>
+                    <TabsTrigger value="register">Register</TabsTrigger>
                   </TabsList>
-                  <Button
-                    variant="outline"
-                    onClick={() => handleOAuthSignIn("google")}
-                    className="bg-white/15 w-full border-white/10 text-white hover:bg-white/10 px-8"
-                  >
-                    <GoogleIcon />
-                    <span className="ml-2">Google</span>
-                  </Button>
-                  <div className="mt-6">
-                  <div className="relative">
-                    <div className="absolute inset-0 flex items-center">
-                      <div className="w-full border-t border-white/10"></div>
-                    </div>
-                    <div className="relative flex justify-center text-xs">
-                      <span className="px-2 bg-black/40 text-white/60">
-                        Or continue with
-                      </span>
-                    </div>
-                  </div>
-
-                  {/* <div className="flex justify-center mt-4"></div> */}
-                </div>
-                  <TabsContent value="login" className="mt-4">
-                    <form onSubmit={handleSignIn} className="space-y-4">
-                      <div className="space-y-2">
-                        <Label htmlFor="login-email" className="text-white">
-                          Email
-                        </Label>
-                        <Input
-                          id="login-email"
-                          type="email"
-                          placeholder="Enter your email"
-                          value={email}
-                          onChange={(e) => setEmail(e.target.value)}
-                          required
-                          className="bg-white/10 border-white/20 text-white placeholder:text-white/40 focus:border-blue-400"
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <div className="flex items-center justify-between">
-                          <Label
-                            htmlFor="login-password"
-                            className="text-white"
-                          >
-                            Password
-                          </Label>
-                          <Button
-                            variant="link"
-                            onClick={() => handleSignIn}
-                            className="p-0 h-auto text-sm text-blue-400 hover:text-blue-300"
-                          >
-                            Forgot password?
-                          </Button>
+                  <TabsContent value="login">
+                    <form onSubmit={handleSignIn} className="space-y-5">
+                      <div className="space-y-3">
+                        <div className="space-y-2">
+                          <Label htmlFor="email-login">Email</Label>
+                          <Input
+                            id="email-login"
+                            value={email}
+                            onChange={(e) => setEmail(e.target.value)}
+                            placeholder="Enter your email"
+                            autoComplete="email"
+                            className="border border-gray-700 bg-black/40"
+                            required
+                          />
                         </div>
-                        <Input
-                          id="login-password"
-                          type="password"
-                          placeholder="Enter your password"
-                          value={password}
-                          onChange={(e) => setPassword(e.target.value)}
-                          required
-                          className="bg-white/10 border-white/20 text-white placeholder:text-white/40 focus:border-blue-400"
-                        />
+                        <div className="space-y-2">
+                          <div className="flex items-center justify-between">
+                            <Label htmlFor="password-login">Password</Label>
+                            <Button
+                              variant="link"
+                              onClick={() => setResetPassword(true)}
+                              className="text-xs p-0 h-auto text-white/70 hover:text-white"
+                            >
+                              Forgot password?
+                            </Button>
+                          </div>
+                          <Input
+                            id="password-login"
+                            type="password"
+                            value={password}
+                            onChange={(e) => setPassword(e.target.value)}
+                            placeholder="Enter your password"
+                            autoComplete="current-password"
+                            className="border border-gray-700 bg-black/40"
+                            required
+                          />
+                        </div>
                       </div>
                       <Button
                         type="submit"
-                        className="w-full font-semibold bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700"
+                        className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 transition-all"
                         disabled={loading}
                       >
-                        {loading ? "Signing in..." : "Sign In"}
+                        {loading ? (
+                          <span className="flex items-center">
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                            Signing in
+                          </span>
+                        ) : (
+                          "Sign in"
+                        )}
                       </Button>
                     </form>
                   </TabsContent>
-
-                  <TabsContent value="register" className="mt-4">
-                    <form onSubmit={handleSignUp} className="space-y-4">
-                      <div className="space-y-2">
-                        <Label htmlFor="register-name" className="text-white">
-                          Full Name
-                        </Label>
-                        <Input
-                          id="register-name"
-                          type="text"
-                          placeholder="Enter your name"
-                          value={name}
-                          onChange={(e) => setName(e.target.value)}
-                          required
-                          className="bg-white/10 border-white/20 text-white placeholder:text-white/40 focus:border-blue-400"
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="register-email" className="text-white">
-                          Email
-                        </Label>
-                        <Input
-                          id="register-email"
-                          type="email"
-                          placeholder="Enter your email"
-                          value={email}
-                          onChange={(e) => setEmail(e.target.value)}
-                          required
-                          className="bg-white/10 border-white/20 text-white placeholder:text-white/40 focus:border-blue-400"
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label
-                          htmlFor="register-password"
-                          className="text-white"
-                        >
-                          Password
-                        </Label>
-                        <Input
-                          id="register-password"
-                          type="password"
-                          placeholder="Create a password"
-                          value={password}
-                          onChange={(e) => setPassword(e.target.value)}
-                          required
-                          className="bg-white/10 border-white/20 text-white placeholder:text-white/40 focus:border-blue-400"
-                        />
+                  <TabsContent value="register">
+                    <form onSubmit={handleSignUp} className="space-y-5">
+                      <div className="space-y-3">
+                        <div className="space-y-2">
+                          <Label htmlFor="name">Full Name</Label>
+                          <Input
+                            id="name"
+                            value={name}
+                            onChange={(e) => setName(e.target.value)}
+                            placeholder="Enter your full name"
+                            autoComplete="name"
+                            className="border border-gray-700 bg-black/40"
+                            required
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="email-register">Email</Label>
+                          <Input
+                            id="email-register"
+                            value={email}
+                            onChange={(e) => setEmail(e.target.value)}
+                            placeholder="Enter your email"
+                            autoComplete="email"
+                            className="border border-gray-700 bg-black/40"
+                            required
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="password-register">Password</Label>
+                          <Input
+                            id="password-register"
+                            type="password"
+                            value={password}
+                            onChange={(e) => setPassword(e.target.value)}
+                            placeholder="Create a secure password"
+                            autoComplete="new-password"
+                            className="border border-gray-700 bg-black/40"
+                            required
+                          />
+                          <p className="text-xs text-white/60">
+                            Password must be at least 8 characters with uppercase, lowercase, and numbers or special characters.
+                          </p>
+                        </div>
                       </div>
                       <Button
                         type="submit"
-                        className="w-full font-semibold bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700"
+                        className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 transition-all"
                         disabled={loading}
                       >
-                        {loading ? "Creating account..." : "Create Account"}
+                        {loading ? (
+                          <span className="flex items-center">
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                            Creating account
+                          </span>
+                        ) : (
+                          "Create account"
+                        )}
                       </Button>
                     </form>
                   </TabsContent>
                 </Tabs>
-
-                
+                <div className="relative my-6">
+                  <div className="absolute inset-0 flex items-center">
+                    <span className="w-full border-t border-gray-700"></span>
+                  </div>
+                  <div className="relative flex justify-center text-xs">
+                    <span className="bg-black/60 px-2 text-white/60">Or continue with</span>
+                  </div>
+                </div>
+                <div className="flex flex-col space-y-3">
+                  <Button
+                    variant="outline"
+                    onClick={() => handleOAuthSignIn("google")}
+                    className="bg-transparent border border-gray-700 hover:bg-white/10"
+                  >
+                    <svg
+                      className="mr-2 h-4 w-4"
+                      aria-hidden="true"
+                      focusable="false"
+                      data-prefix="fab"
+                      data-icon="google"
+                      role="img"
+                      xmlns="http://www.w3.org/2000/svg"
+                      viewBox="0 0 488 512"
+                    >
+                      <path
+                        fill="currentColor"
+                        d="M488 261.8C488 403.3 391.1 504 248 504 110.8 504 0 393.2 0 256S110.8 8 248 8c66.8 0 123 24.5 166.3 64.9l-67.5 64.9C258.5 52.6 94.3 116.6 94.3 256c0 86.5 69.1 156.6 153.7 156.6 98.2 0 135-70.4 140.8-106.9H248v-85.3h236.1c2.3 12.7 3.9 24.9 3.9 41.4z"
+                      ></path>
+                    </svg>
+                    Google
+                  </Button>
+                </div>
               </CardContent>
             </Card>
-          )}
-        </motion.div>
+          </div>
+        )}
       </main>
     </div>
   );

@@ -58,14 +58,41 @@ export default function Discover() {
 
   useEffect(() => {
     checkAuthAndFetchUserRole();
-    
-    // Check for tab query parameter in URL
+  }, []);
+  
+  // Handle URL search parameters
+  useEffect(() => {
     const params = new URLSearchParams(location.search);
+    
+    // Check for tab parameter
     const tabParam = params.get('tab');
     if (tabParam === 'services' || tabParam === 'posts') {
       setDiscoverTab(tabParam);
     }
+    
+    // Check for search parameter
+    const searchParam = params.get('search');
+    if (searchParam) {
+      setSearchQuery(searchParam);
+    }
   }, [location.search]);
+
+  // Extract and apply search query from URL parameters
+  useEffect(() => {
+    if (searchQuery && services.length > 0) {
+      // If there's a search query and it matches services better than posts,
+      // automatically switch to services tab
+      const query = searchQuery.toLowerCase();
+      const matchingServices = services.filter(s => 
+        (s.title && s.title.toLowerCase().includes(query)) ||
+        (s.category && s.category.toLowerCase().includes(query))
+      );
+      
+      if (matchingServices.length > 0 && discoverTab !== 'services') {
+        setDiscoverTab('services');
+      }
+    }
+  }, [searchQuery, services, discoverTab]);
 
   const checkAuthAndFetchUserRole = async () => {
     try {
@@ -210,8 +237,13 @@ export default function Discover() {
     setShowPostModal(true);
   };
 
-  const handleUserClick = (userId: string) => {
-    window.location.href = `/user/${userId}`;
+  const handleUserClick = (userId: string, username: string | null) => {
+    if (username) {
+      navigate(`/@${username}`);
+    } else {
+      // Fallback to user ID if username is not available
+      navigate(`/user/${userId}`);
+    }
   };
 
   const getPostPreviewContent = (post: Post) => {

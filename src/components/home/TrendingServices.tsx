@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Search, X } from "lucide-react";
+import { Search, X, ArrowRight } from "lucide-react";
 import { SearchUsers } from "./SearchUsers";
 import { supabase } from "@/integrations/supabase/client";
 import { useNavigate } from "react-router-dom";
@@ -19,16 +19,24 @@ interface TrendingService {
   description: string;
   engagement_score: number;
   user_id?: string;
-  owner_id?: string;
+  owner_id?: string | {
+    id: string;
+    username: string;
+    avatar_url: string;
+    display_name?: string;
+    business_name?: string;
+  };
   profile?: {
     username: string;
     avatar_url: string;
+    display_name?: string;
   };
   user_profile?: {
     username: string;
     avatar_url: string;
+    display_name?: string;
   };
-  image_url?: string;
+  image?: string;
   price?: number;
   is_price_range?: boolean;
   bookingCount?: number;
@@ -69,10 +77,13 @@ export function TrendingServices() {
       // First fetch just the services without any joins
       const { data: servicesData, error: servicesError } = await supabase
         .from('services')
-        .select('*')
+        .select('*, owner_id(*)')
         .order('created_at', { ascending: false });
       
       if (servicesError) throw servicesError;
+      
+      // Debug services data to see owner structure
+      console.log("Services data with owner:", servicesData);
 
       if (!servicesData || servicesData.length === 0) {
         setTrendingServices([]);
@@ -220,7 +231,7 @@ export function TrendingServices() {
       if (userIds.length > 0) {
         const { data: profiles, error: profileError } = await supabase
           .from('profiles')
-          .select('id, username, avatar_url')
+          .select('id, username, avatar_url, display_name, business_name')
           .in('id', userIds);
         
         if (profileError) throw profileError;
@@ -229,12 +240,12 @@ export function TrendingServices() {
       
       // Map profile data to services
       const servicesWithProfiles = selectedServices.map(service => {
-        const profileMatch = service.user_id ? 
-          profileData.find(profile => profile.id === service.user_id) : null;
+        const profileMatch = service.owner_id ? 
+          profileData.find(profile => profile.id === service.owner_id) : null;
         
         return {
           ...service,
-          user_profile: profileMatch || null
+          owner_id: profileMatch || null
         };
       });
       
@@ -253,9 +264,26 @@ export function TrendingServices() {
     setShowResults(!!value);
   };
 
-  const handleServiceClick = (serviceId: string, userId: string, username?: string) => {
-    // Navigate to the user profile page and directly to the services tab
-    navigate(`/user/${userId}?tab=services`);
+  const handleServiceClick = (serviceId: string, userId: string, username?: string, categoryOrTitle?: string) => {
+    // Option 1: Navigate to the service detail page
+    navigate(`/services/${serviceId}`);
+    
+    // Option 2: Navigate to the user profile with services tab
+    // if (username) {
+    //   navigate(`/@${username}?tab=services`);
+    // } else {
+    //   navigate(`/user/${userId}?tab=services`);
+    // }
+  };
+
+  const handleCategoryClick = (category: string) => {
+    // Navigate to discover page with search param for this category
+    navigate(`/discover?search=${encodeURIComponent(category)}`);
+  };
+
+  // Function to handle "Explore More" button click
+  const handleExploreMore = () => {
+    navigate('/discover?tab=services');
   };
 
   return (
@@ -296,7 +324,32 @@ export function TrendingServices() {
       </div>
 
       <Card className="p-6 bg-black/20 border-white/5">
-        <h2 className="text-lg font-semibold mb-4">Trending Services</h2>
+        <div className="flex justify-between items-center mb-4">
+          <h2 className="text-lg font-semibold">Trending Services</h2>
+          <Button 
+            variant="ghost" 
+            size="sm" 
+            className="text-primary hover:text-white"
+            onClick={handleExploreMore}
+          >
+            Explore More <ArrowRight className="ml-1 h-4 w-4" />
+          </Button>
+        </div>
+        
+        {/* Category chips */}
+        <div className="flex flex-wrap gap-2 mb-4">
+          {['Design', 'Development', 'Marketing', 'Writing', 'Digital Art'].map(category => (
+            <Badge 
+              key={category}
+              variant="outline" 
+              className="cursor-pointer hover:bg-white/10 transition-colors"
+              onClick={() => handleCategoryClick(category)}
+            >
+              {category}
+            </Badge>
+          ))}
+        </div>
+        
         <div className="space-y-4">
           {loading ? (
             // Loading skeleton
@@ -321,9 +374,9 @@ export function TrendingServices() {
                       <div className="aspect-video w-full md:w-1/3 relative overflow-hidden">
                         <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent z-10" />
                         
-                        {service.image_url ? (
+                        {service.image ? (
                           <img 
-                            src={service.image_url}
+                            src={service.image}
                             alt={service.title}
                             className="w-full h-full object-cover"
                             onError={(e) => {
@@ -347,15 +400,27 @@ export function TrendingServices() {
                         <div className="flex items-center gap-2 mb-2">
                           <Avatar className="h-6 w-6">
                             <AvatarImage 
-                              src={service.user_profile?.avatar_url || service.profiles?.avatar_url} 
-                              alt={service.user_profile?.username || service.profiles?.username || "Business"} 
+                              src={
+                                typeof service.owner_id === 'object' 
+                                  ? service.owner_id?.avatar_url 
+                                  : service.user_profile?.avatar_url || service.profile?.avatar_url
+                              }
+                              alt={
+                                typeof service.owner_id === 'object'
+                                  ? service.owner_id?.display_name || service.owner_id?.business_name || service.owner_id?.username
+                                  : service.user_profile?.display_name || service.user_profile?.username || service.profile?.display_name || service.profile?.username || "Business"
+                              } 
                             />
                             <AvatarFallback>
                               <User className="h-4 w-4" />
                             </AvatarFallback>
                           </Avatar>
                           <span className="text-xs text-muted-foreground">
-                            {service.user_profile?.username || service.profiles?.username || "Business"}
+                            {
+                              typeof service.owner_id === 'object'
+                                ? service.owner_id?.display_name || service.owner_id?.business_name || service.owner_id?.username || "Business"
+                                : service.user_profile?.display_name || service.user_profile?.username || service.profile?.display_name || service.profile?.username || "Business"
+                            }
                           </span>
                         </div>
                         
@@ -371,6 +436,20 @@ export function TrendingServices() {
                                 : formatPrice(service.price)
                               : 'Free'}
                           </div>
+                          
+                          {service.category && (
+                            <Badge 
+                              variant="outline" 
+                              className="cursor-pointer hover:bg-white/10"
+                              onClick={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                handleCategoryClick(service.category);
+                              }}
+                            >
+                              {service.category}
+                            </Badge>
+                          )}
                         </div>
                       </div>
                     </div>

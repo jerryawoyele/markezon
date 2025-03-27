@@ -5,8 +5,9 @@ import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/components/ui/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { EscrowService } from "@/utils/escrow-service";
-import { Loader2, ThumbsUp, ThumbsDown, AlertCircle } from "lucide-react";
+import { Loader2, ThumbsUp, ThumbsDown, AlertCircle, MessageSquare } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { useNavigate } from "react-router-dom";
 
 interface CustomerConfirmationModalProps {
   isOpen: boolean;
@@ -14,6 +15,7 @@ interface CustomerConfirmationModalProps {
   booking: any;
   onConfirm: () => void;
   onDispute: () => void;
+  user: any;
 }
 
 export function CustomerConfirmationModal({
@@ -21,16 +23,23 @@ export function CustomerConfirmationModal({
   onClose,
   booking,
   onConfirm,
-  onDispute
+  onDispute,
+  user
 }: CustomerConfirmationModalProps) {
   const [feedbackText, setFeedbackText] = useState("");
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
   const [paymentRequired, setPaymentRequired] = useState(false);
   const [paymentLoading, setPaymentLoading] = useState(false);
+  const navigate = useNavigate();
 
   // Check if payment is required but not completed
   const isPaymentRequired = () => {
+    // If payment feature is disabled, never require payment
+    if (EscrowService.isExternalPaymentMode) {
+      return false;
+    }
+    
     if (!booking || !booking.escrow_payments || booking.escrow_payments.length === 0) {
       return true; // Payment is required but not initiated
     }
@@ -100,7 +109,7 @@ export function CustomerConfirmationModal({
       // Release payment if there is one
       if (booking.escrow_payments?.[0]?.id) {
         try {
-          await EscrowService.releasePayment(booking.escrow_payments[0].id);
+          await EscrowService.releasePayment(booking.escrow_payments[0].id, booking.id);
         } catch (paymentError) {
           console.error("Error releasing payment:", paymentError);
           // Continue with completion even if payment release fails
@@ -127,20 +136,33 @@ export function CustomerConfirmationModal({
   };
 
   const handleDispute = async () => {
-    if (!booking) return;
+    if (!booking || !user) return;
     setLoading(true);
     
     try {
-      // Update booking with dispute information
-      const { error } = await supabase
-        .from('bookings')
-        .update({ 
-          status: "disputed",
-          customer_feedback: feedbackText 
-        })
-        .eq('id', booking.id);
+      // If there's a payment, mark it as disputed
+      if (booking.escrow_payments?.[0]?.id) {
+        const result = await EscrowService.createDispute(
+          booking.escrow_payments[0].id,
+          feedbackText || "Customer disputed service completion",
+          user.id,
+          booking.provider_id,
+          booking.id
+        );
         
-      if (error) throw error;
+        if (result.error) throw result.error;
+      } else {
+        // If no payment record, just update the booking status
+        const { error } = await supabase
+          .from('bookings')
+          .update({ 
+            status: "disputed",
+            customer_feedback: feedbackText 
+          })
+          .eq('id', booking.id);
+          
+        if (error) throw error;
+      }
       
       toast({
         title: "Dispute Filed",
@@ -175,9 +197,9 @@ export function CustomerConfirmationModal({
           <div className="space-y-4 py-4">
             <Alert variant="warning">
               <AlertCircle className="h-4 w-4" />
-              <AlertTitle>Payment Required</AlertTitle>
+              <AlertTitle>Payment Discussion</AlertTitle>
               <AlertDescription>
-                Payment is required before you can confirm this service as completed.
+                Please ensure you've discussed and arranged payment with the service provider before confirming.
               </AlertDescription>
             </Alert>
             
@@ -187,22 +209,30 @@ export function CustomerConfirmationModal({
               <p className="text-sm font-medium mt-2">Amount: ${booking?.services?.price}</p>
             </div>
             
-            <div className="flex justify-end space-x-2">
-              <Button
-                variant="outline"
-                onClick={onClose}
-                disabled={paymentLoading}
-              >
-                Cancel
-              </Button>
-              <Button
-                onClick={handleMakePayment}
-                disabled={paymentLoading}
-                className="flex items-center gap-2"
-              >
-                {paymentLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-                Make Payment
-              </Button>
+            <div className="flex flex-col gap-3">
+              <p className="text-sm text-muted-foreground">
+                Payments are currently handled directly between you and the service provider.
+                If you haven't arranged payment yet, please contact the provider before confirming.
+              </p>
+              
+              <div className="flex justify-end space-x-2">
+                <Button
+                  variant="outline"
+                  onClick={onClose}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  onClick={() => {
+                    onClose();
+                    navigate(`/messages?user=${booking?.provider_id}`);
+                  }}
+                  className="flex items-center gap-2"
+                >
+                  <MessageSquare className="h-4 w-4" />
+                  Contact Provider
+                </Button>
+              </div>
             </div>
           </div>
         ) : (

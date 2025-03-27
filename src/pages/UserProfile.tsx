@@ -38,10 +38,12 @@ interface ServiceType {
 }
 
 export function UserProfile() {
-  const { username, userId, postId } = useParams();
+  const params = useParams();
   const navigate = useNavigate();
   const location = useLocation();
   const { toast } = useToast();
+  
+  // Extract username or userId from params
   const [activeTab, setActiveTab] = useState("Discover");
   const [activeProfileTab, setActiveProfileTab] = useState("posts");
   const [loading, setLoading] = useState(true);
@@ -66,6 +68,13 @@ export function UserProfile() {
   const [loadingBookings, setLoadingBookings] = useState(true);
   const [loadingFollowStatus, setLoadingFollowStatus] = useState(false);
   const postRefs = useRef<{ [key: string]: HTMLDivElement | null }>({});
+  
+  // Debug log for params
+  useEffect(() => {
+    console.log("UserProfile params:", params);
+    console.log("Current URL path:", location.pathname);
+    console.log("Current URL search:", location.search);
+  }, [params, location]);
   
   // Use effect to check for tab parameter in URL and set the active tab
   useEffect(() => {
@@ -217,9 +226,9 @@ export function UserProfile() {
       }
       
       // If we need to scroll to a specific post
-      if (postId) {
+      if (params.postId) {
         setTimeout(() => {
-          const postElement = postRefs.current[postId];
+          const postElement = postRefs.current[params.postId];
           if (postElement) {
             postElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
             postElement.classList.add('highlight-post');
@@ -242,109 +251,181 @@ export function UserProfile() {
     }
   };
 
-  // Fetch profile
-  const getProfile = async () => {
+  // Helper function to fetch profile by a specific field and operator
+  const fetchProfileByField = async (field: string, operator: string, value: string) => {
+    console.log(`Fetching profile by ${field} with operator ${operator} and value ${value}`);
     try {
-      setLoadingProfile(true);
+      // Check if supabase is available
+      if (!supabase) {
+        console.error("Supabase client not available");
+        return null;
+      }
+
+      // Use the REST API directly
+      const supabaseUrl = "https://zrjgcanxtojemyknzfgl.supabase.co";
+      const supabaseKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpyamdjYW54dG9qZW15a256ZmdsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDAzNTY1NjMsImV4cCI6MjA1NTkzMjU2M30.fUzRKtbcoYU6SXhB3FM2gXtn2NhI9427-U6eAF5yDdE";
+
+      // For case-insensitive username matching, we should ensure we're using ilike
+      let queryParam = `${field}=${operator}.`;
+      if (field === 'username' && operator === 'eq') {
+        // Always use ilike for usernames to ensure case-insensitive matching
+        queryParam = `${field}=ilike.`;
+      }
+
+      const response = await fetch(`${supabaseUrl}/rest/v1/profiles?${queryParam}${encodeURIComponent(value)}&select=*`, {
+        headers: {
+          'apikey': supabaseKey,
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        }
+      });
       
-      let idOrUsername = userId;
+      if (!response.ok) {
+        console.error(`HTTP error! status: ${response.status}`);
+        return null;
+      }
       
-      // If we don't have a userId but we have a postId, we need to fetch the post first
-      if (!userId && postId) {
-        const { data: postData, error: postError } = await supabase
-          .from('posts')
-          .select('user_id')
-          .eq('id', postId)
-          .single();
-          
-        if (postError || !postData) {
-          console.error("Error fetching post:", postError);
-          navigate('/404');
+      const profiles = await response.json();
+      console.log(`Fetch result for ${field}=${value}:`, profiles);
+      
+      if (profiles && profiles.length > 0) {
+        return profiles[0];
+      } else {
+        console.log(`No profile found with ${field}=${value}`);
+        return null;
+      }
+    } catch (error) {
+      console.error(`Error fetching profile by ${field}:`, error);
+      return null;
+    }
+  };
+
+  // Fetch user profile by user ID or username
+  useEffect(() => {
+    const fetchProfileData = async () => {
+      try {
+        setLoadingProfile(true);
+        
+        // Get the userId or username from params
+        const { userId, username } = params;
+        console.log("Fetching profile with params:", { userId, username });
+        
+        if (!userId && !username) {
+          console.error("No userId or username found in params");
+          setLoadingProfile(false);
           return;
         }
         
-        idOrUsername = postData.user_id;
-      }
-      
-      // First try to fetch via profileId or username
-        const { data, error } = await supabase
-        .from('profiles')
-          .select('*')
-        .or(`id.eq.${idOrUsername},username.eq.${idOrUsername}`)
-        .single();
+        let profileData = null;
         
-      if (error || !data) {
-        console.error("Error fetching profile:", error);
-        
-        // Supabase query might fail for security reasons, try a direct fetch
-        const fetchProfileDirectly = async (idOrUsername, isUsername = false) => {
-          try {
-            const field = isUsername ? 'username' : 'id';
-            // Use a different approach to avoid direct access to protected properties
-            const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/rest/v1/profiles?${field}=eq.${encodeURIComponent(idOrUsername)}&select=*`, {
-              headers: {
-                'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
-                'Content-Type': 'application/json',
-                'Accept': 'application/json'
-              }
-            });
-            
-            console.log(`Fetching profile directly with ${field}:`, idOrUsername);
-            
-            if (!response.ok) {
-              throw new Error(`HTTP error! status: ${response.status}`);
-            }
-            
-            const profiles = await response.json();
-            
-            if (profiles && profiles.length > 0) {
-              setProfile(profiles[0] as ProfileType);
-              return profiles[0];
-            } else {
-              console.error("No profile found with direct fetch");
-              navigate('/404');
-              return null;
-            }
-          } catch (fetchError) {
-            console.error("Error with direct fetch:", fetchError);
-            navigate('/404');
-            return null;
+        if (username) {
+          console.log("Fetching profile by username:", username);
+          // If username starts with @, remove it
+          const cleanUsername = username.startsWith('@') ? username.substring(1) : username;
+          console.log("Cleaned username:", cleanUsername);
+          
+          // Special logging for Spyrojerry
+          if (cleanUsername.toLowerCase() === 'spyrojerry') {
+            console.warn("DEBUG: Attempting to fetch Spyrojerry profile");
           }
-        };
-        
-        // Try first as ID, then as username
-        let profile = await fetchProfileDirectly(idOrUsername, false);
-        
-        if (!profile) {
-          profile = await fetchProfileDirectly(idOrUsername, true);
+          
+          // Attempt to fetch profile by username using ilike for case-insensitive matching
+          try {
+            // First try using ilike directly with Supabase client
+            console.log(`Trying first method: supabase.from('profiles').select('*').ilike('username', ${cleanUsername})`);
+            const { data, error } = await supabase
+              .from('profiles')
+              .select('*')
+              .ilike('username', cleanUsername)
+              .single();
+              
+            if (error) {
+              console.error("Error fetching profile by username using ilike:", error);
+              
+              // Try second method - fetchProfileByField with eq (which will use ilike internally)
+              console.log(`Trying second method: fetchProfileByField with username eq ${cleanUsername}`);
+              profileData = await fetchProfileByField('username', 'eq', cleanUsername);
+              
+              if (!profileData) {
+                // Third attempt - using direct ilike operator
+                console.log(`Trying third method: fetchProfileByField with username ilike ${cleanUsername}`);
+                profileData = await fetchProfileByField('username', 'ilike', cleanUsername);
+                
+                if (!profileData) {
+                  // Final attempt - try a direct query for all profiles and match in memory
+                  console.log("Trying final method: fetch all profiles and match in memory");
+                  const { data: allProfiles, error: allProfilesError } = await supabase
+                    .from('profiles')
+                    .select('*');
+                    
+                  if (!allProfilesError && allProfiles) {
+                    console.log(`Found ${allProfiles.length} profiles in total`);
+                    // Find profile with case-insensitive username match
+                    const matchingProfile = allProfiles.find(
+                      p => p.username && p.username.toLowerCase() === cleanUsername.toLowerCase()
+                    );
+                    
+                    if (matchingProfile) {
+                      console.log("Found matching profile in memory:", matchingProfile);
+                      profileData = matchingProfile;
+                    } else {
+                      // Log all usernames to help debug
+                      console.log("All usernames in database:", allProfiles.map(p => p.username));
+                    }
+                  }
+                }
+              }
+            } else {
+              console.log("Profile fetched by username successfully:", data);
+              profileData = data;
+            }
+          } catch (err) {
+            console.error("Exception in username profile fetch:", err);
+          }
+        } else if (userId) {
+          console.log("Fetching profile by userId:", userId);
+          // Regular user ID lookup
+          const { data, error } = await supabase
+            .from('profiles')
+            .select('*')
+            .eq('id', userId)
+            .single();
+            
+          if (error) {
+            console.error("Error fetching profile by ID:", error);
+          } else {
+            console.log("Profile fetched by ID successfully:", data);
+            profileData = data;
+          }
         }
         
-        if (!profile) {
-          return; // We've already navigated to 404
+        if (profileData) {
+          setProfile(profileData as ProfileType);
+          
+          // Check if this is the current user's profile
+          setIsOwnProfile(profileData.id === currentUser);
+          
+          // Load this user's content once we have their profile
+          setTimeout(() => loadContent(), 0);
+          
+          // Check if the current user is following this profile
+          setTimeout(() => checkFollowStatus(), 0);
+        } else {
+          console.error("Profile not found");
+          setProfile(null);
         }
-      } else {
-        setProfile(data as ProfileType);
+        
+        setLoadingProfile(false);
+      } catch (error) {
+        console.error("Error in fetchProfileData:", error);
+        setLoadingProfile(false);
       }
-      
-      setLoadingProfile(false);
-    } catch (error) {
-      console.error("Error in getProfile:", error);
-      navigate('/404');
+    };
+    
+    if (currentUser !== null) {
+      fetchProfileData();
     }
-  };
-  
-  // Effect to load profile data
-  useEffect(() => {
-    getProfile();
-  }, [username, userId]);
-  
-  // Effect to check follow status when profile or current user changes
-  useEffect(() => {
-    if (profile && currentUser && !isOwnProfile) {
-      console.log("Checking follow status for profile", profile.id, "and currentUser", currentUser);
-    checkFollowStatus();
-    }
-  }, [profile, currentUser, isOwnProfile]);
+  }, [params, currentUser]);
   
   // Effect to load posts and services after profile is loaded
   useEffect(() => {
@@ -358,7 +439,7 @@ export function UserProfile() {
         setIsOwnProfile(false);
       }
     }
-  }, [profile, postId, currentUser]);
+  }, [profile, params, currentUser]);
   
   // Add this function to fetch bookings for the customer
   const fetchBookings = async () => {
@@ -463,7 +544,7 @@ export function UserProfile() {
         fetchBookings();
       }
     }
-  }, [profile, postId, currentUser]);
+  }, [profile, params, currentUser]);
   
   const requireAuth = (callback: Function) => {
     if (!isAuthenticated) {
@@ -483,9 +564,9 @@ export function UserProfile() {
   const handleShareProfile = () => {
     const currentUrl = window.location.href;
     
-    // If we're on /profile, generate the /user/{userId} URL instead
-    const shareUrl = window.location.pathname === "/profile" 
-      ? `${window.location.origin}/user/${profile?.id}`
+    // Generate the profile URL using the @username format
+    const shareUrl = profile?.username 
+      ? `${window.location.origin}/@${profile.username}`
       : currentUrl;
     
     if (navigator.share) {
@@ -614,43 +695,68 @@ export function UserProfile() {
             throw new Error(`HTTP error! status: ${response.status}`);
           }
         } else {
-          // Follow logic - use REST API directly
-          console.log(`Following: ${currentUser} follows ${profile?.id}`);
-          const response = await fetch(
-            `${supabaseUrl}/rest/v1/follows`,
-            {
-              method: 'POST',
-              headers,
-              body: JSON.stringify({
-                follower_id: currentUser,
-                following_id: profile?.id
-              })
+          // Before following, check if the relationship already exists to avoid 409 conflict
+          console.log(`Checking if ${currentUser} already follows ${profile?.id}`);
+          const checkResponse = await fetch(
+            `${supabaseUrl}/rest/v1/follows?follower_id=eq.${currentUser}&following_id=eq.${profile?.id}&select=id`,
+            { 
+              headers: {
+                'apikey': supabaseKey,
+                'Content-Type': 'application/json',
+                'Accept': 'application/json'
+              }
             }
           );
           
-          if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
+          if (!checkResponse.ok) {
+            throw new Error(`HTTP error checking follow status! status: ${checkResponse.status}`);
           }
           
-          // Create a notification for the user being followed
-          if (profile?.id && currentUser) {
-            // Get current user's profile info to use in notification
-            const { data: currentUserProfile } = await supabase
-              .from('profiles')
-              .select('username')
-              .eq('id', currentUser)
-              .single();
+          const existingFollow = await checkResponse.json();
+          if (existingFollow && existingFollow.length > 0) {
+            console.log("Follow relationship already exists, skipping follow creation");
+            // If follow relationship already exists, just update UI state
+            setIsFollowing(true);
+          } else {
+            // Follow logic - use REST API directly
+            console.log(`Following: ${currentUser} follows ${profile?.id}`);
+            const response = await fetch(
+              `${supabaseUrl}/rest/v1/follows`,
+              {
+                method: 'POST',
+                headers,
+                body: JSON.stringify({
+                  follower_id: currentUser,
+                  following_id: profile?.id
+                })
+              }
+            );
             
-            const username = currentUserProfile?.username || 'Someone';
+            if (!response.ok) {
+              console.error(`Follow error: ${response.status}`, await response.text());
+              throw new Error(`HTTP error! status: ${response.status}`);
+            }
             
-            // Create the follow notification
-            await createNotification({
-              userId: profile.id,
-              actorId: currentUser,
-              actorName: username,
-              type: 'follow',
-              message: `${username} started following you`
-            });
+            // Create a notification for the user being followed
+            if (profile?.id && currentUser) {
+              // Get current user's profile info to use in notification
+              const { data: currentUserProfile } = await supabase
+                .from('profiles')
+                .select('username')
+                .eq('id', currentUser)
+                .single();
+              
+              const username = currentUserProfile?.username || 'Someone';
+              
+              // Create the follow notification
+              await createNotification({
+                userId: profile.id,
+                actorId: currentUser,
+                actorName: username,
+                type: 'follow',
+                message: `${username} started following you`
+              });
+            }
           }
         }
         
@@ -846,8 +952,8 @@ export function UserProfile() {
   if (loading && !profile) {
     return (
       <MainLayout 
-        activeTab="" 
-        setActiveTab={() => { }}
+        activeTab="Profile" 
+        setActiveTab={() => {}} 
         userRole={currentUserRole as any} 
         isAuthenticated={isAuthenticated}
       >
@@ -862,8 +968,8 @@ export function UserProfile() {
   if (!profile && !loadingProfile) {
     return (
       <MainLayout 
-        activeTab="" 
-        setActiveTab={() => { }}
+        activeTab="Profile" 
+        setActiveTab={() => {}} 
         userRole={currentUserRole as any} 
         isAuthenticated={isAuthenticated}
       >
@@ -884,8 +990,8 @@ export function UserProfile() {
   
   return (
     <MainLayout 
-      activeTab="" 
-      setActiveTab={() => { }}
+      activeTab="Profile" 
+      setActiveTab={(newTab) => setActiveTab(newTab)} 
       userRole={currentUserRole as any} 
       isAuthenticated={isAuthenticated}
     >
@@ -936,48 +1042,51 @@ export function UserProfile() {
                             <p className="text-muted-foreground mb-1">@{profile?.username}</p>
                           </>
                         ) : (
-                          <h1 className="text-2xl font-bold">{profile?.username || "User"}</h1>
+                          <>
+                            <h1 className="text-2xl font-bold">{profile?.display_name || profile?.username || "User"}</h1>
+                            {profile?.username && <p className="text-muted-foreground mb-1">@{profile?.username}</p>}
+                          </>
                         )}
                         <p className="text-white/60 mt-2">{profile?.bio}</p>
                       </div>
                       
                       <div className="grid grid-cols-1 sm:grid-cols-2 md:flex gap-2 mt-4 sm:mt-0">
-                    {!isOwnProfile && (
-                      <>
+                        {!isOwnProfile && (
+                          <>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="flex items-center gap-2"
+                              onClick={handleMessage}
+                            >
+                              <MessageSquare className="h-4 w-4" />
+                              Message
+                            </Button>
+                            
+                            <Button
+                              variant={isFollowing ? "secondary" : "default"}
+                              size="sm"
+                              className="flex items-center gap-2"
+                              onClick={handleFollow}
+                              disabled={loadingFollowStatus}
+                            >
+                              <Users className="h-4 w-4" />
+                              {isFollowing ? 'Following' : 'Follow'}
+                            </Button>
+                          </>
+                        )}
+                        
                         <Button
                           variant="outline"
                           size="sm"
                           className="flex items-center gap-2"
-                          onClick={handleMessage}
+                          onClick={handleShareProfile}
                         >
-                          <MessageSquare className="h-4 w-4" />
-                          Message
+                          <Share2 className="h-4 w-4" />
+                          Share
                         </Button>
-                        
-                        <Button
-                          variant={isFollowing ? "secondary" : "default"}
-                          size="sm"
-                          className="flex items-center gap-2"
-                          onClick={handleFollow}
-                          disabled={loadingFollowStatus}
-                        >
-                          <Users className="h-4 w-4" />
-                          {isFollowing ? 'Following' : 'Follow'}
-                        </Button>
-                      </>
-                    )}
-                    
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="flex items-center gap-2"
-                      onClick={handleShareProfile}
-                    >
-                      <Share2 className="h-4 w-4" />
-                      Share
-                    </Button>
-                  </div>
-                </div>
+                      </div>
+                    </div>
                   </div>
                   
                   {/* Stats row */}
@@ -1070,7 +1179,7 @@ export function UserProfile() {
                     <div 
                       key={post.id} 
                       ref={el => postRefs.current[post.id] = el}
-                      className={`transition-all duration-300 ${postId === post.id ? '' : ''
+                      className={`transition-all duration-300 ${params.postId === post.id ? '' : ''
                       }`}
                     >
                   <Post 

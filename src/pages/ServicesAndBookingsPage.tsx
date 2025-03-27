@@ -31,8 +31,10 @@ import {
   Filter,
   LayoutGrid,
   Sliders,
-  AlertTriangle
+  AlertTriangle,
+  CheckCircle
 } from "lucide-react";
+import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
 import { EscrowService } from "@/utils/escrow-service";
 import { LocationService } from "@/utils/location-service";
 import { MainLayout } from "@/layouts/MainLayout";
@@ -255,8 +257,15 @@ export default function ServicesAndBookingsPage() {
     
     let filtered = [...bookings];
     
-    // Always filter by status (we removed the "all" tab)
-    filtered = filtered.filter(booking => booking.status === statusTab);
+    // Filter by status with special handling for pending_completion
+    filtered = filtered.filter(booking => {
+      // Show pending_completion bookings in the confirmed tab
+      if (statusTab === "confirmed") {
+        return booking.status === "confirmed" || booking.status === "pending_completion";
+      }
+      // Otherwise, use exact status match
+      return booking.status === statusTab;
+    });
     
     // Apply search filter
     if (searchQuery) {
@@ -273,7 +282,7 @@ export default function ServicesAndBookingsPage() {
 
   const handleOpenBooking = (booking: any) => {
     // Navigate to the service details page and show the bookings tab
-    navigate(`/services/${booking.service_id}?tab=bookings`);
+    navigate(`/services/${booking.service_id}`);
   };
 
   const handleContactProvider = (providerId: string, e: React.MouseEvent) => {
@@ -302,7 +311,7 @@ export default function ServicesAndBookingsPage() {
       const booking = bookings.find(b => b.id === bookingToCancel);
       if (booking?.escrow_payments?.[0]?.id) {
         try {
-          await EscrowService.refundPayment(booking.escrow_payments[0].id);
+          await EscrowService.refundPayment(booking.escrow_payments[0].id, null);
         } catch (paymentError) {
           console.error("Error refunding payment:", paymentError);
           // Continue with cancellation even if refund fails
@@ -481,14 +490,14 @@ export default function ServicesAndBookingsPage() {
       const escrowPayment = selectedBooking.escrow_payments?.[0];
       if (!escrowPayment) throw new Error("No payment found for this booking");
       
-      const { error } = await EscrowService.createDispute(
+      const result = await EscrowService.createDispute(
         escrowPayment.id,
         disputeReason,
         user.id,
         selectedBooking.provider_id
       );
       
-      if (error) throw error;
+      if (result.error) throw result.error;
       
       toast({
         title: "Dispute Submitted",
@@ -522,6 +531,12 @@ export default function ServicesAndBookingsPage() {
     } finally {
       setSubmittingDispute(false);
     }
+  };
+
+  // Add this after the existing functions
+  const countPendingConfirmations = () => {
+    if (!bookings) return 0;
+    return bookings.filter(booking => booking.status === "pending_completion").length;
   };
 
   // UI rendering
@@ -578,7 +593,18 @@ export default function ServicesAndBookingsPage() {
   );
 
   const renderBookingsContent = () => (
-    <>
+    <div>
+      {countPendingConfirmations() > 0 && (
+        <Alert className="mb-6 bg-amber-900 border-amber-200">
+          <AlertTriangle className="h-4 w-4 text-amber-600" />
+          <AlertTitle>Action Required</AlertTitle>
+          <AlertDescription>
+            You have {countPendingConfirmations()} {countPendingConfirmations() === 1 ? 'booking' : 'bookings'} awaiting your confirmation. 
+            Service providers have marked these as completed. Please confirm their completion or provide feedback.
+          </AlertDescription>
+        </Alert>
+      )}
+
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8">
         <div>
           <h1 className="text-3xl font-bold mb-1">My Bookings</h1>
@@ -618,7 +644,7 @@ export default function ServicesAndBookingsPage() {
           </div>
 
           <Tabs value={statusTab} onValueChange={setStatusTab} className="mb-6 overflow-hidden">
-            <TabsList className="overflow-x-auto whitespace-nowrap w-full flex ">
+            <TabsList className="overflow-x-auto whitespace-nowrap w-fit flex ">
               <TabsTrigger value="pending">Pending</TabsTrigger>
               <TabsTrigger value="confirmed">Confirmed</TabsTrigger>
               <TabsTrigger value="completed">Completed</TabsTrigger>
@@ -674,14 +700,17 @@ export default function ServicesAndBookingsPage() {
                       </div>
                     )}
                     <Badge 
-                      className="absolute top-2 right-2"
+                      className={`absolute top-2 right-2 ${booking.status === "pending_completion" ? "bg-amber-100 text-amber-800 border-amber-200 hover:bg-amber-100" : ""}`}
                       variant={
                         booking.status === "completed" ? "default" :
                         booking.status === "confirmed" ? "outline" :
-                        booking.status === "pending" ? "secondary" : "destructive"
+                        booking.status === "pending" ? "secondary" : 
+                        booking.status === "pending_completion" ? "outline" : "destructive"
                       }
                     >
-                      {booking.status.charAt(0).toUpperCase() + booking.status.slice(1)}
+                      {booking.status === "pending_completion" 
+                        ? "Awaiting Confirmation" 
+                        : booking.status.charAt(0).toUpperCase() + booking.status.slice(1)}
                     </Badge>
                   </div>
                   
@@ -735,6 +764,21 @@ export default function ServicesAndBookingsPage() {
                         onClick={(e) => handleOpenBooking(booking)}
                       >
                         View Booking
+                      </Button>
+                    )}
+                    
+                    {booking.status === "pending_completion" && (
+                      <Button 
+                        variant="default" 
+                        size="sm" 
+                        className="flex-1"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          navigate(`/bookings/${booking.id}`);
+                        }}
+                      >
+                        <CheckCircle className="h-3 w-3 mr-1" />
+                        Confirm Completion
                       </Button>
                     )}
                     
@@ -816,7 +860,7 @@ export default function ServicesAndBookingsPage() {
                   <StarRating 
                     value={reviewRating} 
                     onChange={setReviewRating} 
-                    size="large"
+                    size={24}
                   />
                 </div>
                 
@@ -928,7 +972,7 @@ export default function ServicesAndBookingsPage() {
           </Dialog>
         </>
       )}
-    </>
+    </div>
   );
 
   return (

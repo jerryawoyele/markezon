@@ -622,11 +622,11 @@ export default function Home() {
       activeTab={activeTab} 
       setActiveTab={setActiveTab}
     >
-      <div className="container max-w-4xl mx-auto px-4 py-4 mb-20">
+      <div className="max-lg:max-w-4xl max-lg:pt-16 py-4 mb-20">
         <MobileHeader />
         
         {/* Content area */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
           {/* Main content - posts */}
           <div className="md:col-span-2">
             {/* Create post area */}
@@ -636,11 +636,11 @@ export default function Home() {
             <div className="mt-4">
               {/* Refresh button */}
               <div className="flex justify-between items-center mb-2">
-                <h2 className="text-lg font-semibold">Latest Posts</h2>
+                <h2 className="text-lg ml-4 font-semibold">Latest Posts</h2>
                 <Button 
                   variant="ghost" 
                   size="sm" 
-                  className="text-gray-800 hover:bg-gray-400 mr-4 bg-primary" 
+                  className="text-gray-800 hover:text-gray-800 hover:bg-gray-300 mr-4 bg-primary" 
                   onClick={refreshPosts}
                 >
                   <RefreshCw className="h-4 w-4 mr-1" />
@@ -735,7 +735,7 @@ export default function Home() {
           </div>
           
           {/* Sidebar */}
-          <div className="hidden md:block">
+          <div className="hidden lg:block">
             <TrendingServices />
           </div>
         </div>

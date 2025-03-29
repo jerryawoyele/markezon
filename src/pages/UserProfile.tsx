@@ -12,7 +12,7 @@ import { ServiceModal } from "@/components/services/ServiceModal";
 import { supabase } from "@/integrations/supabase/client";
 import { ServiceCard } from "@/components/services/ServiceCard";
 import { useToast } from "@/components/ui/use-toast";
-import { Star, Users, FileImage, MessageSquare, Share2, ShoppingCart, CheckCircle, ArrowLeft, Bell } from "lucide-react";
+import { Star, Users, FileImage, MessageSquare, Share2, ShoppingCart, CheckCircle, ArrowLeft, Bell, User } from "lucide-react";
 import type { Profile as ProfileType, Post as PostType } from "@/types";
 import { AuthRequiredModal } from "@/components/auth/AuthRequiredModal";
 import { FollowersModal } from "@/components/profile/FollowersModal";
@@ -429,9 +429,8 @@ export function UserProfile() {
       }
     };
 
-    if (currentUser !== null) {
-      fetchProfileData();
-    }
+    // Always fetch profile data even if currentUser is null
+    fetchProfileData();
   }, [params, currentUser]);
 
   // Effect to load posts and services after profile is loaded
@@ -1127,388 +1126,406 @@ export function UserProfile() {
 
   return (
     <MainLayout
-      activeTab="Discover"
-      setActiveTab={(newTab) => setActiveTab(newTab)}
+      activeTab={activeTab}
+      setActiveTab={setActiveTab}
       userRole={currentUserRole as any}
       isAuthenticated={isAuthenticated}
       unreadNotifications={unreadNotifications}
       unreadMessages={unreadMessages}
     >
-      <div className="w-full overflow-x-hidden pb-16 md:pb-0">
-        <div>
-          {/* Profile header with skeleton loader */}
-          <Card className="rounded-lg overflow-hidden mb-8">
-            <div className="p-6 flex flex-col gap-4">
-              {loadingProfile ? (
-                <div className="flex flex-col md:flex-row gap-6">
-                  <Skeleton className="h-24 w-24 rounded-full" />
-                  <div className="flex-1 space-y-4">
-                    <Skeleton className="h-8 w-1/3" />
-                    <Skeleton className="h-4 w-2/3" />
-                    <div className="flex gap-4">
-                      <Skeleton className="h-10 w-24" />
-                      <Skeleton className="h-10 w-24" />
-                    </div>
-                  </div>
-                </div>
-              ) : (
-                <>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => window.history.back()}
-                    className="w-fit mb-4"
-                  >
-                    <ArrowLeft className="h-4 w-4 mr-2" />
-                    Back
-                  </Button>
-
-                  <div className="flex flex-col md:flex-row gap-6">
-                    <div className="flex-shrink-0">
-                      <AvatarWithModal
-                        size={80}
-                        className="border-2 border-white/20"
-                        avatarUrl={profile?.avatar_url}
-                        username={profile?.username}
-                      />
-                    </div>
-
-                    <div className="flex-1 space-y-4">
-                      <div>
-                        {profile?.user_role === 'business' && profile?.business_name ? (
-                          <>
-                            <h1 className="text-2xl font-bold">{profile.business_name}</h1>
-                            <p className="text-muted-foreground mb-1">@{profile?.username}</p>
-                          </>
-                        ) : (
-                          <>
-                            <h1 className="text-2xl font-bold">{profile?.display_name || profile?.username || "User"}</h1>
-                            {profile?.username && <p className="text-muted-foreground mb-1">@{profile?.username}</p>}
-                          </>
-                        )}
-                        <p className="text-white/60 mt-2">{profile?.bio}</p>
-                      </div>
-
-                      <div className="flex flex-row gap-2 mt-4 sm:mt-0">
-                        {!isOwnProfile && (
-                          <>
-                            <Button
-                              variant={isFollowing ? "secondary" : "default"}
-                              size="sm"
-                              className="flex w-fit items-center gap-2"
-                              onClick={handleFollow}
-                              disabled={loadingFollowStatus}
-                            >
-                              <Users className="h-4 w-4" />
-                              {isFollowing ? 'Following' : 'Follow'}
-                            </Button>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              className="flex w-fit items-center gap-2"
-                              onClick={handleMessage}
-                            >
-                              <MessageSquare className="h-4 w-4" />
-                              Message
-                            </Button>
-
-
-                          </>
-                        )}
-
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="flex w-fit items-center gap-2"
-                          onClick={handleShareProfile}
-                        >
-                          <Share2 className="h-4 w-4" />
-                          Share
-                        </Button>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Stats row */}
-                  <div className="flex flex-row flex-wrap justify-around mt-4 pt-4 border-t border-white/10">
-                    <div
-                      className="text-center cursor-pointer hover:bg-black/20 px-4 py-2 rounded-md transition-colors"
-                      onClick={handlePostsClick}
-                    >
-                      <p className="font-semibold">{userPosts.length}</p>
-                      <p className="text-white/60 text-sm">Posts</p>
-                    </div>
-
-                    <div
-                      className="text-center cursor-pointer hover:bg-black/20 px-4 py-2 rounded-md transition-colors"
-                      onClick={() => setShowFollowersModal(true)}
-                    >
-                      <p className="font-semibold">{profile?.followers_count || 0}</p>
-                      <p className="text-white/60 text-sm">Followers</p>
-                    </div>
-
-                    <div
-                      className="text-center cursor-pointer hover:bg-black/20 px-4 py-2 rounded-md transition-colors"
-                      onClick={() => setShowFollowingModal(true)}
-                    >
-                      <p className="font-semibold">{profile?.following_count || 0}</p>
-                      <p className="text-white/60 text-sm">Following</p>
-                    </div>
-
-                    {profile?.user_role === "business" && (
-                      <div
-                        className="text-center cursor-pointer hover:bg-black/20 px-4 py-2 rounded-md transition-colors"
-                        onClick={handleOpenReviewsModal}
-                      >
-                        <div className="flex items-center justify-center gap-1">
-                          <Star className="w-4 h-4 text-yellow-400" />
-                          <p className="font-semibold">
-                            {profile?.reviews_count && profile.reviews_count > 0
-                              ? (profile?.reviews_rating?.toFixed(1) || '0.0')
-                              : '-'}
-                          </p>
-                        </div>
-                        <p className="text-white/60 text-sm">
-                          {profile?.reviews_count && profile.reviews_count > 0
-                            ? `Rating (${profile?.reviews_count || 0})`
-                            : 'No reviews yet'}
-                        </p>
-                      </div>
-                    )}
-                  </div>
-                </>
-              )}
+      {!loadingProfile && !profile ? (
+        // Profile Not Found State
+        <div className="container mx-auto py-16 px-4 text-center">
+          <div className="max-w-md mx-auto">
+            <div className="mb-8">
+              <User className="h-16 w-16 mx-auto text-muted-foreground mb-4" />
+              <h1 className="text-2xl font-bold mb-2">User Not Found</h1>
+              <p className="text-muted-foreground">
+                The user profile you're looking for doesn't exist or hasn't been created yet.
+              </p>
             </div>
-          </Card>
-
-          {/* Tabs for Posts and Services */}
-          <Tabs value={activeProfileTab} onValueChange={setActiveProfileTab}>
-            <TabsList className="mb-6">
-              <TabsTrigger value="posts">Posts</TabsTrigger>
-              {profile?.user_role === "business" ? (
-                <TabsTrigger value="services">Services</TabsTrigger>
-              ) : (
-                profile?.id === currentUser && (
-                  <TabsTrigger value="bookings">Bookings</TabsTrigger>
-                )
-              )}
-            </TabsList>
-
-            <TabsContent value="posts" className="pb-4">
-              <div ref={postsTabRef} className="mb-4 flex justify-between items-center">
-                <h2 className="text-xl font-semibold"></h2>
-              </div>
-              <div className="grid gap-4 md:gap-6 max-w-4xl mx-auto">
-                {loadingPosts ? (
-                  // Post skeletons
-                  Array(3).fill(0).map((_, i) => (
-                    <div key={i} className="w-full rounded-lg overflow-hidden">
-                      <div className="p-4 bg-black/20 flex items-center gap-3">
-                        <Skeleton className="h-10 w-10 rounded-full" />
-                        <div className="space-y-2">
-                          <Skeleton className="h-4 w-32" />
-                          <Skeleton className="h-3 w-24" />
-                        </div>
-                      </div>
-                      <Skeleton className="h-64 w-full" />
-                      <div className="p-4 bg-black/20 space-y-2">
-                        <Skeleton className="h-4 w-3/4" />
-                        <Skeleton className="h-4 w-1/2" />
+            <Button onClick={() => navigate('/')}>
+              Back to Home
+            </Button>
+          </div>
+        </div>
+      ) : (
+        <div className="w-full overflow-x-hidden pb-16 md:pb-0">
+          <div>
+            {/* Profile header with skeleton loader */}
+            <Card className="rounded-lg overflow-hidden mb-8">
+              <div className="p-6 flex flex-col gap-4">
+                {loadingProfile ? (
+                  <div className="flex flex-col md:flex-row gap-6">
+                    <Skeleton className="h-24 w-24 rounded-full" />
+                    <div className="flex-1 space-y-4">
+                      <Skeleton className="h-8 w-1/3" />
+                      <Skeleton className="h-4 w-2/3" />
+                      <div className="flex gap-4">
+                        <Skeleton className="h-10 w-24" />
+                        <Skeleton className="h-10 w-24" />
                       </div>
                     </div>
-                  ))
-                ) : userPosts.length > 0 ? (
-                  userPosts.map((post) => (
-                    <div
-                      key={post.id}
-                      ref={el => postRefs.current[post.id] = el}
-                      className={`transition-all duration-300 ${params.postId === post.id ? '' : ''
-                        }`}
+                  </div>
+                ) : (
+                  <>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => window.history.back()}
+                      className="w-fit mb-4"
                     >
-                      <Post
-                        {...post}
-                        profiles={post.profiles}
-                        currentUserId={async () => currentUser}
-                        isAuthenticated={isAuthenticated}
-                      />
-                    </div>
-                  ))
-                ) : (
-                  <div className="text-center py-8">
-                    <Card className="p-8 text-center">
-                      <p className="mb-4">No posts yet</p>
-                    </Card>
-                  </div>
-                )}
-              </div>
-            </TabsContent>
+                      <ArrowLeft className="h-4 w-4 mr-2" />
+                      Back
+                    </Button>
 
-            <TabsContent value="services" className="mt-0">
-              <div className="mb-4">
-                {/* No Add Service button for other users' profiles */}
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {loadingServices ? (
-                  // Service skeletons
-                  Array(6).fill(0).map((_, i) => (
-                    <div key={i} className="rounded-lg overflow-hidden">
-                      <Skeleton className="aspect-video w-full" />
-                      <div className="p-4 bg-black/20 space-y-2">
-                        <Skeleton className="h-5 w-3/4" />
-                        <Skeleton className="h-4 w-1/2" />
-                        <Skeleton className="h-6 w-24" />
+                    <div className="flex flex-col md:flex-row gap-6">
+                      <div className="flex-shrink-0">
+                        <AvatarWithModal
+                          size={80}
+                          className="border-2 border-white/20"
+                          avatarUrl={profile?.avatar_url}
+                          username={profile?.username}
+                        />
                       </div>
-                    </div>
-                  ))
-                ) : services.length > 0 ? (
-                  services.map((service) => (
-                    <ServiceCard
-                      key={service.id}
-                      service={{
-                        id: service.id,
-                        title: service.title,
-                        description: service.description,
-                        category: service.category,
-                        price: typeof service.price === 'string' ? parseFloat(service.price) : service.price,
-                        location: service.location || "",
-                        duration_minutes: service.duration_minutes || 60,
-                        image: service.image || null,
-                        owner_id: service.owner_id,
-                        ratings_count: service.ratings_count || 0,
-                        ratings_sum: service.ratings_sum || 0
-                      }}
-                      showOptions={service.owner_id === currentUser}
-                      onDelete={() => handleDeleteService(service.id, service.title)}
-                      refreshServices={fetchUserServices}
-                    />
-                  ))
-                ) : (
-                  <div className="col-span-full text-center py-8">
-                    <Card className="p-8 text-center">
-                      <p className="mb-4">No services listed yet</p>
-                    </Card>
-                  </div>
-                )}
-              </div>
-            </TabsContent>
 
-            <TabsContent value="bookings" className="mt-0">
-              <Card>
-                <CardHeader>
-                  <CardTitle>My Bookings</CardTitle>
-                  <CardDescription>
-                    Services you have booked
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  {loadingBookings ? (
-                    // Bookings skeleton
-                    <div className="space-y-4">
-                      {Array(3).fill(0).map((_, i) => (
-                        <div key={i} className="p-4 border rounded-lg animate-pulse">
-                          <div className="flex justify-between">
-                            <div className="h-5 bg-gray-300 rounded w-1/3"></div>
-                            <div className="h-5 bg-gray-300 rounded w-1/4"></div>
-                          </div>
-                          <div className="h-4 bg-gray-300 rounded w-1/2 mt-2"></div>
-                          <div className="h-10 bg-gray-300 rounded w-full mt-4"></div>
+                      <div className="flex-1 space-y-4">
+                        <div>
+                          {profile?.user_role === 'business' && profile?.business_name ? (
+                            <>
+                              <h1 className="text-2xl font-bold">{profile.business_name}</h1>
+                              <p className="text-muted-foreground mb-1">@{profile?.username}</p>
+                            </>
+                          ) : (
+                            <>
+                              <h1 className="text-2xl font-bold">{profile?.display_name || profile?.username || "User"}</h1>
+                              {profile?.username && <p className="text-muted-foreground mb-1">@{profile?.username}</p>}
+                            </>
+                          )}
+                          <p className="text-white/60 mt-2">{profile?.bio}</p>
                         </div>
-                      ))}
-                    </div>
-                  ) : bookings.length > 0 ? (
-                    <div className="space-y-4">
-                      {bookings.map((booking) => (
-                        <Card key={booking.id} className="overflow-hidden">
-                          <CardHeader className="p-4">
-                            <div className="flex justify-between items-center">
-                              <div>
-                                <div className="flex items-center gap-2">
-                                  <ShoppingCart className="h-4 w-4" />
-                                  <h3 className="font-medium">{booking.services.title}</h3>
-                                </div>
-                                <div className="text-sm text-muted-foreground mt-1">
-                                  <p>Provider: {booking.providers.username}</p>
-                                  <p>Price: ${booking.services.price}</p>
-                                  <p>Booked on: {new Date(booking.created_at).toLocaleDateString()}</p>
-                                </div>
-                              </div>
-                              <Badge variant={
-                                booking.status === 'completed' ? 'default' :
-                                  booking.status === 'pending' ? 'secondary' :
-                                    booking.status === 'cancelled' ? 'destructive' :
-                                      booking.status === 'confirmed' ? 'outline' : 'default'
-                              }>
-                                {booking.status.charAt(0).toUpperCase() + booking.status.slice(1)}
-                              </Badge>
-                            </div>
-                          </CardHeader>
-                          <CardFooter className="p-4 bg-muted/20 flex justify-end gap-2">
-                            {["pending", "confirmed"].includes(booking.status) && (
+
+                        <div className="flex flex-row gap-2 mt-4 sm:mt-0">
+                          {!isOwnProfile && (
+                            <>
+                              <Button
+                                variant={isFollowing ? "secondary" : "default"}
+                                size="sm"
+                                className="flex w-fit items-center gap-2"
+                                onClick={handleFollow}
+                                disabled={loadingFollowStatus}
+                              >
+                                <Users className="h-4 w-4" />
+                                {isFollowing ? 'Following' : 'Follow'}
+                              </Button>
                               <Button
                                 variant="outline"
                                 size="sm"
-                                onClick={() => handleCancelBooking(booking.id)}
+                                className="flex w-fit items-center gap-2"
+                                onClick={handleMessage}
                               >
-                                Cancel Booking
+                                <MessageSquare className="h-4 w-4" />
+                                Message
                               </Button>
-                            )}
-                            <Button
-                              variant="default"
-                              size="sm"
-                              onClick={() => navigate(`/messages?user=${booking.provider_id}`)}
-                            >
-                              <MessageSquare className="h-4 w-4 mr-2" />
-                              Message Provider
-                            </Button>
-                          </CardFooter>
-                        </Card>
-                      ))}
+
+
+                            </>
+                          )}
+
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="flex w-fit items-center gap-2"
+                            onClick={handleShareProfile}
+                          >
+                            <Share2 className="h-4 w-4" />
+                            Share
+                          </Button>
+                        </div>
+                      </div>
                     </div>
+
+                    {/* Stats row */}
+                    <div className="flex flex-row flex-wrap justify-around mt-4 pt-4 border-t border-white/10">
+                      <div
+                        className="text-center cursor-pointer hover:bg-black/20 px-4 py-2 rounded-md transition-colors"
+                        onClick={handlePostsClick}
+                      >
+                        <p className="font-semibold">{userPosts.length}</p>
+                        <p className="text-white/60 text-sm">Posts</p>
+                      </div>
+
+                      <div
+                        className="text-center cursor-pointer hover:bg-black/20 px-4 py-2 rounded-md transition-colors"
+                        onClick={() => setShowFollowersModal(true)}
+                      >
+                        <p className="font-semibold">{profile?.followers_count || 0}</p>
+                        <p className="text-white/60 text-sm">Followers</p>
+                      </div>
+
+                      <div
+                        className="text-center cursor-pointer hover:bg-black/20 px-4 py-2 rounded-md transition-colors"
+                        onClick={() => setShowFollowingModal(true)}
+                      >
+                        <p className="font-semibold">{profile?.following_count || 0}</p>
+                        <p className="text-white/60 text-sm">Following</p>
+                      </div>
+
+                      {profile?.user_role === "business" && (
+                        <div
+                          className="text-center cursor-pointer hover:bg-black/20 px-4 py-2 rounded-md transition-colors"
+                          onClick={handleOpenReviewsModal}
+                        >
+                          <div className="flex items-center justify-center gap-1">
+                            <Star className="w-4 h-4 text-yellow-400" />
+                            <p className="font-semibold">
+                              {profile?.reviews_count && profile.reviews_count > 0
+                                ? (profile?.reviews_rating?.toFixed(1) || '0.0')
+                                : '-'}
+                            </p>
+                          </div>
+                          <p className="text-white/60 text-sm">
+                            {profile?.reviews_count && profile.reviews_count > 0
+                              ? `Rating (${profile?.reviews_count || 0})`
+                              : 'No reviews yet'}
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  </>
+                )}
+              </div>
+            </Card>
+
+            {/* Tabs for Posts and Services */}
+            <Tabs value={activeProfileTab} onValueChange={setActiveProfileTab}>
+              <TabsList className="mb-6">
+                <TabsTrigger value="posts">Posts</TabsTrigger>
+                {profile?.user_role === "business" ? (
+                  <TabsTrigger value="services">Services</TabsTrigger>
+                ) : (
+                  profile?.id === currentUser && (
+                    <TabsTrigger value="bookings">Bookings</TabsTrigger>
+                  )
+                )}
+              </TabsList>
+
+              <TabsContent value="posts" className="pb-4">
+                <div ref={postsTabRef} className="mb-4 flex justify-between items-center">
+                  <h2 className="text-xl font-semibold"></h2>
+                </div>
+                <div className="grid gap-4 md:gap-6 max-w-4xl mx-auto">
+                  {loadingPosts ? (
+                    // Post skeletons
+                    Array(3).fill(0).map((_, i) => (
+                      <div key={i} className="w-full rounded-lg overflow-hidden">
+                        <div className="p-4 bg-black/20 flex items-center gap-3">
+                          <Skeleton className="h-10 w-10 rounded-full" />
+                          <div className="space-y-2">
+                            <Skeleton className="h-4 w-32" />
+                            <Skeleton className="h-3 w-24" />
+                          </div>
+                        </div>
+                        <Skeleton className="h-64 w-full" />
+                        <div className="p-4 bg-black/20 space-y-2">
+                          <Skeleton className="h-4 w-3/4" />
+                          <Skeleton className="h-4 w-1/2" />
+                        </div>
+                      </div>
+                    ))
+                  ) : userPosts.length > 0 ? (
+                    userPosts.map((post) => (
+                      <div
+                        key={post.id}
+                        ref={el => postRefs.current[post.id] = el}
+                        className={`transition-all duration-300 ${params.postId === post.id ? '' : ''
+                          }`}
+                      >
+                        <Post
+                          {...post}
+                          profiles={post.profiles}
+                          currentUserId={async () => currentUser}
+                          isAuthenticated={isAuthenticated}
+                        />
+                      </div>
+                    ))
                   ) : (
                     <div className="text-center py-8">
-                      <p>You don't have any service bookings yet.</p>
-                      <Button
-                        onClick={() => navigate('/discover')}
-                        className="mt-4"
-                      >
-                        Discover Services
-                      </Button>
+                      <Card className="p-8 text-center">
+                        <p className="mb-4">No posts yet</p>
+                      </Card>
                     </div>
                   )}
-                </CardContent>
-              </Card>
-            </TabsContent>
-          </Tabs>
+                </div>
+              </TabsContent>
 
-          {/* Modals */}
-          <AuthRequiredModal
-            isOpen={showAuthModal}
-            setIsOpen={setShowAuthModal}
-            message="You need to sign in to interact with this profile."
-          />
+              <TabsContent value="services" className="mt-0">
+                <div className="mb-4">
+                  {/* No Add Service button for other users' profiles */}
+                </div>
 
-          {profile && (
-            <>
-              <FollowersModal
-                userId={profile.id}
-                isOpen={showFollowersModal}
-                onClose={() => setShowFollowersModal(false)}
-                currentUserId={currentUser}
-                onFollowersLoaded={updateFollowersCount}
-              />
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {loadingServices ? (
+                    // Service skeletons
+                    Array(6).fill(0).map((_, i) => (
+                      <div key={i} className="rounded-lg overflow-hidden">
+                        <Skeleton className="aspect-video w-full" />
+                        <div className="p-4 bg-black/20 space-y-2">
+                          <Skeleton className="h-5 w-3/4" />
+                          <Skeleton className="h-4 w-1/2" />
+                          <Skeleton className="h-6 w-24" />
+                        </div>
+                      </div>
+                    ))
+                  ) : services.length > 0 ? (
+                    services.map((service) => (
+                      <ServiceCard
+                        key={service.id}
+                        service={{
+                          id: service.id,
+                          title: service.title,
+                          description: service.description,
+                          category: service.category,
+                          price: typeof service.price === 'string' ? parseFloat(service.price) : service.price,
+                          location: service.location || "",
+                          duration_minutes: service.duration_minutes || 60,
+                          image: service.image || null,
+                          owner_id: service.owner_id,
+                          ratings_count: service.ratings_count || 0,
+                          ratings_sum: service.ratings_sum || 0
+                        }}
+                        showOptions={service.owner_id === currentUser}
+                        onDelete={() => handleDeleteService(service.id, service.title)}
+                        refreshServices={fetchUserServices}
+                      />
+                    ))
+                  ) : (
+                    <div className="col-span-full text-center py-8">
+                      <Card className="p-8 text-center">
+                        <p className="mb-4">No services listed yet</p>
+                      </Card>
+                    </div>
+                  )}
+                </div>
+              </TabsContent>
 
-              <FollowingModal
-                userId={profile.id}
-                isOpen={showFollowingModal}
-                onClose={() => setShowFollowingModal(false)}
-                currentUserId={currentUser}
-                onFollowingLoaded={updateFollowingCount}
-              />
-            </>
-          )}
+              <TabsContent value="bookings" className="mt-0">
+                <Card>
+                  <CardHeader>
+                    <CardTitle>My Bookings</CardTitle>
+                    <CardDescription>
+                      Services you have booked
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    {loadingBookings ? (
+                      // Bookings skeleton
+                      <div className="space-y-4">
+                        {Array(3).fill(0).map((_, i) => (
+                          <div key={i} className="p-4 border rounded-lg animate-pulse">
+                            <div className="flex justify-between">
+                              <div className="h-5 bg-gray-300 rounded w-1/3"></div>
+                              <div className="h-5 bg-gray-300 rounded w-1/4"></div>
+                            </div>
+                            <div className="h-4 bg-gray-300 rounded w-1/2 mt-2"></div>
+                            <div className="h-10 bg-gray-300 rounded w-full mt-4"></div>
+                          </div>
+                        ))}
+                      </div>
+                    ) : bookings.length > 0 ? (
+                      <div className="space-y-4">
+                        {bookings.map((booking) => (
+                          <Card key={booking.id} className="overflow-hidden">
+                            <CardHeader className="p-4">
+                              <div className="flex justify-between items-center">
+                                <div>
+                                  <div className="flex items-center gap-2">
+                                    <ShoppingCart className="h-4 w-4" />
+                                    <h3 className="font-medium">{booking.services.title}</h3>
+                                  </div>
+                                  <div className="text-sm text-muted-foreground mt-1">
+                                    <p>Provider: {booking.providers.username}</p>
+                                    <p>Price: ${booking.services.price}</p>
+                                    <p>Booked on: {new Date(booking.created_at).toLocaleDateString()}</p>
+                                  </div>
+                                </div>
+                                <Badge variant={
+                                  booking.status === 'completed' ? 'default' :
+                                    booking.status === 'pending' ? 'secondary' :
+                                      booking.status === 'cancelled' ? 'destructive' :
+                                        booking.status === 'confirmed' ? 'outline' : 'default'
+                                }>
+                                  {booking.status.charAt(0).toUpperCase() + booking.status.slice(1)}
+                                </Badge>
+                              </div>
+                            </CardHeader>
+                            <CardFooter className="p-4 bg-muted/20 flex justify-end gap-2">
+                              {["pending", "confirmed"].includes(booking.status) && (
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => handleCancelBooking(booking.id)}
+                                >
+                                  Cancel Booking
+                                </Button>
+                              )}
+                              <Button
+                                variant="default"
+                                size="sm"
+                                onClick={() => navigate(`/messages?user=${booking.provider_id}`)}
+                              >
+                                <MessageSquare className="h-4 w-4 mr-2" />
+                                Message Provider
+                              </Button>
+                            </CardFooter>
+                          </Card>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="text-center py-8">
+                        <p>You don't have any service bookings yet.</p>
+                        <Button
+                          onClick={() => navigate('/discover')}
+                          className="mt-4"
+                        >
+                          Discover Services
+                        </Button>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              </TabsContent>
+            </Tabs>
+
+            {/* Modals */}
+            <AuthRequiredModal
+              isOpen={showAuthModal}
+              setIsOpen={setShowAuthModal}
+              message="You need to sign in to interact with this profile."
+            />
+
+            {profile && (
+              <>
+                <FollowersModal
+                  userId={profile.id}
+                  isOpen={showFollowersModal}
+                  onClose={() => setShowFollowersModal(false)}
+                  currentUserId={currentUser}
+                  onFollowersLoaded={updateFollowersCount}
+                />
+
+                <FollowingModal
+                  userId={profile.id}
+                  isOpen={showFollowingModal}
+                  onClose={() => setShowFollowingModal(false)}
+                  currentUserId={currentUser}
+                  onFollowingLoaded={updateFollowingCount}
+                />
+              </>
+            )}
+          </div>
         </div>
-      </div>
+      )}
 
       {selectedService && (
         <ServiceModal

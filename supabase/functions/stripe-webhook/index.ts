@@ -3,7 +3,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1';
 import { Stripe } from 'https://esm.sh/stripe@12.1.1';
 
 const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Origin': 'https://markezon.vercel.app, http:localhost:8080',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 

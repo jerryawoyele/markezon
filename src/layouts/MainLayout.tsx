@@ -122,7 +122,7 @@ export function MainLayout({
       />
       
       {/* Main content area */}
-      <div className="flex-1 lg:ml-64 lg:w-fit overflow-x-hidden">
+      <div className="flex-1 lg:ml-64 lg:max-w-[calc(100vw-64px)] overflow-x-hidden">
         <MobileHeader 
           unreadNotifications={displayUnreadNotifications}
           unreadMessages={displayUnreadMessages}

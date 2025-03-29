@@ -635,7 +635,7 @@ export default function Home() {
             {/* Posts feed */}
             <div className="mt-4">
               {/* Refresh button */}
-              <div className="flex justify-between items-center mb-2">
+              <div className="flex justify-between items-center mb-4">
                 <h2 className="text-lg ml-4 font-semibold">Latest Posts</h2>
                 <Button 
                   variant="ghost" 

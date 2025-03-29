@@ -558,7 +558,7 @@ export default function Settings() {
     const statusParam = params.get('status');
 
     // Only set active tab if it's a valid tab value
-    if (tabParam && ["profile", "notifications", "privacy", "payments", "verification"].includes(tabParam)) {
+    if (tabParam && ["profile", "notifications", "privacy", "verification"].includes(tabParam)) {
       setActiveTab(tabParam);
     }
 
@@ -1148,8 +1148,13 @@ export default function Settings() {
     }
   };
 
-  // Try to detect user's location
+  // Try to detect user's location - simplified since we don't need it for payments anymore
   const detectUserLocation = async (userId: string) => {
+    // Return a default country code since we don't need this functionality anymore
+    // after removing the payments tab
+    return "US";
+    
+    /* Original implementation:
     try {
       // First try the API endpoint
       try {
@@ -1189,6 +1194,7 @@ export default function Settings() {
       console.warn("All location detection methods failed:", locationError);
     }
     return null;
+    */
   };
 
   // Main layout loading placeholder
@@ -1233,10 +1239,6 @@ export default function Settings() {
             <TabsTrigger value="privacy" className="data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none py-2 px-1">
               <Lock className="h-4 w-4 mr-2" />
               Privacy
-            </TabsTrigger>
-            <TabsTrigger value="payments" className="data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none py-2 px-1">
-              <Wallet className="h-4 w-4 mr-2" />
-              Payments
             </TabsTrigger>
             <TabsTrigger value="verification" className="data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none py-2 px-1">
               <Shield className="h-4 w-4 mr-2" />
@@ -1371,7 +1373,7 @@ export default function Settings() {
                             />
                             {isCheckingUsername && (
                               <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
-                                <LoaderIcon className="h-4 w-4 animate-spin text-primary" />
+                                <Loader2 className="h-4 w-4 animate-spin text-primary" />
                               </div>
                             )}
                           </div>
@@ -1593,183 +1595,6 @@ export default function Settings() {
                   {saving ? "Saving..." : "Save Privacy Settings"}
                 </Button>
               </CardFooter>
-            </Card>
-          </TabsContent>
-
-          <TabsContent value="payments" className="space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle>Payment Settings</CardTitle>
-                <CardDescription>
-                  Manage your payment methods and transactions
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                {paymentBlocked && userProfile?.user_role === "business" ? (
-                  <Alert variant="destructive">
-                    <AlertCircle className="h-4 w-4" />
-                    <AlertTitle>Business Verification Required</AlertTitle>
-                    <AlertDescription>
-                      Business accounts need to complete verification before offering paid services.
-                      Please go to the Verification tab to submit your documents.
-                    </AlertDescription>
-                    <Button
-                      className="mt-2"
-                      variant="outline"
-                      onClick={() => setActiveTab("verification")}
-                    >
-                      Go to Verification
-                    </Button>
-                  </Alert>
-                ) : (
-                  <>
-                    <div className="space-y-4">
-                      <h3 className="text-lg font-medium">Payment Methods</h3>
-
-                      {paymentMethodsLoading ? (
-                        <div className="text-center p-6 border rounded-lg flex items-center justify-center gap-2">
-                          <Loader2 className="h-4 w-4 animate-spin" />
-                          <p>Loading payment methods...</p>
-                        </div>
-                      ) : paymentMethods.length > 0 ? (
-                        <div className="space-y-2">
-                          {paymentMethods.map((method) => (
-                            <div key={method.id} className="flex items-center justify-between p-4 border rounded-lg">
-                              <div className="flex items-center">
-                                <CreditCard className="h-5 w-5 mr-2" />
-                                <div>
-                                  <p className="font-medium">{method.card_brand} •••• {method.card_last4}</p>
-                                  <p className="text-sm text-muted-foreground">
-                                    Expires {method.card_exp_month}/{method.card_exp_year}
-                                    {method.provider && (
-                                      <span className="ml-2 inline-flex">
-                                        via <Badge variant="outline" className="ml-1 capitalize">{method.provider}</Badge>
-                                      </span>
-                                    )}
-                                  </p>
-                                </div>
-                              </div>
-                              <div className="flex space-x-2">
-                                {method.is_default && (
-                                  <Badge variant="outline">Default</Badge>
-                                )}
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={async () => {
-                                    try {
-                                      const { error } = await supabase
-                                        .from("payment_methods")
-                                        .delete()
-                                        .eq("id", method.id);
-
-                                      if (error) throw error;
-
-                                      setPaymentMethods(prev => prev.filter(m => m.id !== method.id));
-
-                                      toast({
-                                        title: "Payment method removed",
-                                        description: "Your payment method has been removed successfully.",
-                                      });
-                                    } catch (error) {
-                                      console.error("Error removing payment method:", error);
-                                      toast({
-                                        title: "Error",
-                                        description: "Failed to remove payment method",
-                                        variant: "destructive",
-                                      });
-                                    }
-                                  }}
-                                >
-                                  Remove
-                                </Button>
-                                {!method.is_default && (
-                                  <Button
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={async () => {
-                                      try {
-                                        // Set all payment methods to non-default
-                                        const { error: resetError } = await supabase
-                                          .from("payment_methods")
-                                          .update({ is_default: false })
-                                          .eq("user_id", userId);
-
-                                        if (resetError) throw resetError;
-
-                                        // Set this one as default
-                                        const { error: updateError } = await supabase
-                                          .from("payment_methods")
-                                          .update({ is_default: true })
-                                          .eq("id", method.id);
-
-                                        if (updateError) throw updateError;
-
-                                        // Update local state
-                                        setPaymentMethods(prev => prev.map(m => ({
-                                          ...m,
-                                          is_default: m.id === method.id
-                                        })));
-
-                                        // Update default payment method
-                                        setDefaultPaymentMethod(method.id);
-
-                                        toast({
-                                          title: "Default payment method updated",
-                                          description: "Your default payment method has been updated.",
-                                        });
-                                      } catch (error) {
-                                        console.error("Error setting default payment method:", error);
-                                        toast({
-                                          title: "Error",
-                                          description: "Failed to update default payment method",
-                                          variant: "destructive",
-                                        });
-                                      }
-                                    }}
-                                  >
-                                    Set as Default
-                                  </Button>
-                                )}
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      ) : (
-                        <div className="text-center p-6 border rounded-lg">
-                          <p className="text-muted-foreground mb-4">No payment methods added yet</p>
-                        </div>
-                      )}
-
-                      <div className="mt-6 p-6 border rounded-lg">
-                        <h4 className="text-base font-medium mb-4">Add a New Payment Method</h4>
-                        <StripeWrapper>
-                          <PaymentForm
-                            onSuccess={() => {
-                              // Reload payment methods
-                              fetchPaymentMethods();
-                              toast({
-                                title: "Payment method added",
-                                description: "Your payment method has been added successfully.",
-                              });
-                            }}
-                            userId={userId || ''}
-                          />
-                        </StripeWrapper>
-                      </div>
-                    </div>
-
-                    <Separator />
-
-                    <div className="space-y-4">
-                      <h3 className="text-lg font-medium">Transaction History</h3>
-                      <div className="text-center p-6 border rounded-lg">
-                        <p className="text-muted-foreground">No transactions found</p>
-                      </div>
-                    </div>
-                  </>
-                )}
-              </CardContent>
             </Card>
           </TabsContent>
 

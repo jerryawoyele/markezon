@@ -38,6 +38,8 @@ import { AuthRequiredModal } from "@/components/auth/AuthRequiredModal";
 import { Badge } from "@/components/ui/badge";
 import { LikesModal } from "./LikesModal";
 import { createNotification } from "@/utils/notification-helper";
+import { PromotedLabel } from './PromotedLabel';
+import { PromotePostModal } from "./PromotePostModal";
 
 interface Profile {
   id: string;
@@ -89,6 +91,9 @@ interface PostProps {
   currentUserId?: () => Promise<string | null>;
   showDetailOnClick?: boolean;
   isAuthenticated?: boolean;
+  isPromoted?: boolean;
+  promotionLevel?: 'basic' | 'premium' | 'featured';
+  userRole?: 'business' | 'customer' | null;
 }
 
 export function Post({ 
@@ -105,7 +110,10 @@ export function Post({
   onEdit,
   currentUserId,
   showDetailOnClick = false,
-  isAuthenticated = true
+  isAuthenticated = true,
+  isPromoted = false,
+  promotionLevel = 'basic',
+  userRole,
 }: PostProps) {
   const [showComments, setShowComments] = useState(false);
   const [newComment, setNewComment] = useState("");
@@ -136,6 +144,7 @@ export function Post({
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [currentUserObj, setCurrentUserObj] = useState<{ id: string } | null>(null);
   const [commentLikes, setCommentLikes] = useState<Record<string, boolean>>({});
+  const [showPromoteModal, setShowPromoteModal] = useState(false);
 
   useEffect(() => {
     const checkOwnership = async () => {
@@ -775,6 +784,10 @@ export function Post({
               </span>
             </div>
             
+            {isPromoted && promotionLevel && (
+              <PromotedLabel level={promotionLevel}/>
+            )}
+            
             {/* Post Options Menu - Only visible for post owner */}
             {isOwner && (
               <div className="ml-auto">
@@ -788,21 +801,18 @@ export function Post({
                   <DropdownMenuContent align="end">
                     <DropdownMenuItem onClick={() => {
                       setDropdownOpen(false);
-                      setEditMode(true);
-                      setShowPostModal(true);
+                      setShowPromoteModal(true);
                     }}>
-                      <Edit className="mr-2 h-4 w-4" />
-                      <span>Edit Post</span>
+                      <Heart className="h-4 w-4 mr-2" />
+                      Promote
                     </DropdownMenuItem>
-                    <DropdownMenuItem 
-                      onClick={() => {
-                        setDropdownOpen(false);
-                        setShowDeleteConfirm(true);
-                      }} 
-                      className="text-red-500 focus:text-red-500"
-                    >
-                      <Trash className="mr-2 h-4 w-4" />
-                      <span>Delete Post</span>
+                    <DropdownMenuItem onClick={() => setEditMode(true)}>
+                      <Edit className="h-4 w-4 mr-2" />
+                      Edit Post
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => setShowDeleteConfirm(true)}>
+                      <Trash className="h-4 w-4 mr-2" />
+                      Delete Post
                     </DropdownMenuItem>
                   </DropdownMenuContent>
                 </DropdownMenu>
@@ -1192,20 +1202,18 @@ export function Post({
                             <DropdownMenuContent align="end">
                               <DropdownMenuItem onClick={() => {
                                 setDropdownOpen(false);
-                                setEditMode(true);
+                                setShowPromoteModal(true);
                               }}>
-                                <Edit className="mr-2 h-4 w-4" />
-                                <span>Edit Post</span>
+                                <Heart className="h-4 w-4 mr-2" />
+                                Promote
                               </DropdownMenuItem>
-                              <DropdownMenuItem 
-                                onClick={() => {
-                                  setDropdownOpen(false);
-                                  setShowDeleteConfirm(true);
-                                }} 
-                                className="text-red-500 focus:text-red-500"
-                              >
-                                <Trash className="mr-2 h-4 w-4" />
-                                <span>Delete Post</span>
+                              <DropdownMenuItem onClick={() => setEditMode(true)}>
+                                <Edit className="h-4 w-4 mr-2" />
+                                Edit Post
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => setShowDeleteConfirm(true)}>
+                                <Trash className="h-4 w-4 mr-2" />
+                                Delete Post
                               </DropdownMenuItem>
                             </DropdownMenuContent>
                           </DropdownMenu>
@@ -1284,6 +1292,16 @@ export function Post({
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Promote Post Modal */}
+      {showPromoteModal && (
+        <PromotePostModal
+          isOpen={showPromoteModal}
+          onClose={() => setShowPromoteModal(false)}
+          postId={id}
+          userId={user_id}
+        />
+      )}
     </>
   );
 }

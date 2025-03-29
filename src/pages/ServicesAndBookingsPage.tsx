@@ -386,15 +386,40 @@ export default function ServicesAndBookingsPage() {
         throw new Error("User ID is missing. Please log in again.");
       }
       
+      // Add debugging to check the IDs
+      console.log("Debug review IDs:", {
+        user_id: user.id,
+        service_owner_id: selectedBooking.services?.owner_id,
+        provider_id: selectedBooking.provider_id,
+        is_user_owner: selectedBooking.services?.owner_id === user.id,
+        is_user_provider: selectedBooking.provider_id === user.id
+      });
+      
       // Check if user is trying to review their own service
       if (selectedBooking.services?.owner_id === user.id) {
         throw new Error("You cannot review your own service");
       }
       
       // Check if a review already exists
-      const existingReview = selectedBooking.reviews?.find(
+      let existingReview = selectedBooking.reviews?.find(
         (r: any) => r.reviewer_id === user.id
       );
+      
+      // If we didn't find it in the booking data, check the database directly
+      if (!existingReview) {
+        const { data: existingReviewData, error: lookupError } = await supabase
+          .from("reviews")
+          .select("*")
+          .eq("service_id", selectedBooking.service_id)
+          .eq("reviewer_id", user.id)
+          .maybeSingle();
+        
+        if (lookupError) {
+          console.error("Error checking for existing review:", lookupError);
+        } else if (existingReviewData) {
+          existingReview = existingReviewData;
+        }
+      }
       
       if (existingReview) {
         // Update existing review
@@ -409,49 +434,109 @@ export default function ServicesAndBookingsPage() {
           
         if (error) throw error;
       } else {
-        // Create new review
-        const { error } = await supabase
-          .from("reviews")
-          .insert({
-            service_id: selectedBooking.service_id,
-            reviewer_id: user.id,
-            user_id: user.id,
-            content: reviewContent,
-            rating: reviewRating
+        // Try to create new review
+        try {
+          const { data, error } = await supabase
+            .from("reviews")
+            .insert({
+              service_id: selectedBooking.service_id,
+              reviewer_id: user.id,
+              user_id: selectedBooking.services?.owner_id, // The ID of the user being reviewed
+              content: reviewContent,
+              rating: reviewRating
+            })
+            .select()
+            .single();
+            
+          if (error) {
+            // If we got a duplicate key error, we need to update instead
+            if (error.code === '23505') {
+              console.log("Duplicate review detected, attempting to update instead");
+              
+              // Get the existing review ID first
+              const { data: existingData } = await supabase
+                .from("reviews")
+                .select("id")
+                .eq("service_id", selectedBooking.service_id)
+                .eq("reviewer_id", user.id)
+                .single();
+                
+              if (existingData) {
+                // Update using the ID we found
+                const { error: updateError } = await supabase
+                  .from("reviews")
+                  .update({
+                    content: reviewContent,
+                    rating: reviewRating,
+                    updated_at: new Date().toISOString()
+                  })
+                  .eq("id", existingData.id);
+                  
+                if (updateError) throw updateError;
+              } else {
+                throw error; // Original error if we couldn't find the record to update
+              }
+            } else {
+              throw error; // Rethrow if it's not a duplicate key error
+            }
+          }
+          
+          // Update service ratings
+          const { data: serviceData } = await supabase
+            .from("services")
+            .select("ratings_count, ratings_sum")
+            .eq("id", selectedBooking.service_id)
+            .single();
+            
+          if (serviceData) {
+            const newCount = (serviceData.ratings_count || 0) + 1;
+            const newSum = (serviceData.ratings_sum || 0) + reviewRating;
+            
+            await supabase
+              .from("services")
+              .update({
+                ratings_count: newCount,
+                ratings_sum: newSum
+              })
+              .eq("id", selectedBooking.service_id);
+          }
+          
+          // Successfully submitted/updated the review
+          toast({
+            title: "Review Submitted",
+            description: "Thank you for your feedback!"
           });
           
-        if (error) throw error;
-        
-        // Update service ratings
-        const { data: serviceData } = await supabase
-          .from("services")
-          .select("ratings_count, ratings_sum")
-          .eq("id", selectedBooking.service_id)
-          .single();
+          setShowReviewModal(false);
+          setReviewContent("");
+          setReviewRating(5);
+          fetchBookings(); // Refresh bookings to include the new review
+        } catch (error) {
+          console.error("Error submitting review:", error);
           
-        if (serviceData) {
-          const newCount = (serviceData.ratings_count || 0) + 1;
-          const newSum = (serviceData.ratings_sum || 0) + reviewRating;
+          // Check for specific error types
+          let errorMessage = "Failed to submit review";
           
-          await supabase
-            .from("services")
-            .update({
-              ratings_count: newCount,
-              ratings_sum: newSum
-            })
-            .eq("id", selectedBooking.service_id);
+          if (error instanceof Error) {
+            if (error.message === "You cannot review your own service") {
+              errorMessage = "You cannot review your own service";
+            }
+          } else if (typeof error === 'object' && error !== null) {
+            // Check for Supabase constraint error
+            const supabaseError = error as any;
+            if (supabaseError.code === '23514' && 
+                supabaseError.message?.includes('prevent_self_review')) {
+              errorMessage = "You cannot review your own service";
+            }
+          }
+          
+          toast({
+            title: "Error",
+            description: errorMessage,
+            variant: "destructive",
+          });
         }
       }
-      
-      toast({
-        title: "Review Submitted",
-        description: "Thank you for your feedback!"
-      });
-      
-      setShowReviewModal(false);
-      setReviewContent("");
-      setReviewRating(5);
-      fetchBookings(); // Refresh bookings to include the new review
     } catch (error) {
       console.error("Error submitting review:", error);
       
@@ -655,7 +740,7 @@ export default function ServicesAndBookingsPage() {
           </div>
 
           <Tabs value={statusTab} onValueChange={setStatusTab} className="mb-6 overflow-hidden">
-            <TabsList className="overflow-x-auto whitespace-nowrap lg:w-fit max-lg:w-full flex ">
+            <TabsList className="overflow-x-auto whitespace-nowrap sm:w-fit w-full flex ">
               <TabsTrigger value="pending">Pending</TabsTrigger>
               <TabsTrigger value="confirmed">Confirmed</TabsTrigger>
               <TabsTrigger value="completed">Completed</TabsTrigger>
@@ -889,7 +974,7 @@ export default function ServicesAndBookingsPage() {
                   <StarRating 
                     value={reviewRating} 
                     onChange={setReviewRating} 
-                    size={24}
+                    size={window.innerWidth}
                   />
                 </div>
                 

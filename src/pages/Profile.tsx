@@ -1043,6 +1043,8 @@ export function Profile() {
     if (!serviceToDelete) return;
     
     try {
+      setShowDeleteServiceModal(false); // Close the modal immediately to prevent double-clicking
+      
       const { error } = await supabase
         .from('services')
         .delete()
@@ -1055,31 +1057,12 @@ export function Profile() {
         description: "Your service has been successfully deleted",
       });
       
-      // Use direct reference to the fetchUserServices function declared earlier in this file
-      const fetchUserServicesTemp = async () => {
-        try {
-          setLoadingServices(true);
-          
-          if (!profile?.id) return;
-  
-          const { data, error } = await supabase
-            .from('services')
-            .select('*')
-            .eq('owner_id', profile.id)
-            .order('created_at', { ascending: false });
-            
-          if (error) throw error;
-          
-          setServices(data || []);
-        } catch (error) {
-          console.error("Error fetching services:", error);
-          setServices([]);
-        } finally {
-          setLoadingServices(false);
-        }
-      };
+      // Reset state variables
+      setServiceToDelete(null);
+      setServiceDeleteTitle("");
       
-      fetchUserServicesTemp();
+      // Fetch updated services
+      fetchUserServices();
     } catch (error) {
       console.error("Error deleting service:", error);
       toast({

@@ -26,6 +26,21 @@ export interface Post {
   profiles?: Profile;
 }
 
+export interface PromotedPost {
+  id: string;
+  post_id: string;
+  user_id: string;
+  promotion_level: 'basic' | 'premium' | 'featured';
+  starts_at: string;
+  ends_at: string;
+  target_audience?: string | null;
+  budget?: number | null;
+  impressions?: number;
+  clicks?: number;
+  created_at: string;
+  post?: Post;
+}
+
 export interface Comment {
   id: string;
   content: string;

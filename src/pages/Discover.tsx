@@ -554,7 +554,11 @@ export default function Discover() {
                               className="flex items-center gap-2 cursor-pointer hover:text-primary transition-colors"
                               onClick={(e) => {
                                 e.stopPropagation(); // Prevent triggering service card click
-                                navigate(`/user/${service.profiles?.id}`);
+                                if (service.profiles?.id) {
+                                  navigate(`/user/${service.profiles.id}`);
+                                } else if (service.owner_id) {
+                                  navigate(`/user/${service.owner_id}`);
+                                }
                               }}
                             >
                               <div className="h-6 w-6 rounded-full bg-muted overflow-hidden">

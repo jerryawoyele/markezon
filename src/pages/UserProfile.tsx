@@ -444,6 +444,9 @@ export function UserProfile() {
       } else {
         setIsOwnProfile(false);
       }
+      
+      // Load reviews data immediately when profile is loaded
+      ensureReviewsData();
     }
   }, [profile, params, currentUser]);
 

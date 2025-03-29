@@ -4,6 +4,7 @@ import { MobileHeader } from "@/components/home/MobileHeader";
 import { supabase } from "@/integrations/supabase/client";
 import { RoleSetupModal } from "@/components/onboarding/RoleSetupModal";
 import { useNavigate, useLocation } from "react-router-dom";
+import { useNotifications } from "@/contexts/NotificationContext";
 
 interface MainLayoutProps {
   children: React.ReactNode;
@@ -11,6 +12,8 @@ interface MainLayoutProps {
   setActiveTab: (tab: string) => void;
   userRole?: "business" | "customer" | null;
   isAuthenticated?: boolean;
+  unreadNotifications?: number;
+  unreadMessages?: number;
 }
 
 export function MainLayout({ 
@@ -18,13 +21,17 @@ export function MainLayout({
   activeTab, 
   setActiveTab, 
   userRole,
-  isAuthenticated: propIsAuthenticated
+  isAuthenticated: propIsAuthenticated,
+  unreadNotifications: propUnreadNotifications,
+  unreadMessages: propUnreadMessages
 }: MainLayoutProps) {
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [isAuthenticated, setIsAuthenticated] = useState(propIsAuthenticated !== undefined ? propIsAuthenticated : false);
   const navigate = useNavigate();
   const location = useLocation();
+  // Get notification counts from context
+  const { unreadNotifications, unreadMessages } = useNotifications();
 
   useEffect(() => {
     const checkUserStatus = async () => {
@@ -77,10 +84,9 @@ export function MainLayout({
       .select('user_role')
       .eq('id', (await supabase.auth.getUser()).data.user?.id || "")
       .single();
-      
-    if (typeof userRole === 'function') {
-      userRole(data?.user_role || "customer");
-    }
+    
+    // We don't need to do anything with userRole here since it's not a setter
+    console.log("Onboarding complete, new role:", data?.user_role);
   };
   
   if (isLoading) {
@@ -94,14 +100,33 @@ export function MainLayout({
     );
   }
 
+  // Use the notification counts from context or props if provided
+  const displayUnreadNotifications = propUnreadNotifications !== undefined 
+    ? propUnreadNotifications 
+    : unreadNotifications;
+    
+  const displayUnreadMessages = propUnreadMessages !== undefined 
+    ? propUnreadMessages 
+    : unreadMessages;
+
   return (
     <div className="min-h-screen bg-background flex flex-col">
       {/* Desktop sidebar - remains hidden on mobile */}
-      <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} userRole={userRole} isAuthenticated={isAuthenticated} />
+      <Sidebar 
+        activeTab={activeTab} 
+        setActiveTab={setActiveTab} 
+        userRole={userRole} 
+        isAuthenticated={isAuthenticated} 
+        unreadNotifications={displayUnreadNotifications}
+        unreadMessages={displayUnreadMessages}
+      />
       
       {/* Main content area */}
-      <div className="flex-1 lg:ml-64 lg:w-4/5 overflow-x-hidden">
-        <MobileHeader />
+      <div className="flex-1 lg:ml-64 lg:w-[full-width] overflow-x-hidden">
+        <MobileHeader 
+          unreadNotifications={displayUnreadNotifications}
+          unreadMessages={displayUnreadMessages}
+        />
         <div className="container mx-auto pt-4 lg:pt-8 pb-24 lg:pb-8 px-4">
           {children}
         </div>

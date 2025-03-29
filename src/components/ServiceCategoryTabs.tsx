@@ -98,8 +98,8 @@ export function ServiceCategoryTabs() {
   const navigate = useNavigate();
 
   const handleServiceClick = (service: string) => {
-    // Navigate to discover page with the service as search query
-    navigate(`/discover?search=${encodeURIComponent(service)}`);
+    // Navigate to discover page with the service as search query and services tab
+    navigate(`/discover?search=${encodeURIComponent(service)}&tab=services`);
   };
 
   return (

@@ -6,9 +6,15 @@ import { useLocation, useNavigate } from "react-router-dom";
 
 interface MobileHeaderProps {
   onSearch?: (query: string) => void;
+  unreadNotifications?: number;
+  unreadMessages?: number;
 }
 
-export function MobileHeader({ onSearch }: MobileHeaderProps) {
+export function MobileHeader({ 
+  onSearch, 
+  unreadNotifications = 0, 
+  unreadMessages = 0 
+}: MobileHeaderProps) {
   const [searchQuery, setSearchQuery] = useState("");
   const [showResults, setShowResults] = useState(false);
   const location = useLocation();
@@ -72,6 +78,7 @@ export function MobileHeader({ onSearch }: MobileHeaderProps) {
       >
         Markezon
       </h1>
+      
       <div className="relative search-container ml-auto">
         <div className="relative">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-white/40 w-4 h-4" />

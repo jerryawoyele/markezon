@@ -387,7 +387,7 @@ export default function ServicesAndBookingsPage() {
       }
       
       // Check if user is trying to review their own service
-      if (selectedBooking.services?.owner_id === user.id || selectedBooking.provider_id === user.id) {
+      if (selectedBooking.services?.owner_id === user.id) {
         throw new Error("You cannot review your own service");
       }
       
@@ -497,7 +497,9 @@ export default function ServicesAndBookingsPage() {
         selectedBooking.provider_id
       );
       
-      if (result.error) throw result.error;
+      if (!result) {
+        throw new Error("Failed to create dispute");
+      }
       
       toast({
         title: "Dispute Submitted",
@@ -537,6 +539,21 @@ export default function ServicesAndBookingsPage() {
   const countPendingConfirmations = () => {
     if (!bookings) return 0;
     return bookings.filter(booking => booking.status === "pending_completion").length;
+  };
+
+  // Add this function to extract booking details from notes
+  const extractBookingDetails = (notes: string) => {
+    if (!notes) return { date: null, time: null, location: null };
+
+    const dateMatch = notes.match(/Date: (.+?)\n/);
+    const timeMatch = notes.match(/Time: (.+?)\n/);
+    const locationMatch = notes.match(/Location: (.+?)(?:\n|$)/);
+
+    return {
+      date: dateMatch ? dateMatch[1] : null,
+      time: timeMatch ? timeMatch[1] : null,
+      location: locationMatch ? locationMatch[1] : null
+    };
   };
 
   // UI rendering
@@ -593,25 +610,9 @@ export default function ServicesAndBookingsPage() {
   );
 
   const renderBookingsContent = () => (
-    <div>
-      {countPendingConfirmations() > 0 && (
-        <Alert className="mb-6 bg-amber-900 border-amber-200">
-          <AlertTriangle className="h-4 w-4 text-amber-600" />
-          <AlertTitle>Action Required</AlertTitle>
-          <AlertDescription>
-            You have {countPendingConfirmations()} {countPendingConfirmations() === 1 ? 'booking' : 'bookings'} awaiting your confirmation. 
-            Service providers have marked these as completed. Please confirm their completion or provide feedback.
-          </AlertDescription>
-        </Alert>
-      )}
-
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8">
-        <div>
-          <h1 className="text-3xl font-bold mb-1">My Bookings</h1>
-          <p className="text-muted-foreground">
-            Manage and track all your service bookings
-          </p>
-        </div>
+    <div className="container mx-auto px-4 py-8">
+      <div className="flex items-center justify-between mb-6">
+        <h1 className="text-3xl font-bold">Your Bookings</h1>
       </div>
 
       {authLoading ? (
@@ -628,6 +629,16 @@ export default function ServicesAndBookingsPage() {
             You need to be signed in to view and manage your bookings.
           </p>
           <Button onClick={() => navigate("/auth")}>Sign In</Button>
+        </Card>
+      ) : userRole === "business" ? (
+        <Card className="p-8 text-center">
+          <Shield className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
+          <h2 className="text-xl font-semibold mb-4">Business Account</h2>
+          <p className="mb-6 text-muted-foreground">
+            Only customer accounts can book services. As a business account, you can provide 
+            services but cannot make bookings. To make bookings, please create a customer account.
+          </p>
+          <Button onClick={() => navigate("/profile")}>Go to Profile</Button>
         </Card>
       ) : (
         <>
@@ -721,17 +732,29 @@ export default function ServicesAndBookingsPage() {
                       <div className="flex items-center justify-between text-sm">
                         <div className="flex items-center gap-1">
                           <Calendar className="h-3 w-3 text-muted-foreground" />
-                          <span>{new Date(booking.scheduled_time).toLocaleDateString()}</span>
+                          <span>
+                            {booking.notes ? 
+                              extractBookingDetails(booking.notes).date : 
+                              new Date(booking.scheduled_time).toLocaleDateString()}
+                          </span>
                         </div>
                         <div className="flex items-center gap-1">
                           <Clock className="h-3 w-3 text-muted-foreground" />
-                          <span>{new Date(booking.scheduled_time).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>
+                          <span>
+                            {booking.notes ? 
+                              extractBookingDetails(booking.notes).time : 
+                              new Date(booking.scheduled_time).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                          </span>
                         </div>
                       </div>
                       
                       <div className="flex items-center gap-1 text-sm">
                         <MapPin className="h-3 w-3 text-muted-foreground" />
-                        <span>{booking.location || booking.services?.location}</span>
+                        <span>
+                          {booking.notes ? 
+                            extractBookingDetails(booking.notes).location : 
+                            (booking.location || booking.services?.location)}
+                        </span>
                       </div>
                       
                       <div className="flex items-center gap-1 text-sm">
@@ -741,7 +764,13 @@ export default function ServicesAndBookingsPage() {
                     </div>
                     
                     <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
+                      <div 
+                        className="flex items-center gap-2 cursor-pointer hover:text-primary transition-colors"
+                        onClick={(e) => {
+                          e.stopPropagation(); // Prevent triggering the card click
+                          navigate(`/user/${booking.provider_id}`);
+                        }}
+                      >
                         <Avatar className="h-6 w-6">
                           <AvatarImage src={booking.provider?.avatar_url} />
                           <AvatarFallback>

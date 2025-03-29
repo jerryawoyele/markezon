@@ -12,7 +12,7 @@ import { ServiceModal } from "@/components/services/ServiceModal";
 import { supabase } from "@/integrations/supabase/client";
 import { ServiceCard } from "@/components/services/ServiceCard";
 import { useToast } from "@/components/ui/use-toast";
-import { Star, Users, FileImage, MessageSquare, Share2, ShoppingCart, CheckCircle, ArrowLeft } from "lucide-react";
+import { Star, Users, FileImage, MessageSquare, Share2, ShoppingCart, CheckCircle, ArrowLeft, Bell } from "lucide-react";
 import type { Profile as ProfileType, Post as PostType } from "@/types";
 import { AuthRequiredModal } from "@/components/auth/AuthRequiredModal";
 import { FollowersModal } from "@/components/profile/FollowersModal";
@@ -25,6 +25,7 @@ import { createNotification } from '@/utils/notification-helper';
 import { Badge } from "@/components/ui/badge";
 import { AvatarWithModal } from "@/components/profile/AvatarWithModal";
 import { updateProfileReviews } from "@/utils/profile-helper";
+import { DeleteServiceModal } from "@/components/services/DeleteServiceModal";
 
 // Define ServiceType locally since it's not exported from @/types
 interface ServiceType {
@@ -42,7 +43,7 @@ export function UserProfile() {
   const navigate = useNavigate();
   const location = useLocation();
   const { toast } = useToast();
-  
+
   // Extract username or userId from params
   const [activeTab, setActiveTab] = useState("Discover");
   const [activeProfileTab, setActiveProfileTab] = useState("posts");
@@ -68,42 +69,48 @@ export function UserProfile() {
   const [loadingBookings, setLoadingBookings] = useState(true);
   const [loadingFollowStatus, setLoadingFollowStatus] = useState(false);
   const postRefs = useRef<{ [key: string]: HTMLDivElement | null }>({});
-  
+  const postsTabRef = useRef<HTMLDivElement>(null);
+  const [unreadNotifications, setUnreadNotifications] = useState(0);
+  const [unreadMessages, setUnreadMessages] = useState(0);
+  const [serviceToDelete, setServiceToDelete] = useState<string | null>(null);
+  const [showDeleteServiceModal, setShowDeleteServiceModal] = useState(false);
+  const [serviceDeleteTitle, setServiceDeleteTitle] = useState("");
+
   // Debug log for params
   useEffect(() => {
     console.log("UserProfile params:", params);
     console.log("Current URL path:", location.pathname);
     console.log("Current URL search:", location.search);
   }, [params, location]);
-  
+
   // Use effect to check for tab parameter in URL and set the active tab
   useEffect(() => {
     // Get the 'tab' query parameter from the URL
     const searchParams = new URLSearchParams(location.search);
     const tabParam = searchParams.get('tab');
-    
+
     // If tab parameter exists and is valid, set it as the active tab
     if (tabParam === 'services' || tabParam === 'posts') {
       setActiveProfileTab(tabParam);
     }
   }, [location.search]);
-  
+
   useEffect(() => {
     const checkAuth = async () => {
       try {
         const { data: { session } } = await supabase.auth.getSession();
-        
+
         if (session) {
           setIsAuthenticated(true);
           setCurrentUser(session.user.id);
-          
+
           // Fetch current user role from profiles table
           const { data: currentUserData, error: roleError } = await supabase
             .from('profiles')
             .select('*')  // Select all columns to avoid specific column errors
             .eq('id', session.user.id)
             .single();
-            
+
           if (!roleError && currentUserData) {
             try {
               // Check if user_role exists in the data
@@ -111,7 +118,7 @@ export function UserProfile() {
                 // Safely cast the type
                 const role = currentUserData.user_role as string;
                 setCurrentUserRole(role);
-                
+
               } else {
                 // Default to customer if no role specified
                 setCurrentUserRole("customer");
@@ -130,47 +137,47 @@ export function UserProfile() {
         console.error("Error checking auth:", error);
       }
     };
-    
+
     checkAuth();
   }, []);
-  
+
   // Check if the current user is following this profile
   const checkFollowStatus = async () => {
     if (!profile || !currentUser) return;
-    
+
     try {
       setLoadingFollowStatus(true);
-      
+
       try {
         // Use the Supabase URL and key directly from the client file
         const supabaseUrl = "https://zrjgcanxtojemyknzfgl.supabase.co";
         const supabaseKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpyamdjYW54dG9qZW15a256ZmdsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDAzNTY1NjMsImV4cCI6MjA1NTkzMjU2M30.fUzRKtbcoYU6SXhB3FM2gXtn2NhI9427-U6eAF5yDdE";
-        
+
         // Get auth session for authorization header
         const { data: { session } } = await supabase.auth.getSession();
-        
+
         const headers: Record<string, string> = {
           'apikey': supabaseKey,
           'Content-Type': 'application/json',
           'Accept': 'application/json'
         };
-        
+
         // Add authorization header if we have a session
         if (session?.access_token) {
           headers['Authorization'] = `Bearer ${session.access_token}`;
         }
-        
+
         console.log(`Checking follow status: ${currentUser} following ${profile.id}`);
-        
+
         const response = await fetch(
           `${supabaseUrl}/rest/v1/follows?follower_id=eq.${currentUser}&following_id=eq.${profile.id}&select=id`,
           { headers }
         );
-        
+
         if (!response.ok) {
           throw new Error(`HTTP error! status: ${response.status}`);
         }
-        
+
         const followData = await response.json();
         console.log("Follow status check result:", followData);
         setIsFollowing(followData && followData.length > 0);
@@ -178,7 +185,7 @@ export function UserProfile() {
         console.error("Error checking follow status:", error);
         setIsFollowing(false);
       }
-      
+
       setLoadingFollowStatus(false);
     } catch (error) {
       console.error("Error in checkFollowStatus:", error);
@@ -191,23 +198,23 @@ export function UserProfile() {
     try {
       // Set loading state for posts
       setLoadingPosts(true);
-      
+
       // Fetch the posts for this profile
       const { data, error } = await supabase
-          .from('posts')
-          .select(`
+        .from('posts')
+        .select(`
             *,
           profiles (*)
           `)
         .eq('user_id', profile?.id)
-          .order('created_at', { ascending: false });
-        
+        .order('created_at', { ascending: false });
+
       if (error) {
         console.error("Error fetching posts:", error);
       } else {
         setUserPosts(data as unknown as PostType[]);
       }
-      
+
       // Fetch services if business user
       if (profile?.user_role === "business") {
         setLoadingServices(true);
@@ -216,7 +223,7 @@ export function UserProfile() {
           .select('*')
           .eq('owner_id', profile?.id)
           .order('created_at', { ascending: false });
-          
+
         if (servicesError) {
           console.error("Error fetching services:", servicesError);
         } else {
@@ -224,7 +231,7 @@ export function UserProfile() {
         }
         setLoadingServices(false);
       }
-      
+
       // If we need to scroll to a specific post
       if (params.postId) {
         setTimeout(() => {
@@ -232,7 +239,7 @@ export function UserProfile() {
           if (postElement) {
             postElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
             postElement.classList.add('highlight-post');
-            
+
             // Remove highlight after animation
             setTimeout(() => {
               postElement.classList.remove('highlight-post');
@@ -240,7 +247,7 @@ export function UserProfile() {
           }
         }, 500);
       }
-      
+
       // Loading complete
       setLoadingPosts(false);
       setLoading(false);
@@ -279,15 +286,15 @@ export function UserProfile() {
           'Accept': 'application/json'
         }
       });
-      
+
       if (!response.ok) {
         console.error(`HTTP error! status: ${response.status}`);
         return null;
       }
-      
+
       const profiles = await response.json();
       console.log(`Fetch result for ${field}=${value}:`, profiles);
-      
+
       if (profiles && profiles.length > 0) {
         return profiles[0];
       } else {
@@ -305,30 +312,30 @@ export function UserProfile() {
     const fetchProfileData = async () => {
       try {
         setLoadingProfile(true);
-        
+
         // Get the userId or username from params
         const { userId, username } = params;
         console.log("Fetching profile with params:", { userId, username });
-        
+
         if (!userId && !username) {
           console.error("No userId or username found in params");
           setLoadingProfile(false);
           return;
         }
-        
+
         let profileData = null;
-        
+
         if (username) {
           console.log("Fetching profile by username:", username);
           // If username starts with @, remove it
           const cleanUsername = username.startsWith('@') ? username.substring(1) : username;
           console.log("Cleaned username:", cleanUsername);
-          
+
           // Special logging for Spyrojerry
           if (cleanUsername.toLowerCase() === 'spyrojerry') {
             console.warn("DEBUG: Attempting to fetch Spyrojerry profile");
           }
-          
+
           // Attempt to fetch profile by username using ilike for case-insensitive matching
           try {
             // First try using ilike directly with Supabase client
@@ -338,33 +345,33 @@ export function UserProfile() {
               .select('*')
               .ilike('username', cleanUsername)
               .single();
-              
+
             if (error) {
               console.error("Error fetching profile by username using ilike:", error);
-              
+
               // Try second method - fetchProfileByField with eq (which will use ilike internally)
               console.log(`Trying second method: fetchProfileByField with username eq ${cleanUsername}`);
               profileData = await fetchProfileByField('username', 'eq', cleanUsername);
-              
+
               if (!profileData) {
                 // Third attempt - using direct ilike operator
                 console.log(`Trying third method: fetchProfileByField with username ilike ${cleanUsername}`);
                 profileData = await fetchProfileByField('username', 'ilike', cleanUsername);
-                
+
                 if (!profileData) {
                   // Final attempt - try a direct query for all profiles and match in memory
                   console.log("Trying final method: fetch all profiles and match in memory");
                   const { data: allProfiles, error: allProfilesError } = await supabase
                     .from('profiles')
                     .select('*');
-                    
+
                   if (!allProfilesError && allProfiles) {
                     console.log(`Found ${allProfiles.length} profiles in total`);
                     // Find profile with case-insensitive username match
                     const matchingProfile = allProfiles.find(
                       p => p.username && p.username.toLowerCase() === cleanUsername.toLowerCase()
                     );
-                    
+
                     if (matchingProfile) {
                       console.log("Found matching profile in memory:", matchingProfile);
                       profileData = matchingProfile;
@@ -390,7 +397,7 @@ export function UserProfile() {
             .select('*')
             .eq('id', userId)
             .single();
-            
+
           if (error) {
             console.error("Error fetching profile by ID:", error);
           } else {
@@ -398,40 +405,40 @@ export function UserProfile() {
             profileData = data;
           }
         }
-        
+
         if (profileData) {
           setProfile(profileData as ProfileType);
-          
+
           // Check if this is the current user's profile
           setIsOwnProfile(profileData.id === currentUser);
-          
+
           // Load this user's content once we have their profile
           setTimeout(() => loadContent(), 0);
-          
+
           // Check if the current user is following this profile
           setTimeout(() => checkFollowStatus(), 0);
         } else {
           console.error("Profile not found");
           setProfile(null);
         }
-        
+
         setLoadingProfile(false);
       } catch (error) {
         console.error("Error in fetchProfileData:", error);
         setLoadingProfile(false);
       }
     };
-    
+
     if (currentUser !== null) {
       fetchProfileData();
     }
   }, [params, currentUser]);
-  
+
   // Effect to load posts and services after profile is loaded
   useEffect(() => {
     if (profile) {
       loadContent();
-      
+
       // Check if this is the current user's profile
       if (currentUser && profile.id === currentUser) {
         setIsOwnProfile(true);
@@ -440,28 +447,28 @@ export function UserProfile() {
       }
     }
   }, [profile, params, currentUser]);
-  
+
   // Add this function to fetch bookings for the customer
   const fetchBookings = async () => {
     if (!profile?.id || profile?.user_role !== "customer") return;
 
     try {
       setLoadingBookings(true);
-      
+
       // Get current user's session
       const { data: { session } } = await supabase.auth.getSession();
-      
+
       if (!session) {
         navigate('/auth');
         return;
       }
-      
+
       // Only fetch bookings if viewing our own profile and we're a customer
       if (session.user.id !== profile.id) {
         setLoadingBookings(false);
         return;
       }
-      
+
       try {
         // Use the supabase client instead of direct fetch
         const { data: bookingsData, error } = await supabase
@@ -469,50 +476,50 @@ export function UserProfile() {
           .select('*')
           .eq('customer_id', profile.id)
           .order('created_at', { ascending: false });
-        
+
         if (error) {
           throw error;
         }
-        
+
         if (bookingsData && bookingsData.length > 0) {
           // Extract service IDs and provider IDs
           const serviceIds = bookingsData.map(booking => booking.service_id).filter(Boolean);
           const providerIds = bookingsData.map(booking => booking.provider_id).filter(Boolean);
-          
+
           // Fetch services data
           const { data: servicesData, error: servicesError } = await supabase
             .from('services')
             .select('id, title, price, category, image')
             .in('id', serviceIds);
-            
+
           if (servicesError) console.error("Error fetching services:", servicesError);
-          
+
           // Fetch providers data
           const { data: providersData, error: providersError } = await supabase
             .from('profiles')
             .select('id, username, avatar_url')
             .in('id', providerIds);
-            
+
           if (providersError) console.error("Error fetching providers:", providersError);
-          
+
           // Create lookup tables
           const servicesMap = (servicesData || []).reduce((acc, service) => {
             acc[service.id] = service;
             return acc;
           }, {});
-          
+
           const providersMap = (providersData || []).reduce((acc, provider) => {
             acc[provider.id] = provider;
             return acc;
           }, {});
-          
+
           // Join the data
           const bookingsWithRelations = bookingsData.map(booking => ({
             ...booking,
             services: servicesMap[booking.service_id] || { title: 'Unknown Service', price: 'N/A', category: 'Unknown' },
             providers: providersMap[booking.provider_id] || { username: 'Unknown Provider', avatar_url: null }
           }));
-          
+
           setBookings(bookingsWithRelations);
         } else {
           setBookings([]);
@@ -526,7 +533,7 @@ export function UserProfile() {
         });
         setBookings([]);
       }
-      
+
       setLoadingBookings(false);
     } catch (error) {
       console.error("Error in fetchBookings:", error);
@@ -538,14 +545,14 @@ export function UserProfile() {
   useEffect(() => {
     if (profile) {
       loadContent();
-      
+
       // If viewing own profile and user is a customer, fetch bookings
       if (currentUser === profile.id && profile.user_role === "customer") {
         fetchBookings();
       }
     }
   }, [profile, params, currentUser]);
-  
+
   const requireAuth = (callback: Function) => {
     if (!isAuthenticated) {
       setShowAuthModal(true);
@@ -553,22 +560,22 @@ export function UserProfile() {
     }
     callback();
   };
-  
+
   const handleServiceClick = (service: ServiceType) => {
     requireAuth(() => {
       // Navigate to service detail page instead of showing modal
       navigate(`/services/${service.id}`);
     });
   };
-  
+
   const handleShareProfile = () => {
     const currentUrl = window.location.href;
-    
+
     // Generate the profile URL using the @username format
-    const shareUrl = profile?.username 
+    const shareUrl = profile?.username
       ? `${window.location.origin}/@${profile.username}`
       : currentUrl;
-    
+
     if (navigator.share) {
       navigator.share({
         title: `${profile?.username || 'User'}'s Profile`,
@@ -593,19 +600,19 @@ export function UserProfile() {
         });
     }
   };
-  
+
   const handleMessage = () => {
     requireAuth(() => {
       navigate(`/messages?user=${profile?.id}`);
     });
   };
-  
+
   // Add function to handle booking cancellation
   const handleCancelBooking = async (bookingId: string) => {
     try {
       // Get current user's session
       const { data: { session } } = await supabase.auth.getSession();
-      
+
       if (!session) {
         toast({
           variant: "destructive",
@@ -614,24 +621,24 @@ export function UserProfile() {
         });
         return;
       }
-      
+
       // Use Supabase client instead of direct fetch
       const { error } = await supabase
         .from('bookings')
         .update({ status: 'cancelled' })
         .eq('id', bookingId);
-      
+
       if (error) {
         throw error;
       }
-      
+
       // Update local state
-      setBookings(prev => 
-        prev.map(booking => 
+      setBookings(prev =>
+        prev.map(booking =>
           booking.id === bookingId ? { ...booking, status: 'cancelled' } : booking
         )
       );
-      
+
       toast({
         title: "Booking Cancelled",
         description: "Your booking has been cancelled successfully.",
@@ -645,28 +652,28 @@ export function UserProfile() {
       });
     }
   };
-  
+
   // Handle follow/unfollow button click
   const handleFollow = () => {
     requireAuth(async () => {
       try {
         // Set loading state first
         setLoadingFollowStatus(true);
-        
+
         // Use the Supabase URL and key directly from the client file
         const supabaseUrl = "https://zrjgcanxtojemyknzfgl.supabase.co";
         const supabaseKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpyamdjYW54dG9qZW15a256ZmdsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDAzNTY1NjMsImV4cCI6MjA1NTkzMjU2M30.fUzRKtbcoYU6SXhB3FM2gXtn2NhI9427-U6eAF5yDdE";
-        
+
         // Get auth session for authorization header
         const { data: { session } } = await supabase.auth.getSession();
-        
+
         const headers: Record<string, string> = {
           'apikey': supabaseKey,
           'Content-Type': 'application/json',
           'Accept': 'application/json',
           'Prefer': 'return=minimal'
         };
-        
+
         // Add authorization header if we have a session
         if (session?.access_token) {
           headers['Authorization'] = `Bearer ${session.access_token}`;
@@ -679,7 +686,7 @@ export function UserProfile() {
           setLoadingFollowStatus(false);
           return;
         }
-        
+
         if (isFollowing) {
           // Unfollow logic - use REST API directly
           console.log(`Unfollowing: ${currentUser} unfollows ${profile?.id}`);
@@ -690,7 +697,7 @@ export function UserProfile() {
               headers
             }
           );
-          
+
           if (!response.ok) {
             throw new Error(`HTTP error! status: ${response.status}`);
           }
@@ -699,7 +706,7 @@ export function UserProfile() {
           console.log(`Checking if ${currentUser} already follows ${profile?.id}`);
           const checkResponse = await fetch(
             `${supabaseUrl}/rest/v1/follows?follower_id=eq.${currentUser}&following_id=eq.${profile?.id}&select=id`,
-            { 
+            {
               headers: {
                 'apikey': supabaseKey,
                 'Content-Type': 'application/json',
@@ -707,11 +714,11 @@ export function UserProfile() {
               }
             }
           );
-          
+
           if (!checkResponse.ok) {
             throw new Error(`HTTP error checking follow status! status: ${checkResponse.status}`);
           }
-          
+
           const existingFollow = await checkResponse.json();
           if (existingFollow && existingFollow.length > 0) {
             console.log("Follow relationship already exists, skipping follow creation");
@@ -731,12 +738,12 @@ export function UserProfile() {
                 })
               }
             );
-            
+
             if (!response.ok) {
               console.error(`Follow error: ${response.status}`, await response.text());
               throw new Error(`HTTP error! status: ${response.status}`);
             }
-            
+
             // Create a notification for the user being followed
             if (profile?.id && currentUser) {
               // Get current user's profile info to use in notification
@@ -745,9 +752,9 @@ export function UserProfile() {
                 .select('username')
                 .eq('id', currentUser)
                 .single();
-              
+
               const username = currentUserProfile?.username || 'Someone';
-              
+
               // Create the follow notification
               await createNotification({
                 userId: profile.id,
@@ -759,11 +766,11 @@ export function UserProfile() {
             }
           }
         }
-        
+
         // Toggle follow status immediately for better UX
         const newFollowStatus = !isFollowing;
         setIsFollowing(newFollowStatus);
-        
+
         // Update followers count in the UI
         if (profile) {
           const updatedProfile = {
@@ -774,15 +781,15 @@ export function UserProfile() {
           };
           setProfile(updatedProfile as ProfileType);
         }
-        
+
         // Finish loading
         setLoadingFollowStatus(false);
-        
+
         // Show success message
         toast({
           title: newFollowStatus ? "Followed" : "Unfollowed",
-          description: newFollowStatus 
-            ? `You are now following ${profile?.username}` 
+          description: newFollowStatus
+            ? `You are now following ${profile?.username}`
             : `You have unfollowed ${profile?.username}`,
         });
       } catch (error) {
@@ -796,7 +803,7 @@ export function UserProfile() {
       }
     });
   };
-  
+
   // Add a function to update followers count
   const updateFollowersCount = (count: number) => {
     if (profile) {
@@ -822,34 +829,34 @@ export function UserProfile() {
       }
     }
   };
-  
+
   // Add a function to sync follower and following counts
   const syncFollowerCounts = async () => {
     if (!profile?.id) return;
-    
+
     try {
       // Call the resync_follower_counts RPC function
       const { error } = await supabase.rpc('resync_follower_counts', {
         user_id: profile.id
       });
-      
+
       if (error) {
         console.error("Error syncing follower counts:", error);
         return;
       }
-      
+
       // Refresh the profile data to get the updated counts
       const { data, error: profileError } = await supabase
         .from('profiles')
         .select('followers_count, following_count')
         .eq('id', profile.id)
         .single();
-      
+
       if (profileError || !data) {
         console.error("Error fetching updated profile:", profileError);
         return;
       }
-      
+
       // Update the profile with new counts
       setProfile({
         ...profile,
@@ -871,11 +878,11 @@ export function UserProfile() {
   // Add a function to ensure reviews data is available
   const ensureReviewsData = async () => {
     if (!profile?.id) return;
-    
+
     try {
       // Use our utility function
       const { reviews_count, reviews_rating } = await updateProfileReviews(profile.id);
-      
+
       // Only update profile if values are different
       if (profile.reviews_count !== reviews_count || profile.reviews_rating !== reviews_rating) {
         setProfile({
@@ -948,14 +955,142 @@ export function UserProfile() {
       });
     }
   };
-  
+
+  // Add this function to handle post count click
+  const handlePostsClick = () => {
+    setActiveProfileTab("posts");
+    setTimeout(() => {
+      if (postsTabRef.current) {
+        postsTabRef.current.scrollIntoView({ behavior: 'smooth' });
+      }
+    }, 100);
+  };
+
+  // Add this function to fetch unread messages count
+  const fetchUnreadMessagesCount = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+
+      if (!user) return;
+
+      // Get all messages for this user where they're the receiver and the message is unread
+      const { data, error } = await supabase
+        .from('messages')
+        .select('id')
+        .eq('receiver_id', user.id)
+        .eq('read', false);
+
+      if (error) throw error;
+
+      setUnreadMessages(data?.length || 0);
+    } catch (error) {
+      console.error("Error fetching unread messages count:", error);
+    }
+  };
+
+  // Add a function to fetch notification count
+  const fetchNotificationsCount = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+
+      if (!user) return;
+
+      const { count, error } = await supabase
+        .from('notifications')
+        .select('*', { count: 'exact', head: true })
+        .eq('user_id', user.id)
+        .eq('is_read', false);
+
+      if (error) throw error;
+
+      setUnreadNotifications(count || 0);
+
+      // Also fetch unread messages count
+      fetchUnreadMessagesCount();
+    } catch (error) {
+      console.error("Error fetching notification count:", error);
+    }
+  };
+
+  // Add a useEffect to fetch notification and message counts
+  useEffect(() => {
+    if (isAuthenticated && currentUser) {
+      fetchNotificationsCount();
+    }
+  }, [isAuthenticated, currentUser]);
+
+  // Update the handleDeleteService function
+  const handleDeleteService = async (serviceId: string, serviceTitle?: string) => {
+    // Set the service ID to delete and show the confirmation modal
+    setServiceToDelete(serviceId);
+    setServiceDeleteTitle(serviceTitle || "this service");
+    setShowDeleteServiceModal(true);
+  };
+
+  // Handle the actual deletion after confirmation
+  const confirmDeleteService = async () => {
+    if (!serviceToDelete) return;
+
+    try {
+      const { error } = await supabase
+        .from('services')
+        .delete()
+        .eq('id', serviceToDelete);
+
+      if (error) throw error;
+
+      toast({
+        title: "Service deleted",
+        description: "Your service has been successfully deleted",
+      });
+
+      // Refresh services
+      fetchUserServices();
+    } catch (error) {
+      console.error("Error deleting service:", error);
+      toast({
+        title: "Error",
+        description: "Failed to delete the service. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  // Around line 500-550 (after handleServiceClick function)
+  // Rename fetchServices function to fetchUserServices for consistency
+  const fetchUserServices = async () => {
+    try {
+      setLoadingServices(true);
+
+      // Fetch user services
+      if (!profile) return;
+
+      const { data, error } = await supabase
+        .from('services')
+        .select('*')
+        .eq('owner_id', profile.id)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+
+      setServices(data || []);
+    } catch (error) {
+      console.error("Error fetching services:", error);
+      setServices([]);
+    } finally {
+      setLoadingServices(false);
+    }
+  };
+
   if (loading && !profile) {
     return (
-      <MainLayout 
-        activeTab="Profile" 
-        setActiveTab={() => {}} 
-        userRole={currentUserRole as any} 
+      <MainLayout
+        activeTab="Discover"
+        setActiveTab={() => { }}
+        userRole={currentUserRole as any}
         isAuthenticated={isAuthenticated}
+        unreadNotifications={unreadNotifications}
+        unreadMessages={unreadMessages}
       >
         <div className="flex-1 min-h-screen flex flex-col justify-center items-center">
           <div className="w-16 h-16 border-4 border-t-primary border-r-transparent border-b-transparent border-l-transparent rounded-full animate-spin mx-auto mb-4"></div>
@@ -964,14 +1099,16 @@ export function UserProfile() {
       </MainLayout>
     );
   }
-  
+
   if (!profile && !loadingProfile) {
     return (
-      <MainLayout 
-        activeTab="Profile" 
-        setActiveTab={() => {}} 
-        userRole={currentUserRole as any} 
+      <MainLayout
+        activeTab="Discover"
+        setActiveTab={() => { }}
+        userRole={currentUserRole as any}
         isAuthenticated={isAuthenticated}
+        unreadNotifications={unreadNotifications}
+        unreadMessages={unreadMessages}
       >
         <div className="flex-1 min-h-screen flex justify-center items-center">
           <div className="text-center max-w-md mx-auto p-8 bg-black/20 rounded-lg border border-white/10">
@@ -985,22 +1122,24 @@ export function UserProfile() {
       </MainLayout>
     );
   }
-  
+
   console.log("Rendering profile with isOwnProfile:", isOwnProfile, "Current user:", currentUser);
-  
+
   return (
-    <MainLayout 
-      activeTab="Profile" 
-      setActiveTab={(newTab) => setActiveTab(newTab)} 
-      userRole={currentUserRole as any} 
+    <MainLayout
+      activeTab="Discover"
+      setActiveTab={(newTab) => setActiveTab(newTab)}
+      userRole={currentUserRole as any}
       isAuthenticated={isAuthenticated}
+      unreadNotifications={unreadNotifications}
+      unreadMessages={unreadMessages}
     >
       <div className="w-full overflow-x-hidden pb-16 md:pb-0">
         <div>
           {/* Profile header with skeleton loader */}
           <Card className="rounded-lg overflow-hidden mb-8">
             <div className="p-6 flex flex-col gap-4">
-            {loadingProfile ? (
+              {loadingProfile ? (
                 <div className="flex flex-col md:flex-row gap-6">
                   <Skeleton className="h-24 w-24 rounded-full" />
                   <div className="flex-1 space-y-4">
@@ -1009,21 +1148,21 @@ export function UserProfile() {
                     <div className="flex gap-4">
                       <Skeleton className="h-10 w-24" />
                       <Skeleton className="h-10 w-24" />
+                    </div>
                   </div>
                 </div>
-              </div>
-            ) : (
+              ) : (
                 <>
-                  <Button 
-                    variant="outline" 
-                    size="sm" 
+                  <Button
+                    variant="outline"
+                    size="sm"
                     onClick={() => window.history.back()}
                     className="w-fit mb-4"
                   >
                     <ArrowLeft className="h-4 w-4 mr-2" />
                     Back
                   </Button>
-                  
+
                   <div className="flex flex-col md:flex-row gap-6">
                     <div className="flex-shrink-0">
                       <AvatarWithModal
@@ -1032,8 +1171,8 @@ export function UserProfile() {
                         avatarUrl={profile?.avatar_url}
                         username={profile?.username}
                       />
-                      </div>
-                      
+                    </div>
+
                     <div className="flex-1 space-y-4">
                       <div>
                         {profile?.user_role === 'business' && profile?.business_name ? (
@@ -1049,37 +1188,38 @@ export function UserProfile() {
                         )}
                         <p className="text-white/60 mt-2">{profile?.bio}</p>
                       </div>
-                      
-                      <div className="grid grid-cols-1 sm:grid-cols-2 md:flex gap-2 mt-4 sm:mt-0">
+
+                      <div className="flex flex-row gap-2 mt-4 sm:mt-0">
                         {!isOwnProfile && (
                           <>
                             <Button
-                              variant="outline"
-                              size="sm"
-                              className="flex items-center gap-2"
-                              onClick={handleMessage}
-                            >
-                              <MessageSquare className="h-4 w-4" />
-                              Message
-                            </Button>
-                            
-                            <Button
                               variant={isFollowing ? "secondary" : "default"}
                               size="sm"
-                              className="flex items-center gap-2"
+                              className="flex w-fit items-center gap-2"
                               onClick={handleFollow}
                               disabled={loadingFollowStatus}
                             >
                               <Users className="h-4 w-4" />
                               {isFollowing ? 'Following' : 'Follow'}
                             </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="flex w-fit items-center gap-2"
+                              onClick={handleMessage}
+                            >
+                              <MessageSquare className="h-4 w-4" />
+                              Message
+                            </Button>
+
+
                           </>
                         )}
-                        
+
                         <Button
                           variant="outline"
                           size="sm"
-                          className="flex items-center gap-2"
+                          className="flex w-fit items-center gap-2"
                           onClick={handleShareProfile}
                         >
                           <Share2 className="h-4 w-4" />
@@ -1088,10 +1228,13 @@ export function UserProfile() {
                       </div>
                     </div>
                   </div>
-                  
+
                   {/* Stats row */}
                   <div className="flex flex-row flex-wrap justify-around mt-4 pt-4 border-t border-white/10">
-                    <div className="text-center cursor-pointer hover:bg-black/20 px-4 py-2 rounded-md transition-colors">
+                    <div
+                      className="text-center cursor-pointer hover:bg-black/20 px-4 py-2 rounded-md transition-colors"
+                      onClick={handlePostsClick}
+                    >
                       <p className="font-semibold">{userPosts.length}</p>
                       <p className="text-white/60 text-sm">Posts</p>
                     </div>
@@ -1120,39 +1263,39 @@ export function UserProfile() {
                         <div className="flex items-center justify-center gap-1">
                           <Star className="w-4 h-4 text-yellow-400" />
                           <p className="font-semibold">
-                            {profile?.reviews_count && profile.reviews_count > 0 
+                            {profile?.reviews_count && profile.reviews_count > 0
                               ? (profile?.reviews_rating?.toFixed(1) || '0.0')
                               : '-'}
                           </p>
                         </div>
                         <p className="text-white/60 text-sm">
-                          {profile?.reviews_count && profile.reviews_count > 0 
+                          {profile?.reviews_count && profile.reviews_count > 0
                             ? `Rating (${profile?.reviews_count || 0})`
                             : 'No reviews yet'}
                         </p>
-              </div>
-            )}
+                      </div>
+                    )}
                   </div>
                 </>
               )}
             </div>
           </Card>
-          
+
           {/* Tabs for Posts and Services */}
           <Tabs value={activeProfileTab} onValueChange={setActiveProfileTab}>
             <TabsList className="mb-6">
               <TabsTrigger value="posts">Posts</TabsTrigger>
               {profile?.user_role === "business" ? (
-              <TabsTrigger value="services">Services</TabsTrigger>
+                <TabsTrigger value="services">Services</TabsTrigger>
               ) : (
                 profile?.id === currentUser && (
                   <TabsTrigger value="bookings">Bookings</TabsTrigger>
                 )
               )}
             </TabsList>
-            
+
             <TabsContent value="posts" className="pb-4">
-              <div className="mb-4 flex justify-between items-center">
+              <div ref={postsTabRef} className="mb-4 flex justify-between items-center">
                 <h2 className="text-xl font-semibold"></h2>
               </div>
               <div className="grid gap-4 md:gap-6 max-w-4xl mx-auto">
@@ -1175,37 +1318,37 @@ export function UserProfile() {
                     </div>
                   ))
                 ) : userPosts.length > 0 ? (
-                userPosts.map((post) => (
-                    <div 
-                      key={post.id} 
+                  userPosts.map((post) => (
+                    <div
+                      key={post.id}
                       ref={el => postRefs.current[post.id] = el}
                       className={`transition-all duration-300 ${params.postId === post.id ? '' : ''
-                      }`}
+                        }`}
                     >
-                  <Post 
-                    {...post} 
-                    profiles={post.profiles} 
-                    currentUserId={async () => currentUser} 
+                      <Post
+                        {...post}
+                        profiles={post.profiles}
+                        currentUserId={async () => currentUser}
                         isAuthenticated={isAuthenticated}
-                  />
+                      />
                     </div>
-                ))
-              ) : (
+                  ))
+                ) : (
                   <div className="text-center py-8">
-                <Card className="p-8 text-center">
+                    <Card className="p-8 text-center">
                       <p className="mb-4">No posts yet</p>
-                </Card>
+                    </Card>
                   </div>
-              )}
+                )}
               </div>
             </TabsContent>
-            
+
             <TabsContent value="services" className="mt-0">
               <div className="mb-4">
                 {/* No Add Service button for other users' profiles */}
               </div>
-              
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {loadingServices ? (
                   // Service skeletons
                   Array(6).fill(0).map((_, i) => (
@@ -1220,10 +1363,24 @@ export function UserProfile() {
                   ))
                 ) : services.length > 0 ? (
                   services.map((service) => (
-                    <ServiceCard 
-                      key={service.id} 
-                      service={service} 
-                      onClick={() => handleServiceClick(service)}
+                    <ServiceCard
+                      key={service.id}
+                      service={{
+                        id: service.id,
+                        title: service.title,
+                        description: service.description,
+                        category: service.category,
+                        price: typeof service.price === 'string' ? parseFloat(service.price) : service.price,
+                        location: service.location || "",
+                        duration_minutes: service.duration_minutes || 60,
+                        image: service.image || null,
+                        owner_id: service.owner_id,
+                        ratings_count: service.ratings_count || 0,
+                        ratings_sum: service.ratings_sum || 0
+                      }}
+                      showOptions={service.owner_id === currentUser}
+                      onDelete={() => handleDeleteService(service.id, service.title)}
+                      refreshServices={fetchUserServices}
                     />
                   ))
                 ) : (
@@ -1235,7 +1392,7 @@ export function UserProfile() {
                 )}
               </div>
             </TabsContent>
-            
+
             <TabsContent value="bookings" className="mt-0">
               <Card>
                 <CardHeader>
@@ -1278,9 +1435,9 @@ export function UserProfile() {
                               </div>
                               <Badge variant={
                                 booking.status === 'completed' ? 'default' :
-                                booking.status === 'pending' ? 'secondary' :
-                                booking.status === 'cancelled' ? 'destructive' :
-                                booking.status === 'confirmed' ? 'outline' : 'default'
+                                  booking.status === 'pending' ? 'secondary' :
+                                    booking.status === 'cancelled' ? 'destructive' :
+                                      booking.status === 'confirmed' ? 'outline' : 'default'
                               }>
                                 {booking.status.charAt(0).toUpperCase() + booking.status.slice(1)}
                               </Badge>
@@ -1288,8 +1445,8 @@ export function UserProfile() {
                           </CardHeader>
                           <CardFooter className="p-4 bg-muted/20 flex justify-end gap-2">
                             {["pending", "confirmed"].includes(booking.status) && (
-                              <Button 
-                                variant="outline" 
+                              <Button
+                                variant="outline"
                                 size="sm"
                                 onClick={() => handleCancelBooking(booking.id)}
                               >
@@ -1306,13 +1463,13 @@ export function UserProfile() {
                             </Button>
                           </CardFooter>
                         </Card>
-                  ))}
-                </div>
-              ) : (
+                      ))}
+                    </div>
+                  ) : (
                     <div className="text-center py-8">
                       <p>You don't have any service bookings yet.</p>
-                      <Button 
-                        onClick={() => navigate('/discover')} 
+                      <Button
+                        onClick={() => navigate('/discover')}
                         className="mt-4"
                       >
                         Discover Services
@@ -1320,27 +1477,27 @@ export function UserProfile() {
                     </div>
                   )}
                 </CardContent>
-                </Card>
+              </Card>
             </TabsContent>
           </Tabs>
-          
+
           {/* Modals */}
-          <AuthRequiredModal 
-            isOpen={showAuthModal} 
+          <AuthRequiredModal
+            isOpen={showAuthModal}
             setIsOpen={setShowAuthModal}
             message="You need to sign in to interact with this profile."
           />
-          
+
           {profile && (
             <>
-              <FollowersModal 
+              <FollowersModal
                 userId={profile.id}
                 isOpen={showFollowersModal}
                 onClose={() => setShowFollowersModal(false)}
                 currentUserId={currentUser}
                 onFollowersLoaded={updateFollowersCount}
               />
-              
+
               <FollowingModal
                 userId={profile.id}
                 isOpen={showFollowingModal}
@@ -1352,7 +1509,7 @@ export function UserProfile() {
           )}
         </div>
       </div>
-      
+
       {selectedService && (
         <ServiceModal
           service={selectedService}
@@ -1360,10 +1517,10 @@ export function UserProfile() {
           onClose={() => setShowServiceModal(false)}
         />
       )}
-      
+
       {profile && (
         <>
-          <ReviewsModal 
+          <ReviewsModal
             isOpen={showReviewsModal}
             onClose={() => setShowReviewsModal(false)}
             userId={profile.id}
@@ -1371,6 +1528,14 @@ export function UserProfile() {
           />
         </>
       )}
+
+      {/* Delete Service Confirmation Modal */}
+      <DeleteServiceModal
+        isOpen={showDeleteServiceModal}
+        onClose={() => setShowDeleteServiceModal(false)}
+        onConfirm={confirmDeleteService}
+        serviceTitle={serviceDeleteTitle}
+      />
     </MainLayout>
   );
 }

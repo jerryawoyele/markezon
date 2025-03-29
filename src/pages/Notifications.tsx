@@ -296,7 +296,7 @@ export default function Notifications() {
   return (
     <MainLayout activeTab={activeTab} setActiveTab={setActiveTab} userRole={userRole} isAuthenticated={true}>
       <div>
-        <div className="flex items-center gap-4 mb-6">
+        <div className="flex items-center justify-between gap-4 mb-6">
           <Button
             variant="ghost"
             size="sm"
@@ -306,18 +306,17 @@ export default function Notifications() {
             <ArrowLeft className="h-4 w-4" />
             Back to Profile
           </Button>
-          <h1 className="text-2xl font-bold">Notifications</h1>
-        </div>
         {notifications.some(n => !n.is_read) && (
           <Button
-            variant="outline"
+            variant="default"
             size="sm"
             onClick={handleMarkAllAsRead}
-            className="mb-4"
+            className="items-center"
           >
             Mark all as read
           </Button>
         )}
+        </div>
         <div className="space-y-4">
           {notifications.length > 0 ? (
             notifications.map((notification) => (
@@ -340,12 +339,12 @@ export default function Notifications() {
                   </Avatar>
                   <div className="flex-1">
                     <div className="flex items-center gap-2">
-                      <h3 className="font-medium">{notification.actor_name || 'Notification'}</h3>
+                      <h3 className="font-medium max-lg:truncate max-lg:max-w-[130px]">{notification.actor_name || 'Notification'}</h3>
                       {!notification.is_read && (
                         <span className="bg-primary w-2 h-2 rounded-full"></span>
                       )}
                     </div>
-                    <p className="text-sm text-white/60">{notification.message}</p>
+                    <p className="text-sm text-white/60 max-lg:max-w-[130px]">{notification.message}</p>
                     <span className="text-xs text-white/40">
                       {formatTimestamp(notification.created_at)}
                     </span>

@@ -1217,7 +1217,7 @@ export default function Settings() {
             <ArrowLeft className="h-4 w-4 mr-2" />
             Back to Profile
           </Button>
-          <h1 className="text-3xl font-bold">Account Settings</h1>
+          <h3 className="text-3xl font-semibold">Settings</h3>
         </div>
 
         <Tabs defaultValue="profile" value={activeTab} onValueChange={setActiveTab} className="w-full">

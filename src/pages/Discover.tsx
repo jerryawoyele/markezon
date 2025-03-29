@@ -363,7 +363,7 @@ export default function Discover() {
                 <div className="w-full h-16 bg-black/20 rounded-lg animate-pulse" />
                 
                 {/* Grid skeletons */}
-                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                <div className="grid grid-cols-2 bg-black/20 md:grid-cols-3 lg:grid-cols-4 gap-4">
                   {Array(12).fill(0).map((_, i) => (
                     <div key={i} className="aspect-square bg-black/20 rounded-lg animate-pulse" />
                   ))}
@@ -485,12 +485,12 @@ export default function Discover() {
                     {loadingServices ? (
                       Array(6).fill(0).map((_, index) => (
                         <Card key={index} className="overflow-hidden animate-pulse">
-                          <div className="h-48 bg-gray-200"></div>
+                          <div className="h-48 bg-black/50"></div>
                           <CardContent className="p-4">
-                            <div className="h-6 bg-gray-200 rounded w-3/4 mb-2"></div>
-                            <div className="h-4 bg-gray-200 rounded w-1/2 mb-4"></div>
-                            <div className="h-4 bg-gray-200 rounded w-full mb-2"></div>
-                            <div className="h-4 bg-gray-200 rounded w-full"></div>
+                            <div className="h-6 bg-black/80 rounded w-3/4 mb-2"></div>
+                            <div className="h-4 bg-black/20 rounded w-1/2 mb-4"></div>
+                            <div className="h-4 bg-black/20 rounded w-full mb-2"></div>
+                            <div className="h-4 bg-black/20 rounded w-full"></div>
                           </CardContent>
                         </Card>
                       ))
@@ -539,12 +539,24 @@ export default function Discover() {
                               </div>
                               <div className="flex items-center gap-1">
                                 <Clock className="h-3 w-3" />
-                                <span>{service.duration_minutes} min</span>
+                                <span>
+                                  {service.duration_minutes < 60
+                                    ? `${service.duration_minutes||''}m`
+                                    : `${Math.floor(service.duration_minutes / 60)}h${
+                                        service.duration_minutes % 60 ? ` ${service.duration_minutes % 60}m` : ""
+                                      }`}
+                                </span>
                               </div>
                             </div>
                           </CardContent>
                           <div className="py-3 px-4 bg-muted/20 flex items-center justify-between">
-                            <div className="flex items-center gap-2">
+                            <div 
+                              className="flex items-center gap-2 cursor-pointer hover:text-primary transition-colors"
+                              onClick={(e) => {
+                                e.stopPropagation(); // Prevent triggering service card click
+                                navigate(`/user/${service.profiles?.id}`);
+                              }}
+                            >
                               <div className="h-6 w-6 rounded-full bg-muted overflow-hidden">
                                 {service.profiles?.avatar_url ? (
                                   <img 

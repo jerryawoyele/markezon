@@ -99,8 +99,8 @@ export default function Index() {
   };
 
   const handleServiceClick = (serviceTitle: string) => {
-    // Navigate to discover page with search query
-    navigate(`/discover?search=${encodeURIComponent(serviceTitle)}`);
+    // Navigate to discover page with search query and services tab
+    navigate(`/discover?search=${encodeURIComponent(serviceTitle)}&tab=services`);
   };
 
   return (

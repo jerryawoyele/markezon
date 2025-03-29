@@ -22,6 +22,8 @@ import { formatDistance, format, isToday, isYesterday, parseISO } from "date-fns
 import { LoadingScreen } from "@/components/ui/loading-screen";
 import { Profile as ProfileType } from "@/types";
 import { createNotification } from '@/utils/notification-helper';
+import { useNotifications } from "@/contexts/NotificationContext";
+import { DeleteMessageModal } from "@/components/messages/DeleteMessageModal";
 
 // Define types for our data
 interface Profile {
@@ -91,9 +93,16 @@ export default function Messages() {
   const [editMessageContent, setEditMessageContent] = useState("");
   const [userRole, setUserRole] = useState<"business" | "customer" | null>(null);
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+  
+  // Get unread notifications and messages from context
+  const { unreadNotifications, unreadMessages, refreshCounts } = useNotifications();
 
   // Client-side read status tracking to work around RLS policy restrictions
   const [readStatusMap, setReadStatusMap] = useState<Record<string, boolean>>({});
+
+  // Add state variables for message deletion confirmation
+  const [messageToDelete, setMessageToDelete] = useState<string | null>(null);
+  const [showDeleteMessageModal, setShowDeleteMessageModal] = useState(false);
 
   // Check auth and initialize user
   useEffect(() => {
@@ -354,6 +363,9 @@ export default function Messages() {
           conv.id === conversationId ? { ...conv, unread_count: 0 } : conv
         )
       );
+
+      // After marking messages as read, refresh notification counts
+      refreshCounts();
     } catch (error) {
       console.error("Error fetching messages:", error);
       toast({
@@ -500,6 +512,9 @@ export default function Messages() {
           });
         }
       }
+
+      // Add this line at the end of the function to refresh notification counts
+      refreshCounts();
     } catch (error) {
       console.error("Error sending message:", error);
       toast({
@@ -589,6 +604,14 @@ export default function Messages() {
   
   // Delete message
   async function handleDeleteMessage(messageId: string) {
+    setMessageToDelete(messageId);
+    setShowDeleteMessageModal(true);
+  }
+
+  // Create a new function to perform the actual deletion
+  async function confirmDeleteMessage() {
+    if (!messageToDelete) return;
+    
     try {
       // Update message in database - only update content field that is known to exist
       const updateData = { 
@@ -598,13 +621,13 @@ export default function Messages() {
       const { error } = await supabase
         .from('messages')
         .update(updateData)
-        .eq('id', messageId);
+        .eq('id', messageToDelete);
 
       if (error) throw error;
 
       // Update UI with proper type handling
       const updatedMessages = messages.map(msg =>
-        msg.id === messageId ? 
+        msg.id === messageToDelete ? 
           {
             ...msg, 
             content: "[This message was deleted]", 
@@ -656,12 +679,21 @@ export default function Messages() {
   return (
     <div className="lg:ml-64 min-h-screen overflow-x-hidden">
        <div className={`${selectedConversation && isMobile ? "hidden md:flex" : ""}`}>
-        <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} userRole={userRole} />
+        <Sidebar 
+          activeTab={activeTab} 
+          setActiveTab={setActiveTab} 
+          userRole={userRole} 
+          unreadNotifications={unreadNotifications}
+          unreadMessages={unreadMessages}
+        />
         </div>
       <div className="flex flex-col h-screen md:pt-0">
         
         {/* Always show the mobile header on the Messages page */}
-        <MobileHeader />
+        <MobileHeader 
+          unreadNotifications={unreadNotifications}
+          unreadMessages={unreadMessages}
+        />
         
         <div className="flex flex-1 overflow-hidden">
           {/* Conversations sidebar */}
@@ -911,6 +943,13 @@ export default function Messages() {
           </div>
         </div>
       </div>
+      
+      {/* Delete Message Confirmation Modal */}
+      <DeleteMessageModal
+        isOpen={showDeleteMessageModal}
+        onClose={() => setShowDeleteMessageModal(false)}
+        onConfirm={confirmDeleteMessage}
+      />
     </div>
   );
 }

@@ -55,6 +55,7 @@ import { Badge } from "@/components/ui/badge";
 import { createNotification } from '@/utils/notification-helper';
 import { AvatarWithModal } from "@/components/profile/AvatarWithModal";
 import { ServiceModal } from "@/components/services/ServiceModal";
+import { DeleteServiceModal } from "@/components/services/DeleteServiceModal";
 
 // Define ServiceType locally since it's not exported from @/types
 interface ServiceType {
@@ -66,6 +67,11 @@ interface ServiceType {
   image: string;
   user_id: string;
   created_at: string;
+  location?: string;
+  duration_minutes?: number;
+  ratings_count?: number;
+  ratings_sum?: number;
+  owner_id?: string;
 }
 
 export function Profile() {
@@ -95,10 +101,12 @@ export function Profile() {
   const [userRole, setUserRole] = useState<"business" | "customer" | null>(null);
   const [notificationCount, setNotificationCount] = useState(0);
   const [unreadNotifications, setUnreadNotifications] = useState(0);
+  const [unreadMessages, setUnreadMessages] = useState(0);
   const [showFollowersModal, setShowFollowersModal] = useState(false);
   const [showFollowingModal, setShowFollowingModal] = useState(false);
   const [showReviewsModal, setShowReviewsModal] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const postsTabRef = useRef<HTMLDivElement>(null);
   const [loadingProfile, setLoadingProfile] = useState(true);
   const [loadingPosts, setLoadingPosts] = useState(true);
   const [loadingServices, setLoadingServices] = useState(true);
@@ -121,6 +129,11 @@ export function Profile() {
 
   // State to track window width
   const [windowWidth, setWindowWidth] = useState<number>(window.innerWidth);
+
+  // Add state for delete confirmation modal
+  const [serviceToDelete, setServiceToDelete] = useState<string | null>(null);
+  const [showDeleteServiceModal, setShowDeleteServiceModal] = useState(false);
+  const [serviceDeleteTitle, setServiceDeleteTitle] = useState("");
 
   useEffect(() => {
     const handleResize = () => {
@@ -311,94 +324,96 @@ export function Profile() {
   
   const handleAddService = async (serviceData: any) => {
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      
-      if (!session) return;
-
-      // Default base64 image - a simple gray placeholder
-      const defaultImageDataURI = "data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMzAwIiBoZWlnaHQ9IjIwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMzAwIiBoZWlnaHQ9IjIwMCIgZmlsbD0iI2VlZWVlZSIvPjx0ZXh0IHg9IjUwJSIgeT0iNTAlIiBmb250LWZhbWlseT0iQXJpYWwsIHNhbnMtc2VyaWYiIGZvbnQtc2l6ZT0iMThweCIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZG9taW5hbnQtYmFzZWxpbmU9Im1pZGRsZSIgZmlsbD0iIzk5OTk5OSI+Tm8gSW1hZ2U8L3RleHQ+PC9zdmc+";
-
-      // Add user_id to service data if not already present
-      const newService = {
-        title: serviceData.title,
-        description: serviceData.description,
-        price: serviceData.price,
-        category: serviceData.category || "Other", // Ensure category has a default
-        image: serviceData.image || defaultImageDataURI, // Use data URI as fallback
-        location: serviceData.location || "",
-        duration_minutes: serviceData.duration || 60,
-        owner_id: session.user.id
-      };
-
-      // Insert into database
-      const { data, error } = await supabase
-        .from('services')
-        .insert([newService])
-        .select()
-        .single();
-      
-      if (error) {
-        console.error('Service insert error:', error);
-        throw error;
+      // Check if we have profile data
+      if (!profile) {
+        toast({
+          title: "Error",
+          description: "Your profile data is not loaded. Please refresh and try again.",
+          variant: "destructive",
+        });
+        return;
       }
 
-      // Get service ID from response
-      const serviceId = data?.id;
+      // Obtain any needed IDs
+      const userId = profile.id;
+      const serviceId = serviceData.id;
+
+      // Check for required fields
+      if (!serviceData.title || !serviceData.description) {
+        toast({
+          title: "Error",
+          description: "Service title and description are required.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // Create full service object
+      const newService = {
+        id: serviceId,
+        title: serviceData.title,
+        description: serviceData.description,
+        category: serviceData.category,
+        price: serviceData.price,
+        image: serviceData.image,
+        location: serviceData.location,
+        duration_minutes: serviceData.duration_minutes,
+        owner_id: userId,
+        user_id: userId,
+        created_at: new Date().toISOString(),
+      };
 
       // Update local state with complete service data
-      setServices(prev => [...prev, {...newService, id: serviceId || crypto.randomUUID()}]);
+      setServices(prev => [...prev, newService]);
       
       // Notify followers about the new service
       if (serviceId && profile?.username) {
-        // Get all followers of this user
-        const { data: followers } = await supabase
-          .from('follows')
-          .select('follower_id')
-          .eq('following_id', session.user.id);
-        
-        if (followers && followers.length > 0) {
-          // Create notification for each follower
-          const notificationPromises = followers.map(follow => 
-            createNotification({
-              userId: follow.follower_id,
-              actorId: session.user.id,
-              actorName: profile.username || 'Business',
-              type: 'service',
-              entityId: serviceId,
-              message: `${profile.username} added a new service: ${serviceData.title}`
-            })
-          );
-          
-          // Send all notifications in parallel
-          await Promise.all(notificationPromises);
-        }
+        // Create notification for followers
+        createNotification({
+          userId: userId,
+          actorId: userId,
+          actorName: profile.username,
+          type: 'service',
+          entityId: serviceId,
+          message: `${profile.username} added a new service: ${serviceData.title}`
+        });
       }
-      
-      setShowAddServiceModal(false);
+
       toast({
-        title: "Service added",
-        description: "Your service has been added successfully."
+        title: "Service Added",
+        description: "Your service has been added successfully.",
       });
-    } catch (error: any) {
-      console.error('Error adding service:', error);
-      
-      // Provide more specific error message based on the error type
-      let errorMessage = "There was an error adding your service. Please try again.";
-      
-      if (error.message?.includes("Bucket not found")) {
-        errorMessage = "Storage system error: Unable to upload image. Please try a different image or contact support.";
-      } else if (error.code === '23502') { // Not null constraint violation
-        errorMessage = "Please ensure all required fields are filled out.";
-      }
-      
+    } catch (error) {
+      console.error("Error adding service:", error);
       toast({
-        title: "Add failed",
-        description: errorMessage,
-        variant: "destructive"
+        title: "Error",
+        description: "Failed to add service. Please try again.",
+        variant: "destructive",
       });
     }
   };
   
+  const fetchUnreadMessagesCount = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      if (!user) return;
+      
+      // Get all messages for this user where they're the receiver and the message is unread
+      const { data, error } = await supabase
+        .from('messages')
+        .select('id')
+        .eq('receiver_id', user.id)
+        .eq('read', false);
+        
+      if (error) throw error;
+      
+      setUnreadMessages(data?.length || 0);
+    } catch (error) {
+      console.error("Error fetching unread messages count:", error);
+    }
+  };
+
   const fetchNotificationsCount = async () => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
@@ -415,6 +430,9 @@ export function Profile() {
       
       setNotificationCount(count || 0);
       setUnreadNotifications(count || 0);
+      
+      // Also fetch unread messages count
+      fetchUnreadMessagesCount();
     } catch (error) {
       console.error("Error fetching notification count:", error);
     }
@@ -495,22 +513,21 @@ export function Profile() {
       try {
         setLoadingServices(true);
         
-        const { data: { session } } = await supabase.auth.getSession();
-        
-        if (!session) return;
+        if (!profile?.id) return;
 
         const { data, error } = await supabase
           .from('services')
           .select('*')
-          .eq('owner_id', session.user.id)
+          .eq('owner_id', profile.id)
           .order('created_at', { ascending: false });
-
+          
         if (error) throw error;
-
+        
         setServices(data || []);
-        setLoadingServices(false);
       } catch (error) {
-        console.error('Error fetching services:', error);
+        console.error("Error fetching services:", error);
+        setServices([]);
+      } finally {
         setLoadingServices(false);
       }
     };
@@ -1003,6 +1020,76 @@ export function Profile() {
     }
   };
 
+  // Add this function to handle post count click
+  const handlePostsClick = () => {
+    setActiveProfileTab("posts");
+    setTimeout(() => {
+      if (postsTabRef.current) {
+        postsTabRef.current.scrollIntoView({ behavior: 'smooth' });
+      }
+    }, 100);
+  };
+
+  // Update the handleDeleteService function
+  const handleDeleteService = async (serviceId: string, serviceTitle?: string) => {
+    // Set the service ID to delete and show the confirmation modal
+    setServiceToDelete(serviceId);
+    setServiceDeleteTitle(serviceTitle || "this service");
+    setShowDeleteServiceModal(true);
+  };
+
+  // Handle the actual deletion after confirmation
+  const confirmDeleteService = async () => {
+    if (!serviceToDelete) return;
+    
+    try {
+      const { error } = await supabase
+        .from('services')
+        .delete()
+        .eq('id', serviceToDelete);
+        
+      if (error) throw error;
+      
+      toast({
+        title: "Service deleted",
+        description: "Your service has been successfully deleted",
+      });
+      
+      // Use direct reference to the fetchUserServices function declared earlier in this file
+      const fetchUserServicesTemp = async () => {
+        try {
+          setLoadingServices(true);
+          
+          if (!profile?.id) return;
+  
+          const { data, error } = await supabase
+            .from('services')
+            .select('*')
+            .eq('owner_id', profile.id)
+            .order('created_at', { ascending: false });
+            
+          if (error) throw error;
+          
+          setServices(data || []);
+        } catch (error) {
+          console.error("Error fetching services:", error);
+          setServices([]);
+        } finally {
+          setLoadingServices(false);
+        }
+      };
+      
+      fetchUserServicesTemp();
+    } catch (error) {
+      console.error("Error deleting service:", error);
+      toast({
+        title: "Error",
+        description: "Failed to delete the service. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
+
   if (loading && loadingProfile) {
     return (
       <div className="flex min-h-screen">
@@ -1015,7 +1102,13 @@ export function Profile() {
   }
 
   return (
-    <MainLayout activeTab={activeTab} setActiveTab={setActiveTab} userRole={profile?.user_role}>
+    <MainLayout 
+      activeTab={activeTab} 
+      setActiveTab={setActiveTab} 
+      userRole={profile?.user_role}
+      unreadNotifications={unreadNotifications}
+      unreadMessages={unreadMessages}
+    >
       <div className="w-full overflow-x-hidden pb-16 md:pb-0">
         <div>
           {/* Profile header with skeleton loader */}
@@ -1138,6 +1231,21 @@ export function Profile() {
                     Edit Profile
                   </Button>
                 
+                                {/* Notification icon */}
+                                <Button 
+                                  variant="outline" 
+                                  size="sm" 
+                                  onClick={() => navigate('/notifications')}
+                                  className="flex items-center gap-1 relative"
+                                >
+                                  <Bell className="h-4 w-4" />
+                                  {notificationCount > 0 && (
+                                    <span className="absolute -top-1 -right-1 bg-primary text-white text-xs font-bold rounded-full h-4 w-4 flex items-center justify-center">
+                                      {notificationCount > 99 ? '99+' : notificationCount}
+                                    </span>
+                                  )}
+                                </Button>
+                
                                 {/* Only show these buttons on desktop */}
                                 {windowWidth >= 1024 && (
                                   <>
@@ -1147,8 +1255,8 @@ export function Profile() {
                         variant="ghost"
                                       className="text-primary/70 hover:text-primary hover:bg-primary/10"
                       >
-                        <Share2 className="h-4 w-4 mr-2" />
-                                      Share
+                        <Share2 className="h-4 w-4" />
+                                      
                       </Button>
                       <Button
                         size="icon"
@@ -1172,13 +1280,17 @@ export function Profile() {
                       
                 {/* Stats row in a column under */}
                 <div className="mt-4 flex flex-row flex-wrap justify-around">
+                  <div className="text-center cursor-pointer hover:bg-black/20 px-4 py-2 rounded-md transition-colors" onClick={handlePostsClick}>
+                    <p className="font-semibold">{userPosts.length}</p>
+                    <p className="text-white/60 text-sm">Posts</p>
+                  </div>
                       <div 
                         onClick={() => setShowFollowersModal(true)}
                     className="text-center cursor-pointer hover:bg-black/20 px-4 py-2 rounded-md transition-colors"
                   >
                     <p className="font-semibold">{profile?.followers_count || 0}</p>
                     <p className="text-white/60 text-sm">Followers</p>
-                </div>
+                  </div>
                 
                       <div 
                         onClick={() => setShowFollowingModal(true)}
@@ -1186,13 +1298,8 @@ export function Profile() {
                       >
                     <p className="font-semibold">{profile?.following_count || 0}</p>
                     <p className="text-white/60 text-sm">Following</p>
-              </div>
+                  </div>
                 
-                  <div className="text-center cursor-pointer hover:bg-black/20 px-4 py-2 rounded-md transition-colors">
-                    <p className="font-semibold">{userPosts.length}</p>
-                    <p className="text-white/60 text-sm">Posts</p>
-            </div>
-            
                       {profile?.user_role === "business" && (
                         <div 
                           onClick={() => setShowReviewsModal(true)}
@@ -1230,7 +1337,7 @@ export function Profile() {
             </TabsList>
             
             <TabsContent value="posts" className="pb-4">
-              <div className="mb-4 flex justify-between items-center">
+              <div ref={postsTabRef} className="mb-4 flex justify-between items-center">
                 <h2 className="text-xl font-semibold"></h2>
                 {profile?.id && (
                   <Button 
@@ -1304,37 +1411,50 @@ export function Profile() {
                   ))
                 ) : services.length > 0 ? (
                   services.map((service) => (
-                    <Card 
+                    <ServiceCard 
                       key={service.id} 
-                      className="overflow-hidden cursor-pointer hover:shadow-md transition-shadow"
-                      onClick={() => handleServiceClick(service)}
-                    >
-                      <div className="aspect-video bg-black/40 relative">
-                        {service.image ? (
-                          <img
-                            src={service.image}
-                            alt={service.title}
-                            className="w-full h-full object-cover"
-                          />
-                        ) : (
-                          <div className="w-full h-full flex items-center justify-center">
-                            <span className="text-white/40">No image</span>
-                          </div>
-                        )}
-                      </div>
-                      <CardHeader>
-                        <CardTitle className="text-xl">{service.title}</CardTitle>
-                        <div className="flex justify-between items-center">
-                          <p className="text-sm text-primary font-bold">${service.price}</p>
-                          <Badge variant="outline">{service.category}</Badge>
-                        </div>
-                      </CardHeader>
-                      <CardContent>
-                        <p className="line-clamp-3 text-sm text-muted-foreground">
-                          {service.description}
-                        </p>
-                      </CardContent>
-                    </Card>
+                      service={{
+                        id: service.id,
+                        title: service.title,
+                        description: service.description,
+                        category: service.category,
+                        price: typeof service.price === 'string' ? parseFloat(service.price) : service.price,
+                        location: service.location || "",
+                        duration_minutes: service.duration_minutes || 60,
+                        image: service.image,
+                        owner_id: service.user_id || profile?.id || "",
+                        ratings_count: service.ratings_count || 0,
+                        ratings_sum: service.ratings_sum || 0
+                      }}
+                      showOptions={true}
+                      onDelete={() => handleDeleteService(service.id, service.title)}
+                      refreshServices={() => {
+                        const fetchServices = async () => {
+                          try {
+                            setLoadingServices(true);
+                            
+                            if (!profile?.id) return;
+                  
+                            const { data, error } = await supabase
+                              .from('services')
+                              .select('*')
+                              .eq('owner_id', profile.id)
+                              .order('created_at', { ascending: false });
+                              
+                            if (error) throw error;
+                            
+                            setServices(data || []);
+                          } catch (error) {
+                            console.error("Error fetching services:", error);
+                            setServices([]);
+                          } finally {
+                            setLoadingServices(false);
+                          }
+                        };
+                        
+                        fetchServices();
+                      }}
+                    />
                   ))
                 ) : (
                   <div className="col-span-full text-center py-8">
@@ -1516,13 +1636,15 @@ export function Profile() {
                 <div className="space-y-2">
                   <Label htmlFor="avatar">Profile Picture</Label>
                   <div className="flex items-center gap-4">
-                    <AvatarWithModal
-                      className="w-20 h-20"
-                      avatarUrl={avatarUrl}
-                      username={username}
-                    />
+                    <Avatar
+                      className="mx-auto h-24 w-24 cursor-pointer"
+                      onClick={() => fileInputRef.current?.click()}
+                    >
+                      <AvatarImage src={avatarUrl || profile?.avatar_url} />
+                      <AvatarFallback>{profile?.username?.[0] || 'U'}</AvatarFallback>
+                    </Avatar>
                     <FileUpload
-                      endpoint="avatarUploader"
+                      endpoint="profilePicture"
                       onChange={handleAvatarChange} 
                     />
                   </div>
@@ -1670,6 +1792,14 @@ export function Profile() {
             service={selectedService}
             isOpen={showServiceModal}
             onClose={() => setShowServiceModal(false)}
+          />
+
+          {/* Delete Service Confirmation Modal */}
+          <DeleteServiceModal
+            isOpen={showDeleteServiceModal}
+            onClose={() => setShowDeleteServiceModal(false)}
+            onConfirm={confirmDeleteService}
+            serviceTitle={serviceDeleteTitle}
           />
                 </div>
         </div>

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -27,8 +27,11 @@ const formSchema = z.object({
   category: z.string().min(1, "Please select a category"),
   price: z.coerce.number().positive("Price must be positive"),
   location: z.string().min(2, "Location must be at least 2 characters").max(100),
-  duration: z.coerce.number().positive("Duration must be positive"),
+  duration: z.coerce.number().positive("Duration must be positive").max(24, "Duration cannot exceed 24 hours"),
 });
+
+// Try these buckets in order
+const STORAGE_BUCKETS = ['services', 'public', 'images'];
 
 export function AddServiceModal({ isOpen, onClose, onServiceAdded }: AddServiceModalProps) {
   const { user } = useUser();
@@ -37,6 +40,22 @@ export function AddServiceModal({ isOpen, onClose, onServiceAdded }: AddServiceM
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [uploadProgress, setUploadProgress] = useState(0);
+  const [imageError, setImageError] = useState<string | null>(null);
+  // Generate a unique ID for this instance of the form
+  const serviceIdRef = useRef(uuidv4());
+
+  // Reset form when modal opens/closes
+  useEffect(() => {
+    if (isOpen) {
+      // Generate a new unique ID each time the modal opens
+      serviceIdRef.current = uuidv4();
+      reset();
+      setImageFile(null);
+      setImagePreview(null);
+      setImageError(null);
+      setLoading(false);
+    }
+  }, [isOpen]);
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -46,23 +65,32 @@ export function AddServiceModal({ isOpen, onClose, onServiceAdded }: AddServiceM
       category: "",
       price: 0,
       location: "",
-      duration: 60,
+      duration: 1,
     },
   });
 
-  const { register, handleSubmit, formState: { errors } } = form;
+  const { register, handleSubmit, formState: { errors }, reset } = form;
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
+    setImageError(null);
+    
     if (!file) return;
 
     // Check file size (limit to 5MB)
     if (file.size > 5 * 1024 * 1024) {
-      toast({
-        title: "File too large",
-        description: "Image must be less than 5MB",
-        variant: "destructive",
-      });
+      setImageError("Image must be less than 5MB");
+      setImageFile(null);
+      setImagePreview(null);
+      return;
+    }
+
+    // Check file type
+    const validTypes = ['image/jpeg', 'image/png', 'image/webp'];
+    if (!validTypes.includes(file.type)) {
+      setImageError("Only JPEG, PNG, and WEBP images are allowed");
+      setImageFile(null);
+      setImagePreview(null);
       return;
     }
 
@@ -82,29 +110,53 @@ export function AddServiceModal({ isOpen, onClose, onServiceAdded }: AddServiceM
       
       // Create a unique file path
       const fileExt = file.name.split('.').pop();
-      const filePath = `services/${userId}/${uuidv4()}.${fileExt}`;
+      const fileName = `${serviceIdRef.current}.${fileExt}`;
+      const filePath = `services/${userId}/${fileName}`;
       
-      // Upload the file
-      const { error: uploadError, data } = await supabase.storage
-        .from('images')
-        .upload(filePath, file, {
-          cacheControl: '3600',
-          upsert: false,
-        });
+      // Try each bucket in order
+      let uploadError = null;
+      let publicUrl = null;
 
-      if (uploadError) throw uploadError;
+      for (const bucket of STORAGE_BUCKETS) {
+        try {
+          console.log(`Trying to upload to bucket: ${bucket}`);
+          const { error, data } = await supabase.storage
+            .from(bucket)
+            .upload(`${filePath}`, file, {
+              cacheControl: '3600',
+              upsert: true, // Use upsert to avoid duplicates
+            });
+
+          if (error) {
+            console.log(`Error with bucket ${bucket}:`, error);
+            uploadError = error;
+            continue; // Try next bucket
+          }
+          
+          // Upload successful, get URL
+          const { data: urlData } = supabase.storage
+            .from(bucket)
+            .getPublicUrl(`${filePath}`);
+            
+          publicUrl = urlData.publicUrl;
+          console.log(`Successfully uploaded to bucket: ${bucket}`);
+          break; // Exit the loop if successful
+        } catch (err) {
+          console.error(`Error trying bucket ${bucket}:`, err);
+          continue; // Try next bucket
+        }
+      }
+
+      if (!publicUrl) {
+        // If we get here, all buckets failed
+        throw uploadError || new Error("Failed to upload to any storage bucket");
+      }
       
       setUploadProgress(100);
-      
-      // Get the public URL
-      const { data: { publicUrl } } = supabase.storage
-        .from('images')
-        .getPublicUrl(filePath);
-        
       return publicUrl;
     } catch (error) {
       console.error("Error uploading image:", error);
-      return null;
+      throw error;
     }
   };
 
@@ -118,21 +170,33 @@ export function AddServiceModal({ isOpen, onClose, onServiceAdded }: AddServiceM
       return;
     }
     
+    // Prevent submission if already loading
+    if (loading) {
+      return;
+    }
+    
     setLoading(true);
-
+    
     try {
       // Upload image if provided
       let imageUrl = null;
       if (imageFile) {
-        imageUrl = await uploadImage(imageFile, user.id);
-        
-        if (!imageUrl) {
+        try {
+          imageUrl = await uploadImage(imageFile, user.id);
+        } catch (error: any) {
+          console.error("Storage error details:", error);
           toast({
-            title: "Warning",
-            description: "Failed to upload image, but service will be created without an image",
+            title: "Image Upload Failed",
+            description: "Unable to upload image. The service will be created without an image.",
+            variant: "destructive",
           });
+          // Continue without image
+          console.warn("Continuing without image due to storage error");
         }
       }
+
+      // Convert hours to minutes for the database
+      const durationMinutes = Math.round(values.duration * 60);
 
       // Insert into the services table
       const { data, error } = await supabase
@@ -143,7 +207,7 @@ export function AddServiceModal({ isOpen, onClose, onServiceAdded }: AddServiceM
           category: values.category,
           price: values.price,
           location: values.location,
-          duration_minutes: values.duration,
+          duration_minutes: durationMinutes,
           image: imageUrl,
           owner_id: user.id,
           ratings_count: 0,
@@ -159,7 +223,14 @@ export function AddServiceModal({ isOpen, onClose, onServiceAdded }: AddServiceM
         description: "Your service has been created successfully",
       });
 
+      // Reset form and close modal
+      reset();
+      setImageFile(null);
+      setImagePreview(null);
+      setImageError(null);
+      // Call onServiceAdded with the data and immediately close
       onServiceAdded(data);
+      onClose();
     } catch (error: any) {
       console.error("Error adding service:", error);
       toast({
@@ -172,15 +243,33 @@ export function AddServiceModal({ isOpen, onClose, onServiceAdded }: AddServiceM
     }
   };
 
+  const handleClose = () => {
+    if (!loading) {
+      reset();
+      setImageFile(null);
+      setImagePreview(null);
+      setImageError(null);
+      onClose();
+    }
+  };
+
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[500px] max-h-[85vh] flex flex-col overflow-hidden">
-        <DialogHeader>
+    <Dialog open={isOpen} onOpenChange={(open) => {
+      if (!open) handleClose();
+    }}>
+      <DialogContent className="sm:max-w-[500px] max-h-[90vh] overflow-hidden flex flex-col">
+        <DialogHeader className="px-6 pt-6">
           <DialogTitle>Add New Service</DialogTitle>
         </DialogHeader>
-        <ScrollArea className="flex-1 overflow-auto pr-3">
-          <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-            <div className="space-y-2">
+        <ScrollArea className="flex-1 px-6 overflow-auto max-h-[calc(90vh-8rem)]">
+          <form 
+            id="service-form" 
+            className="space-y-4 pb-6"
+            onSubmit={(e) => {
+              e.preventDefault();
+            }}
+          >
+            <div className="space-y-2 px-2">
               <Label htmlFor="title">Service Title</Label>
               <Input
                 id="title"
@@ -192,7 +281,7 @@ export function AddServiceModal({ isOpen, onClose, onServiceAdded }: AddServiceM
               )}
             </div>
 
-            <div className="space-y-2">
+            <div className="space-y-2 px-2">
               <Label htmlFor="description">Description</Label>
               <Textarea
                 id="description"
@@ -205,7 +294,7 @@ export function AddServiceModal({ isOpen, onClose, onServiceAdded }: AddServiceM
               )}
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-2 gap-4 px-2">
               <div className="space-y-2">
                 <Label htmlFor="category">Category</Label>
                 <Select
@@ -237,6 +326,8 @@ export function AddServiceModal({ isOpen, onClose, onServiceAdded }: AddServiceM
                   id="price"
                   type="number"
                   placeholder="99.99"
+                  step="0.01"
+                  min="0"
                   {...register("price")}
                 />
                 {errors.price && (
@@ -245,7 +336,7 @@ export function AddServiceModal({ isOpen, onClose, onServiceAdded }: AddServiceM
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-2 gap-4 px-2">
               <div className="space-y-2">
                 <Label htmlFor="location">Service Location</Label>
                 <Input
@@ -259,11 +350,14 @@ export function AddServiceModal({ isOpen, onClose, onServiceAdded }: AddServiceM
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="duration">Duration (minutes)</Label>
+                <Label htmlFor="duration">Duration (hours)</Label>
                 <Input
                   id="duration"
                   type="number"
-                  placeholder="60"
+                  placeholder="1"
+                  step="0.5"
+                  min="0.5"
+                  max="24"
                   {...register("duration")}
                 />
                 {errors.duration && (
@@ -272,11 +366,11 @@ export function AddServiceModal({ isOpen, onClose, onServiceAdded }: AddServiceM
               </div>
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="image">Service Image</Label>
+            <div className="space-y-2 px-2">
+              <Label htmlFor="image">Service Image (Optional)</Label>
               <div className="grid grid-cols-1 gap-4">
                 {imagePreview && (
-                  <div className="relative w-full aspect-video rounded-md overflow-hidden">
+                  <div className="relative w-full aspect-video rounded-md overflow-hidden bg-white/5">
                     <img 
                       src={imagePreview} 
                       alt="Preview" 
@@ -301,22 +395,29 @@ export function AddServiceModal({ isOpen, onClose, onServiceAdded }: AddServiceM
                     <Input
                       id="image-upload"
                       type="file"
-                      accept="image/*"
+                      accept="image/jpeg,image/png,image/webp"
                       className="hidden"
                       onChange={handleImageChange}
                     />
                   </label>
                 </div>
+                {imageError && (
+                  <p className="text-sm text-red-500">{imageError}</p>
+                )}
               </div>
             </div>
           </form>
         </ScrollArea>
         
-        <DialogFooter className="pt-4 mt-4 border-t">
-          <Button variant="outline" type="button" onClick={onClose}>
+        <DialogFooter className="p-6 border-t">
+          <Button variant="outline" type="button" onClick={handleClose} disabled={loading}>
             Cancel
           </Button>
-          <Button onClick={handleSubmit(onSubmit)} disabled={loading}>
+          <Button 
+            onClick={() => handleSubmit(onSubmit)()}
+            disabled={loading}
+            type="button"
+          >
             {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
             Add Service
           </Button>

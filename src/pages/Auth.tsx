@@ -369,7 +369,7 @@ export default function Auth() {
             <Card className="border-none bg-black/60 backdrop-blur-sm">
               <CardHeader>
                 <CardTitle className="text-center text-2xl font-bold mb-1">
-                  <span className="bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-purple-600">
+                  <span className="bg-clip-text text-transparent bg-slate-300">
                     Welcome to Markezon
                   </span>
                 </CardTitle>
@@ -403,6 +403,7 @@ export default function Auth() {
                             <Label htmlFor="password-login">Password</Label>
                             <Button
                               variant="link"
+                              type="button"
                               onClick={() => setResetPassword(true)}
                               className="text-xs p-0 h-auto text-white/70 hover:text-white"
                             >

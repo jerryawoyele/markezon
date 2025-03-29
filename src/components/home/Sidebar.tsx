@@ -47,6 +47,8 @@ interface SidebarProps {
   setActiveTab: (tab: string) => void;
   userRole?: "business" | "customer" | null;
   isAuthenticated?: boolean;
+  unreadNotifications?: number;
+  unreadMessages?: number;
 }
 
 interface NavItemProps {
@@ -54,10 +56,11 @@ interface NavItemProps {
   label: string;
   isActive: boolean;
   onClick: () => void;
+  badgeCount?: number;
 }
 
 // Add this component to define NavItem
-const NavItem = ({ icon, label, isActive, onClick }: NavItemProps) => {
+const NavItem = ({ icon, label, isActive, onClick, badgeCount = 0 }: NavItemProps) => {
   return (
     <Button
       variant="ghost"
@@ -69,7 +72,14 @@ const NavItem = ({ icon, label, isActive, onClick }: NavItemProps) => {
       )}
       onClick={onClick}
     >
-      {icon}
+      <div className="relative">
+        {icon}
+        {badgeCount > 0 && (
+          <span className="absolute -top-1 -right-1 bg-primary lg:bg-slate-700 text-white text-xs font-bold rounded-full h-5 w-5 flex items-center justify-center">
+            {badgeCount > 99 ? '99+' : badgeCount}
+          </span>
+        )}
+      </div>
       <span>{label}</span>
     </Button>
   );
@@ -80,6 +90,8 @@ export function Sidebar({
   setActiveTab,
   userRole = "customer",
   isAuthenticated = true,
+  unreadNotifications = 0,
+  unreadMessages = 0,
 }: SidebarProps) {
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   const [showAuthModal, setShowAuthModal] = useState(false);
@@ -130,12 +142,24 @@ export function Sidebar({
             <Button
               variant="ghost"
               className={cn(
-                "flex flex-col items-center justify-center p-2",
+                "flex flex-col items-center justify-center p-2 ",
                 activeTab === item.label && "bg-primary/10 text-primary"
               )}
               onClick={() => handleNavigation(item.label, item.path)}
             >
-              <item.icon className="w-5 h-5" />
+              <div className="relative">
+                <item.icon className="w-5 h-5" />
+                {item.label === "Messages" && unreadMessages > 0 && (
+                  <span className="absolute -top-1 -right-1 bg-primary text-white text-xs font-bold rounded-full h-4 w-4 flex items-center justify-center">
+                    {unreadMessages > 99 ? '99+' : unreadMessages}
+                  </span>
+                )}
+                {item.label === "Profile" && unreadNotifications > 0 && (
+                  <span className="absolute -top-1 -right-1 bg-primary text-white text-xs font-bold rounded-full h-4 w-4 flex items-center justify-center">
+                    {unreadNotifications > 99 ? '99+' : unreadNotifications}
+                  </span>
+                )}
+              </div>
               <span className="sr-only">{item.label}</span>
             </Button>
           </li>
@@ -165,6 +189,13 @@ export function Sidebar({
               label={item.label}
               isActive={activeTab === item.label}
               onClick={() => handleNavigation(item.label, item.path)}
+              badgeCount={
+                item.label === "Messages" 
+                  ? unreadMessages 
+                  : item.label === "Profile" 
+                    ? unreadNotifications 
+                    : 0
+              }
             />
           ))}
         </div>

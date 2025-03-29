@@ -16,102 +16,207 @@ export enum EscrowStatus {
  * Interface for escrow payment details
  */
 export interface EscrowPayment {
-  id: string;
+  id?: string;
   booking_id: string;
+  service_id: string;
   amount: number;
-  status: EscrowStatus;
+  platform_fee: number;
+  total_amount: number;
   customer_id: string;
   provider_id: string;
-  service_id: string;
-  created_at: string;
-  updated_at: string;
-  transaction_id?: string;
-  release_date?: string;
+  status: 'pending' | 'completed' | 'released' | 'refunded' | 'disputed';
+  created_at?: string;
+  updated_at?: string;
+  payment_method?: string;
+  payment_id?: string;
+  is_external?: boolean;
 }
 
 /**
  * Service class for handling escrow payments
  */
 export class EscrowService {
-  // Flag to indicate that payments are handled outside the app for now
-  static isExternalPaymentMode = true;
+  // Platform fee percentage
+  static PLATFORM_FEE_PERCENTAGE = 8;
+
+  /**
+   * Calculate platform fee for a given amount
+   */
+  static calculatePlatformFee(amount: number): number {
+    return Math.round((amount * this.PLATFORM_FEE_PERCENTAGE / 100) * 100) / 100;
+  }
+
+  /**
+   * Calculate total amount including platform fee
+   */
+  static calculateTotalAmount(amount: number): number {
+    return Math.round((amount + this.calculatePlatformFee(amount)) * 100) / 100;
+  }
 
   /**
    * Create a new escrow payment for a booking
    */
   static async createPayment(
-    bookingId: string, 
-    amount: number, 
-    customerId: string, 
-    providerId: string, 
-    serviceId: string
+    bookingId: string,
+    amount: number,
+    customerId: string,
+    providerId: string,
+    serviceId: string,
+    isExternal: boolean = false,
+    payment_id?: string
   ): Promise<EscrowPayment | null> {
     try {
-      // Since payments are handled outside the app for now,
-      // we mark the payment as completed immediately while storing the price information
-      const { data, error } = await supabase
+      const platformFee = this.calculatePlatformFee(amount);
+      const totalAmount = this.calculateTotalAmount(amount);
+
+      // Create a payment record
+      const paymentData: EscrowPayment = {
+        booking_id: bookingId,
+        service_id: serviceId,
+        amount,
+        platform_fee: platformFee,
+        total_amount: totalAmount,
+        customer_id: customerId,
+        provider_id: providerId,
+        status: isExternal ? 'completed' : 'pending',
+        payment_method: isExternal ? 'external' : 'card',
+        is_external: isExternal,
+        payment_id: payment_id // Store Stripe session ID if provided
+      };
+
+      const { data: payment, error } = await supabase
         .from('escrow_payments')
-        .insert({
-          booking_id: bookingId,
-          amount,
-          status: EscrowStatus.COMPLETED, // Mark as completed since payment is handled outside
-          customer_id: customerId,
-          provider_id: providerId,
-          service_id: serviceId,
-          transaction_id: `txn_${Math.random().toString(36).substring(2, 12)}`,
-          release_date: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString() // 7 days from now
-        })
+        .insert(paymentData)
         .select()
         .single();
-      
+
       if (error) {
-        console.error("Error creating escrow payment:", error);
+        console.error('Error creating escrow payment:', error);
         return null;
       }
-      
-      // Also update the booking status to reflect payment
+
+      // Update booking status based on payment status
       await supabase
         .from('bookings')
-        .update({ payment_status: 'external', status: 'confirmed' })
+        .update({
+          payment_status: isExternal ? 'completed' : 'pending',
+          status: isExternal ? 'confirmed' : 'pending'
+        })
         .eq('id', bookingId);
-      
-      return data;
+
+      return payment;
     } catch (error) {
-      console.error("Error in createPayment:", error);
+      console.error('Error in createPayment:', error);
       return null;
+    }
+  }
+  
+  /**
+   * Process payment for an existing escrow record
+   */
+  static async processPayment(paymentId: string): Promise<boolean> {
+    try {
+      // Get current payment
+      const { data: payment, error: fetchError } = await supabase
+        .from('escrow_payments')
+        .select('*, bookings(*)')
+        .eq('id', paymentId)
+        .single();
+
+      if (fetchError || !payment) {
+        console.error('Error fetching payment:', fetchError);
+        return false;
+      }
+
+      // Update payment status to completed
+      const { error: updateError } = await supabase
+        .from('escrow_payments')
+        .update({ status: 'completed' })
+        .eq('id', paymentId);
+
+      if (updateError) {
+        console.error('Error updating payment status:', updateError);
+        return false;
+      }
+
+      // Update booking payment status
+      await supabase
+        .from('bookings')
+        .update({ payment_status: 'completed' })
+        .eq('id', payment.booking_id);
+
+      return true;
+    } catch (error) {
+      console.error('Error in processPayment:', error);
+      return false;
     }
   }
   
   /**
    * Release payment to service provider after service completion
    */
-  static async releasePayment(paymentId: string, bookingId: string): Promise<boolean> {
+  static async releasePayment(paymentId: string): Promise<boolean> {
     try {
-      // In a real implementation, this would integrate with a payment processor API
-      // to instruct it to release the held funds
-      
-      const { error } = await supabase
+      // Get current payment
+      const { data: payment, error: fetchError } = await supabase
         .from('escrow_payments')
-        .update({
-          status: EscrowStatus.RELEASED,
+        .select('*, bookings(*)')
+        .eq('id', paymentId)
+        .single();
+
+      if (fetchError || !payment) {
+        console.error('Error fetching payment:', fetchError);
+        return false;
+      }
+
+      // Only completed payments can be released
+      if (payment.status !== 'completed') {
+        console.error('Payment is not in completed status');
+        return false;
+      }
+
+      // Update payment status to released
+      const { error: updateError } = await supabase
+        .from('escrow_payments')
+        .update({ 
+          status: 'released',
           updated_at: new Date().toISOString()
         })
         .eq('id', paymentId);
-      
-      if (error) {
-        console.error("Error releasing escrow payment:", error);
+
+      if (updateError) {
+        console.error('Error releasing payment:', updateError);
         return false;
       }
-      
-      // Update booking status
+
+      // Update booking status to completed
       await supabase
         .from('bookings')
-        .update({ status: 'completed' })
-        .eq('id', bookingId);
-      
+        .update({ 
+          status: 'completed',
+          payment_status: 'released'
+        })
+        .eq('id', payment.booking_id);
+
+      // Notify the service provider
+      await supabase
+        .from('notifications')
+        .insert({
+          user_id: payment.provider_id,
+          type: 'payment',
+          title: 'Payment Released',
+          message: 'Your payment has been released to your account.',
+          is_read: false,
+          data: JSON.stringify({
+            payment_id: payment.id,
+            booking_id: payment.booking_id,
+            amount: payment.amount
+          })
+        });
+
       return true;
     } catch (error) {
-      console.error("Error in releasePayment:", error);
+      console.error('Error in releasePayment:', error);
       return false;
     }
   }
@@ -119,34 +224,70 @@ export class EscrowService {
   /**
    * Refund payment to customer (e.g., if service provider cancels)
    */
-  static async refundPayment(paymentId: string, bookingId?: string): Promise<boolean> {
+  static async refundPayment(paymentId: string, reason: string): Promise<boolean> {
     try {
-      // In a real implementation, this would integrate with a payment processor
-      
-      const { error } = await supabase
+      // Get current payment
+      const { data: payment, error: fetchError } = await supabase
         .from('escrow_payments')
-        .update({
-          status: EscrowStatus.REFUNDED,
+        .select('*, bookings(*)')
+        .eq('id', paymentId)
+        .single();
+
+      if (fetchError || !payment) {
+        console.error('Error fetching payment:', fetchError);
+        return false;
+      }
+
+      // Can only refund completed or pending payments
+      if (payment.status !== 'completed' && payment.status !== 'pending') {
+        console.error('Payment cannot be refunded in current status');
+        return false;
+      }
+
+      // Update payment status to refunded
+      const { error: updateError } = await supabase
+        .from('escrow_payments')
+        .update({ 
+          status: 'refunded',
           updated_at: new Date().toISOString()
         })
         .eq('id', paymentId);
-      
-      if (error) {
-        console.error("Error refunding escrow payment:", error);
+
+      if (updateError) {
+        console.error('Error refunding payment:', updateError);
         return false;
       }
-      
-      // Update booking status if booking ID is provided
-      if (bookingId) {
-        await supabase
-          .from('bookings')
-          .update({ status: 'canceled', payment_status: 'refunded' })
-          .eq('id', bookingId);
-      }
-      
+
+      // Update booking status to cancelled
+      await supabase
+        .from('bookings')
+        .update({ 
+          status: 'cancelled',
+          payment_status: 'refunded',
+          cancellation_reason: reason
+        })
+        .eq('id', payment.booking_id);
+
+      // Notify the customer
+      await supabase
+        .from('notifications')
+        .insert({
+          user_id: payment.customer_id,
+          type: 'payment',
+          title: 'Payment Refunded',
+          message: 'Your payment has been refunded.',
+          is_read: false,
+          data: JSON.stringify({
+            payment_id: payment.id,
+            booking_id: payment.booking_id,
+            amount: payment.amount,
+            reason: reason
+          })
+        });
+
       return true;
     } catch (error) {
-      console.error("Error in refundPayment:", error);
+      console.error('Error in refundPayment:', error);
       return false;
     }
   }
@@ -156,55 +297,112 @@ export class EscrowService {
    */
   static async createDispute(
     paymentId: string, 
-    reason: string,
-    userId: string,
-    providerId: string,
-    bookingId?: string
-  ): Promise<{ error?: any }> {
+    reason: string, 
+    description: string,
+    userId: string
+  ): Promise<boolean> {
     try {
-      // First mark the payment as disputed
-      const { error: paymentError } = await supabase
+      // Get current payment
+      const { data: payment, error: fetchError } = await supabase
         .from('escrow_payments')
-        .update({
-          status: EscrowStatus.DISPUTED,
+        .select('*, bookings(*)')
+        .eq('id', paymentId)
+        .single();
+
+      if (fetchError || !payment) {
+        console.error('Error fetching payment:', fetchError);
+        return false;
+      }
+
+      // Can only dispute completed payments
+      if (payment.status !== 'completed') {
+        console.error('Payment must be completed to dispute');
+        return false;
+      }
+
+      // Update payment status to disputed
+      const { error: updateError } = await supabase
+        .from('escrow_payments')
+        .update({ 
+          status: 'disputed',
           updated_at: new Date().toISOString()
         })
         .eq('id', paymentId);
-      
-      if (paymentError) {
-        console.error("Error marking payment as disputed:", paymentError);
-        return { error: paymentError };
+
+      if (updateError) {
+        console.error('Error updating payment status to disputed:', updateError);
+        return false;
       }
-      
-      // Create dispute record
+
+      // Create a dispute record
       const { error: disputeError } = await supabase
         .from('payment_disputes')
         .insert({
           payment_id: paymentId,
-          booking_id: bookingId,
+          booking_id: payment.booking_id,
+          created_by: userId,
           reason,
-          user_id: userId,
-          provider_id: providerId,
-          status: 'open'
+          description,
+          status: 'open',
+          customer_id: payment.customer_id,
+          provider_id: payment.provider_id
         });
-      
+
       if (disputeError) {
-        console.error("Error creating payment dispute:", disputeError);
-        return { error: disputeError };
+        console.error('Error creating dispute record:', disputeError);
+        return false;
       }
-      
-      // Update booking status if booking ID is provided
-      if (bookingId) {
-        await supabase
-          .from('bookings')
-          .update({ status: 'disputed' })
-          .eq('id', bookingId);
-      }
-      
-      return {};
+
+      // Update booking status to disputed
+      await supabase
+        .from('bookings')
+        .update({ 
+          status: 'disputed',
+          payment_status: 'disputed'
+        })
+        .eq('id', payment.booking_id);
+
+      // Notify the other party and admin
+      const notifyUserId = userId === payment.customer_id 
+        ? payment.provider_id 
+        : payment.customer_id;
+
+      await supabase
+        .from('notifications')
+        .insert([
+          {
+            user_id: notifyUserId,
+            type: 'dispute',
+            title: 'Payment Disputed',
+            message: 'A dispute has been opened for a booking.',
+            is_read: false,
+            data: JSON.stringify({
+              payment_id: payment.id,
+              booking_id: payment.booking_id,
+              dispute_reason: reason
+            })
+          },
+          // Admin notification (assuming admin user ID or role-based notification)
+          {
+            user_id: 'admin', // Update with actual admin user ID or role
+            type: 'dispute',
+            title: 'New Payment Dispute',
+            message: `A dispute has been opened for booking #${payment.booking_id}`,
+            is_read: false,
+            data: JSON.stringify({
+              payment_id: payment.id,
+              booking_id: payment.booking_id,
+              customer_id: payment.customer_id,
+              provider_id: payment.provider_id,
+              dispute_reason: reason
+            })
+          }
+        ]);
+
+      return true;
     } catch (error) {
-      console.error("Error in createDispute:", error);
-      return { error };
+      console.error('Error in createDispute:', error);
+      return false;
     }
   }
   

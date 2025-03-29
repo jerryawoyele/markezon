@@ -36,7 +36,7 @@ export function CustomerConfirmationModal({
   // Check if payment is required but not completed
   const isPaymentRequired = () => {
     // If payment feature is disabled, never require payment
-    if (EscrowService.isExternalPaymentMode) {
+    if (booking?.is_external_payment) {
       return false;
     }
     
@@ -109,7 +109,7 @@ export function CustomerConfirmationModal({
       // Release payment if there is one
       if (booking.escrow_payments?.[0]?.id) {
         try {
-          await EscrowService.releasePayment(booking.escrow_payments[0].id, booking.id);
+          await EscrowService.releasePayment(booking.escrow_payments[0].id);
         } catch (paymentError) {
           console.error("Error releasing payment:", paymentError);
           // Continue with completion even if payment release fails
@@ -142,15 +142,19 @@ export function CustomerConfirmationModal({
     try {
       // If there's a payment, mark it as disputed
       if (booking.escrow_payments?.[0]?.id) {
-        const result = await EscrowService.createDispute(
+        const reason = feedbackText || "Customer disputed service completion";
+        const description = "Dispute filed by customer";
+        
+        const success = await EscrowService.createDispute(
           booking.escrow_payments[0].id,
-          feedbackText || "Customer disputed service completion",
-          user.id,
-          booking.provider_id,
-          booking.id
+          reason,
+          description,
+          user.id
         );
         
-        if (result.error) throw result.error;
+        if (!success) {
+          throw new Error("Failed to create dispute");
+        }
       } else {
         // If no payment record, just update the booking status
         const { error } = await supabase

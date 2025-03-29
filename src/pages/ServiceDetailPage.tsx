@@ -19,12 +19,21 @@ import {
   MessageSquare,
   User,
   Calendar as CalendarIcon,
-  Shield
+  Shield,
+  MoreVertical,
+  Trash
 } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { ServiceBookingForm } from "@/components/services/ServiceBookingForm";
 import { LocationService } from "@/utils/location-service";
 import { MainLayout } from "@/layouts/MainLayout";
 import { EscrowService } from "@/utils/escrow-service";
+import { DeleteServiceModal } from "@/components/services/DeleteServiceModal";
 
 export default function ServiceDetailPage() {
   const { serviceId } = useParams<{ serviceId: string }>();
@@ -44,7 +53,9 @@ export default function ServiceDetailPage() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [bookings, setBookings] = useState<any[]>([]);
   const [loadingBookings, setLoadingBookings] = useState(false);
-  
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [optionsDropdownOpen, setOptionsDropdownOpen] = useState(false);
+
   useEffect(() => {
     checkAuthAndFetchUserRole();
     fetchServiceData();
@@ -55,7 +66,7 @@ export default function ServiceDetailPage() {
     if (!loading && service && user) {
       const params = new URLSearchParams(window.location.search);
       const tabParam = params.get('tab');
-      
+
       if (tabParam === 'bookings') {
         // If bookings tab is explicitly requested in URL, set it
         setActiveTab('bookings');
@@ -79,7 +90,7 @@ export default function ServiceDetailPage() {
   const checkAuthAndFetchUserRole = async () => {
     try {
       const { data: { session } } = await supabase.auth.getSession();
-      
+
       if (session) {
         setIsAuthenticated(true);
         const { data, error } = await supabase
@@ -87,7 +98,7 @@ export default function ServiceDetailPage() {
           .select('*')
           .eq('id', session.user.id)
           .single();
-          
+
         if (!error && data) {
           if ('user_role' in data) {
             setUserRole(data.user_role as "business" | "customer");
@@ -113,7 +124,7 @@ export default function ServiceDetailPage() {
   const fetchServiceData = async () => {
     try {
       setLoading(true);
-      
+
       // Fetch service data
       const { data: serviceData, error: serviceError } = await supabase
         .from("services")
@@ -122,7 +133,7 @@ export default function ServiceDetailPage() {
         .single();
 
       if (serviceError) throw serviceError;
-      
+
       setService(serviceData);
 
       // Fetch provider data
@@ -148,26 +159,26 @@ export default function ServiceDetailPage() {
           .order("created_at", { ascending: false });
 
         if (reviewsError) throw reviewsError;
-        
+
         if (reviewsData && reviewsData.length > 0) {
           // Then get the reviewer data separately
           const reviewerIds = reviewsData
             .map(review => review.reviewer_id)
             .filter(Boolean); // Filter out any nulls
-            
+
           if (reviewerIds.length > 0) {
             const { data: reviewersData, error: reviewersError } = await supabase
               .from("profiles")
               .select("id, username, avatar_url")
               .in("id", reviewerIds);
-              
+
             if (!reviewersError && reviewersData) {
               // Combine the data
               const enrichedReviews = reviewsData.map(review => ({
                 ...review,
                 reviewer: reviewersData.find(r => r.id === review.reviewer_id) || null
               }));
-              
+
               setReviews(enrichedReviews);
             } else {
               // If we can't get reviewer data, still show the reviews
@@ -243,14 +254,14 @@ export default function ServiceDetailPage() {
 
     try {
       setLoadingBookings(true);
-      
+
       // Only fetch bookings if user is the service owner
       if (service.owner_id !== user.id) {
         setBookings([]);
         setLoadingBookings(false);
         return;
       }
-      
+
       // Fetch bookings for this service
       const { data, error } = await supabase
         .from('bookings')
@@ -264,9 +275,9 @@ export default function ServiceDetailPage() {
         `)
         .eq('service_id', service.id)
         .order('created_at', { ascending: false });
-      
+
       if (error) throw error;
-      
+
       setBookings(data || []);
     } catch (error) {
       console.error('Error fetching service bookings:', error);
@@ -289,16 +300,16 @@ export default function ServiceDetailPage() {
           .from('bookings')
           .update({ status: "pending_completion" })
           .eq('id', bookingId);
-          
+
         if (error) throw error;
-        
+
         // Update local state
-        setBookings(bookings.map(booking => 
-          booking.id === bookingId 
-            ? { ...booking, status: "pending_completion" } 
+        setBookings(bookings.map(booking =>
+          booking.id === bookingId
+            ? { ...booking, status: "pending_completion" }
             : booking
         ));
-        
+
         toast({
           title: "Status Updated",
           description: "Booking status has been changed to pending customer confirmation",
@@ -309,29 +320,32 @@ export default function ServiceDetailPage() {
           .from('bookings')
           .update({ status: newStatus })
           .eq('id', bookingId);
-        
+
         if (error) throw error;
-        
+
         // Handle escrow status changes based on booking status change
         if (newStatus === "canceled") {
           // Refund the payment
           const booking = bookings.find(b => b.id === bookingId);
           if (booking?.escrow_payments?.[0]?.id) {
             try {
-              await EscrowService.refundPayment(booking.escrow_payments[0].id);
+              await EscrowService.refundPayment(
+                booking.escrow_payments[0].id,
+                "Service canceled by provider"
+              );
             } catch (paymentError) {
               console.error("Error refunding payment:", paymentError);
             }
           }
         }
-  
+
         // Update local state
-        setBookings(bookings.map(booking => 
-          booking.id === bookingId 
-            ? { ...booking, status: newStatus } 
+        setBookings(bookings.map(booking =>
+          booking.id === bookingId
+            ? { ...booking, status: newStatus }
             : booking
         ));
-        
+
         toast({
           title: "Status Updated",
           description: `Booking status has been changed to ${newStatus}`,
@@ -373,16 +387,16 @@ export default function ServiceDetailPage() {
       case "pending":
         return (
           <>
-            <Button 
-              variant="default" 
-              size="sm" 
+            <Button
+              variant="default"
+              size="sm"
               onClick={() => handleUpdateBookingStatus(booking.id, "confirmed")}
             >
               Accept
             </Button>
-            <Button 
-              variant="outline" 
-              size="sm" 
+            <Button
+              variant="outline"
+              size="sm"
               onClick={() => handleUpdateBookingStatus(booking.id, "canceled")}
             >
               Decline
@@ -391,9 +405,9 @@ export default function ServiceDetailPage() {
         );
       case "confirmed":
         return (
-          <Button 
-            variant="default" 
-            size="sm" 
+          <Button
+            variant="default"
+            size="sm"
             onClick={() => handleUpdateBookingStatus(booking.id, "completed")}
           >
             Mark as Completed
@@ -401,9 +415,9 @@ export default function ServiceDetailPage() {
         );
       case "pending_completion":
         return (
-          <Button 
-            variant="outline" 
-            size="sm" 
+          <Button
+            variant="outline"
+            size="sm"
             disabled
           >
             Awaiting Customer Confirmation
@@ -436,6 +450,31 @@ export default function ServiceDetailPage() {
     };
   };
 
+  const handleDeleteService = async () => {
+    try {
+      const { error } = await supabase
+        .from('services')
+        .delete()
+        .eq('id', service.id);
+
+      if (error) throw error;
+
+      toast({
+        title: "Service deleted",
+        description: "Your service has been successfully deleted",
+      });
+
+      navigate("/profile");
+    } catch (error) {
+      console.error("Error deleting service:", error);
+      toast({
+        title: "Error",
+        description: "Failed to delete the service. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
+
   if (loading) {
     return (
       <div className="container py-12 flex items-center justify-center">
@@ -460,10 +499,10 @@ export default function ServiceDetailPage() {
   return (
     <MainLayout activeTab={navbarTab} setActiveTab={setNavbarTab} userRole={userRole} isAuthenticated={isAuthenticated}>
       <div>
-        <Button 
-          variant="ghost" 
-          size="sm" 
-          className="mb-6 flex items-center text-muted-foreground hover:text-foreground" 
+        <Button
+          variant="ghost"
+          size="sm"
+          className="mb-6 flex items-center text-muted-foreground hover:text-foreground"
           onClick={() => navigate(-1)}
         >
           <ChevronLeft className="h-4 w-4 mr-1" />
@@ -475,9 +514,9 @@ export default function ServiceDetailPage() {
           <div className="lg:col-span-2 space-y-6">
             <div className="relative rounded-lg overflow-hidden">
               {service.image ? (
-                <img 
-                  src={service.image} 
-                  alt={service.title} 
+                <img
+                  src={service.image}
+                  alt={service.title}
                   className="w-full h-64 object-cover"
                 />
               ) : (
@@ -490,6 +529,31 @@ export default function ServiceDetailPage() {
               <Badge className="absolute top-4 right-4 text-sm py-1">
                 {service.category}
               </Badge>
+
+              {/* Add options menu if user is the owner */}
+              {isServiceOwner() && (
+                <div className="absolute top-4 left-4 z-10">
+                  <DropdownMenu open={optionsDropdownOpen} onOpenChange={setOptionsDropdownOpen}>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="ghost" size="icon" className="bg-black/30 hover:bg-black/50 text-white">
+                        <MoreVertical className="h-4 w-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="start">
+                      <DropdownMenuItem
+                        onClick={() => {
+                          setOptionsDropdownOpen(false);
+                          setShowDeleteModal(true);
+                        }}
+                        className="text-red-500 focus:text-red-500"
+                      >
+                        <Trash className="h-4 w-4 mr-2" />
+                        Delete Service
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </div>
+              )}
             </div>
 
             <div>
@@ -523,7 +587,7 @@ export default function ServiceDetailPage() {
             </div>
 
             <Tabs value={activeTab} onValueChange={setActiveTab}>
-              <TabsList className="mb-4 overflow-x-auto whitespace-nowrap lg:w-fit max-lg:w-full flex">
+              <TabsList className="mb-4 overflow-x-auto whitespace-nowrap max-lg:w-fit lg:w-fit flex">
                 {isServiceOwner() && (
                   <TabsTrigger value="bookings">Bookings</TabsTrigger>
                 )}
@@ -541,7 +605,22 @@ export default function ServiceDetailPage() {
                   </p>
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+
+                  <Card 
+                    className="cursor-pointer hover:shadow-md transition-shadow"
+                    onClick={() => navigate(`/user/${provider?.id}`)}
+                  >
+                    <CardContent className="p-4 flex items-center gap-3">
+                      <div className="p-2 bg-primary/10 rounded-full">
+                        <Users className="h-5 w-5 text-primary" />
+                      </div>
+                      <div>
+                        <p className="text-sm text-muted-foreground">Provider</p>
+                        <p className="font-medium">{provider?.username || "Unknown"}</p>
+                      </div>
+                    </CardContent>
+                  </Card>
                   <Card>
                     <CardContent className="p-4 flex items-center gap-3">
                       <div className="p-2 bg-primary/10 rounded-full">
@@ -566,17 +645,6 @@ export default function ServiceDetailPage() {
                     </CardContent>
                   </Card>
 
-                  <Card>
-                    <CardContent className="p-4 flex items-center gap-3">
-                      <div className="p-2 bg-primary/10 rounded-full">
-                        <Users className="h-5 w-5 text-primary" />
-                      </div>
-                      <div>
-                        <p className="text-sm text-muted-foreground">Provider</p>
-                        <p className="font-medium">{provider?.username || "Unknown"}</p>
-                      </div>
-                    </CardContent>
-                  </Card>
 
                   <Card>
                     <CardContent className="p-4 flex items-center gap-3">
@@ -590,6 +658,56 @@ export default function ServiceDetailPage() {
                     </CardContent>
                   </Card>
                 </div>
+
+                <Card>
+                  <CardContent className="p-4">
+                    <div className="flex items-start gap-3">
+                      <div className="p-2 bg-primary/10 rounded-full">
+                        <Shield className="h-5 w-5 text-primary" />
+                      </div>
+                      <div>
+                        <h3 className="font-medium mb-1">Secure Payments</h3>
+                        <p className="text-sm text-muted-foreground">
+                          All payments are processed securely through our escrow system. Your money is only released
+                          to the service provider after you confirm the service has been completed to your satisfaction.
+                        </p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardContent className="p-4">
+                    <div className="flex items-start gap-3">
+                      <div className="p-2 bg-primary/10 rounded-full">
+                        <Shield className="h-5 w-5 text-primary" />
+                      </div>
+                      <div>
+                        <h3 className="font-medium mb-1">Provider Verification</h3>
+                        <div className="flex items-center gap-2 mb-2">
+                          <span className="text-sm">Status:</span>
+                          {provider?.kyc_verified ? (
+                            <Badge className="bg-green-100 text-green-800 flex items-center gap-1">
+                              <Shield className="h-3 w-3" />
+                              Verified
+                            </Badge>
+                          ) : (
+                            <Badge variant="outline" className="bg-gray-100 text-gray-800 flex items-center gap-1">
+                              Unverified
+                            </Badge>
+                          )}
+                        </div>
+                        <p className="text-sm text-muted-foreground">
+                          {provider?.kyc_verified ?
+                            "This provider has completed identity verification, offering an extra layer of trust and security." :
+                            "This provider has not yet completed identity verification. We allow unverified providers on our platform, but verified providers offer an extra layer of trust and security."}
+                        </p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+
+
               </TabsContent>
 
               <TabsContent value="reviews">
@@ -600,13 +718,12 @@ export default function ServiceDetailPage() {
                       <div className="flex items-center gap-2">
                         <div className="flex items-center">
                           {[1, 2, 3, 4, 5].map((star) => (
-                            <Star 
+                            <Star
                               key={star}
-                              className={`h-5 w-5 ${
-                                star <= (service.ratings_sum / service.ratings_count)
+                              className={`h-5 w-5 ${star <= (service.ratings_sum / service.ratings_count)
                                   ? "text-amber-500 fill-amber-500"
                                   : "text-gray-300"
-                              }`}
+                                }`}
                             />
                           ))}
                         </div>
@@ -649,13 +766,12 @@ export default function ServiceDetailPage() {
                               </div>
                               <div className="flex items-center">
                                 {[1, 2, 3, 4, 5].map((star) => (
-                                  <Star 
+                                  <Star
                                     key={star}
-                                    className={`h-4 w-4 ${
-                                      star <= review.rating
+                                    className={`h-4 w-4 ${star <= review.rating
                                         ? "text-amber-500 fill-amber-500"
                                         : "text-gray-300"
-                                    }`}
+                                      }`}
                                   />
                                 ))}
                               </div>
@@ -680,7 +796,19 @@ export default function ServiceDetailPage() {
                         </AvatarFallback>
                       </Avatar>
                       <div>
-                        <h2 className="text-xl font-semibold">{provider.username}</h2>
+                        <div className="flex items-center gap-2">
+                          <h2 className="text-xl font-semibold">{provider.username}</h2>
+                          {provider.kyc_verified ? (
+                            <Badge className="bg-green-100 text-green-800 flex items-center gap-1">
+                              <Shield className="h-3 w-3" />
+                              Verified
+                            </Badge>
+                          ) : (
+                            <Badge variant="outline" className="bg-gray-100 text-gray-800 flex items-center gap-1">
+                              Unverified
+                            </Badge>
+                          )}
+                        </div>
                         <p className="text-muted-foreground">Service Provider</p>
                         <div className="flex items-center gap-2 mt-1">
                           <User className="h-4 w-4 text-muted-foreground" />
@@ -696,8 +824,8 @@ export default function ServiceDetailPage() {
                       </p>
                     </div>
 
-                    <Button 
-                      variant="outline" 
+                    <Button
+                      variant="outline"
                       className="w-full"
                       onClick={handleContactProvider}
                     >
@@ -842,27 +970,27 @@ export default function ServiceDetailPage() {
                                   </AvatarFallback>
                                 </Avatar>
                                 <div className="flex flex-col">
-                                <div>
-                                  <p className="font-medium truncate max-w-[150px]">{booking.customer?.username || "Anonymous"}</p>
-                                  <p className="text-sm text-muted-foreground">
-                                    Booked on {formatDate(booking.created_at)}
-                                  </p>
+                                  <div>
+                                    <p className="font-medium max-w-[150px]">{booking.customer?.username || "Anonymous"}</p>
+                                    <p className="text-sm text-muted-foreground">
+                                      Booked on {formatDate(booking.created_at)}
+                                    </p>
+                                  </div>
+                                  <div className="flex items-center">
+                                    <Badge className={`${getStatusColor(booking.status)} max-w-[110px] mt-2 truncate`}>
+                                      {booking.status.charAt(0).toUpperCase() + booking.status.slice(1)}
+                                    </Badge>
+                                  </div>
                                 </div>
-                                <div className="flex items-center">
-                                <Badge className={`${getStatusColor(booking.status)} max-w-[110px] mt-2 truncate`}>
-                                  {booking.status.charAt(0).toUpperCase() + booking.status.slice(1)}
-                                </Badge>
-                              </div>
-                              </div>
                               </div>
 
                             </div>
-                            
+
                             <div className="grid grid-cols-2 gap-2 my-2 text-sm">
                               {(() => {
                                 // Extract booking details from notes
                                 const bookingDetails = extractBookingDetails(booking.notes);
-                                
+
                                 return (
                                   <>
                                     {bookingDetails.date && (
@@ -893,14 +1021,14 @@ export default function ServiceDetailPage() {
                                 );
                               })()}
                             </div>
-                          
-                            
+
+
                             <div className="flex justify-end items-center gap-2 mt-4 border-t pt-3">
                               {getStatusActions(booking)}
                               {booking.status !== "canceled" && booking.status !== "completed" && (
-                                <Button 
-                                  variant="outline" 
-                                  size="sm" 
+                                <Button
+                                  variant="outline"
+                                  size="sm"
                                   onClick={() => handleUpdateBookingStatus(booking.id, "canceled")}
                                 >
                                   Cancel Booking
@@ -928,12 +1056,30 @@ export default function ServiceDetailPage() {
           {/* Booking Column */}
           <div>
             {userCanBook ? (
-              <div className="sticky top-6">
-                <ServiceBookingForm 
-                  service={service} 
-                  onBookingSuccess={handleBookingSuccess}
-                />
-              </div>
+              userRole === "business" ? (
+                <Card>
+                  <CardContent className="p-6 text-center">
+                    <Shield className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
+                    <h3 className="text-lg font-semibold mb-2">Business Account</h3>
+                    <p className="text-muted-foreground mb-4">
+                      Only customer accounts can book services. Please switch to a customer account to book this service.
+                    </p>
+                    <Button
+                      className="w-full"
+                      onClick={() => navigate("/profile")}
+                    >
+                      Go to Profile
+                    </Button>
+                  </CardContent>
+                </Card>
+              ) : (
+                <div className="sticky top-6">
+                  <ServiceBookingForm
+                    service={service}
+                    onBookingSuccess={handleBookingSuccess}
+                  />
+                </div>
+              )
             ) : (
               user ? (
                 <Card>
@@ -943,8 +1089,8 @@ export default function ServiceDetailPage() {
                     <p className="text-muted-foreground mb-4">
                       You can't book your own service. You can manage your bookings from your dashboard.
                     </p>
-                    <Button 
-                      className="w-full" 
+                    <Button
+                      className="w-full"
                       onClick={() => navigate("/services?tab=dashboard")}
                     >
                       Go to Dashboard
@@ -958,15 +1104,15 @@ export default function ServiceDetailPage() {
                     <p className="text-muted-foreground mb-4">
                       Please log in or sign up to book this service and access all features.
                     </p>
-                    <Button 
-                      className="w-full mb-2" 
+                    <Button
+                      className="w-full mb-2"
                       onClick={() => navigate("/auth")}
                     >
                       Log In
                     </Button>
-                    <Button 
-                      variant="outline" 
-                      className="w-full" 
+                    <Button
+                      variant="outline"
+                      className="w-full"
                       onClick={() => navigate("/auth")}
                     >
                       Sign Up
@@ -978,6 +1124,13 @@ export default function ServiceDetailPage() {
           </div>
         </div>
       </div>
+      {/* Delete Service Confirmation Modal */}
+      <DeleteServiceModal
+        isOpen={showDeleteModal}
+        onClose={() => setShowDeleteModal(false)}
+        onConfirm={handleDeleteService}
+        serviceTitle={service?.title}
+      />
     </MainLayout>
   );
 } 

@@ -44,6 +44,7 @@ export function ServiceBookingForm({ service, onBookingSuccess }: ServiceBooking
   const [kycVerified, setKycVerified] = useState(false);
   const [providerKycVerified, setProviderKycVerified] = useState(false);
   const [checkingKyc, setCheckingKyc] = useState(true);
+  const [checkingAuth, setCheckingAuth] = useState(true);
   const { user } = useUser();
   const { toast } = useToast();
   const navigate = useNavigate();
@@ -129,7 +130,24 @@ export function ServiceBookingForm({ service, onBookingSuccess }: ServiceBooking
     checkKycStatus();
   }, [user, service]);
 
+  // Add a useEffect to track when user authentication is resolved
+  useEffect(() => {
+    if (user !== undefined) {
+      // User is either logged in (user is an object) or definitely not logged in (user is null)
+      setCheckingAuth(false);
+    }
+  }, [user]);
+
   const onSubmit = async (values: z.infer<typeof formSchema>) => {
+    if (checkingAuth) {
+      // If we're still checking auth status, show a loading toast
+      toast({
+        title: "Please wait",
+        description: "Verifying your account information...",
+      });
+      return;
+    }
+    
     if (!user) {
       toast({
         title: "Authentication required",
@@ -138,6 +156,29 @@ export function ServiceBookingForm({ service, onBookingSuccess }: ServiceBooking
       });
       navigate("/auth");
       return;
+    }
+
+    // Check if user is a business account
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('user_role')
+        .eq('id', user.id)
+        .single();
+        
+      if (error) throw error;
+      
+      if (data?.user_role === "business") {
+        toast({
+          title: "Booking not allowed",
+          description: "Business accounts cannot book services. Please use a customer account.",
+          variant: "destructive",
+        });
+        navigate("/profile");
+        return;
+      }
+    } catch (error) {
+      console.error("Error checking user role:", error);
     }
 
     if (!service) {
@@ -185,44 +226,21 @@ export function ServiceBookingForm({ service, onBookingSuccess }: ServiceBooking
           service_id: service.id,
           customer_id: user.id,
           provider_id: service.owner_id,
-          status: "pending",
+          status: "draft", // Start as draft until payment is completed
+          payment_status: "pending",
           notes: `Date: ${format(scheduledDateTime, "PPP")}\nTime: ${format(scheduledDateTime, "p")}\nLocation: ${values.location}${values.notes ? `\n\nAdditional Notes: ${values.notes}` : ""}`,
+          scheduled_time: scheduledDateTime.toISOString()
         })
         .select()
         .single();
 
       if (bookingError) throw bookingError;
 
-      // Create an escrow payment for this booking
-      // This will be marked as completed automatically if payments are disabled
-      const escrowPayment = await EscrowService.createPayment(
-        bookingData.id,
-        service.price,
-        user.id,
-        service.owner_id,
-        service.id
-      );
-
-      // Create a notification for the service provider
-      await supabase.from("notifications").insert({
-        user_id: service.owner_id, // Send to service provider
-        type: "booking",
-        title: "New Booking Request",
-        message: `You have a new booking request for ${service.title}`,
-        is_read: false,
-        data: JSON.stringify({
-          booking_id: bookingData.id,
-          service_id: service.id,
-          service_title: service.title,
-        }),
-      });
-
-      setBookingComplete(true);
-      toast({
-        title: "Booking successful",
-        description: "Your booking request has been sent to the service provider",
-      });
-
+      // Don't show the toast since the payment page will guide the user
+      // Redirect directly to payment page with booking ID
+      console.log("Redirecting to payment page for booking:", bookingData.id);
+      navigate(`/payment/${bookingData.id}`);
+      
       if (onBookingSuccess) {
         onBookingSuccess();
       }
@@ -265,13 +283,17 @@ export function ServiceBookingForm({ service, onBookingSuccess }: ServiceBooking
     }
   };
 
-  if (checkingBookings || checkingKyc) {
+  if (checkingBookings || checkingKyc || checkingAuth) {
     return (
       <Card>
-        <CardContent className="pt-6 flex justify-center items-center min-h-[200px]">
-          <div className="flex items-center gap-2">
-            <Loader2 className="h-5 w-5 animate-spin" />
-            <p>Checking booking status...</p>
+        <CardHeader>
+          <CardTitle>Booking</CardTitle>
+          <CardDescription>Book this service</CardDescription>
+        </CardHeader>
+        <CardContent className="flex justify-center py-8">
+          <div className="flex flex-col items-center">
+            <Loader2 className="h-8 w-8 animate-spin mb-2" />
+            <p className="text-sm text-muted-foreground">Loading booking information...</p>
           </div>
         </CardContent>
       </Card>
@@ -284,74 +306,47 @@ export function ServiceBookingForm({ service, onBookingSuccess }: ServiceBooking
     return (
       <Card>
         <CardHeader>
-          <CardTitle>Ongoing Booking</CardTitle>
-          <CardDescription>
-            You already have an active booking for this service
-          </CardDescription>
+          <CardTitle>Existing Booking</CardTitle>
+          <CardDescription>You already have a booking for this service</CardDescription>
         </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="p-4 border rounded-lg bg-muted/20">
-            <div className="space-y-3">
-              <div className="flex justify-between items-start">
-                <h3 className="font-medium">{service.title}</h3>
-                <Badge className="max-w-[110px] truncate">{getStatusDisplay(existingBooking.status)}</Badge>
-              </div>
-              
+        <CardContent>
+          <div className="flex flex-col items-center py-4">
+            <div className="rounded-full bg-primary/10 p-3 mb-4">
+              <CheckCircle className="h-6 w-6 text-primary" />
+            </div>
+            <h3 className="text-lg font-medium mb-2">Booking Exists</h3>
+            <p className="text-center text-muted-foreground mb-4">
+              You already have an active booking for this service. Check your bookings page for details.
+            </p>
+            <div className="w-full space-y-2">
               {bookingDetails.date && (
-                <div className="flex items-center gap-2">
-                  <CalendarIcon className="h-4 w-4 text-muted-foreground" />
-                  <span>{bookingDetails.date}</span>
+                <div className="flex justify-between items-center">
+                  <span className="text-muted-foreground">Date:</span>
+                  <span className="font-medium">{bookingDetails.date}</span>
                 </div>
               )}
-              
               {bookingDetails.time && (
-                <div className="flex items-center gap-2">
-                  <Clock className="h-4 w-4 text-muted-foreground" />
-                  <span>{bookingDetails.time}</span>
+                <div className="flex justify-between items-center">
+                  <span className="text-muted-foreground">Time:</span>
+                  <span className="font-medium">{bookingDetails.time}</span>
                 </div>
               )}
-              
-              {bookingDetails.location && (
-                <div className="flex items-center gap-2">
-                  <MapPin className="h-4 w-4 text-muted-foreground" />
-                  <span>{bookingDetails.location}</span>
-                </div>
-              )}
+              <div className="flex justify-between items-center">
+                <span className="text-muted-foreground">Status:</span>
+                <Badge variant={existingBooking.status === "confirmed" ? "default" : "outline"}>
+                  {existingBooking.status.charAt(0).toUpperCase() + existingBooking.status.slice(1)}
+                </Badge>
+              </div>
             </div>
           </div>
-          <p className="text-sm text-muted-foreground">
-            You cannot book this service again until your current booking is completed or canceled.
-          </p>
         </CardContent>
-        <CardFooter className="flex justify-center gap-2">
-          <Button variant="outline" onClick={() => navigate("/bookings")}>View My Bookings</Button>
-          <Button onClick={() => navigate(`/services/${service.id}`)}>Service Details</Button>
-        </CardFooter>
-      </Card>
-    );
-  }
-
-  if (bookingComplete) {
-    return (
-      <Card>
-        <CardHeader>
-          <CardTitle>Booking Successful</CardTitle>
-          <CardDescription>
-            Your booking request has been sent
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="flex items-center justify-center p-8">
-            <div className="h-16 w-16 rounded-full bg-green-100 flex items-center justify-center">
-              <CheckCircle className="h-8 w-8 text-green-600" />
-            </div>
-          </div>
-          <p className="text-center">
-            We've sent your booking request to the service provider. You'll receive a notification when they confirm your booking.
-          </p>
-        </CardContent>
-        <CardFooter className="flex justify-center">
-          <Button onClick={() => navigate("/bookings")}>View My Bookings</Button>
+        <CardFooter className="flex justify-between">
+          <Button variant="outline" onClick={() => navigate('/bookings')}>
+            View Bookings
+          </Button>
+          <Button onClick={() => navigate(`/payment/${existingBooking.id}`)}>
+            Complete Payment
+          </Button>
         </CardFooter>
       </Card>
     );
@@ -367,11 +362,11 @@ export function ServiceBookingForm({ service, onBookingSuccess }: ServiceBooking
       </CardHeader>
       <CardContent>
         {!providerKycVerified && (
-          <Alert className="mb-4 bg-amber-50 border-amber-200">
+          <Alert className="mb-4 bg-amber-0 border-amber-200">
             <AlertTriangle className="h-4 w-4 text-amber-600" />
-            <AlertTitle>Unverified Service Provider</AlertTitle>
+            <AlertTitle>Provider Not Verified</AlertTitle>
             <AlertDescription>
-              This service provider hasn't completed verification yet. You can still book their service, but proceed with caution.
+              This service provider hasn't completed identity verification yet. You can still book their service, but we recommend choosing verified providers for added security.
             </AlertDescription>
           </Alert>
         )}
@@ -411,7 +406,7 @@ export function ServiceBookingForm({ service, onBookingSuccess }: ServiceBooking
                     id="date"
                     variant="outline"
                     className={cn(
-                      "w-full justify-start text-left font-normal",
+                      "w-full justify-start text-left lg:max-w-40 lg:truncate font-normal",
                       !form.watch("date") && "text-muted-foreground"
                     )}
                   >
@@ -423,7 +418,7 @@ export function ServiceBookingForm({ service, onBookingSuccess }: ServiceBooking
                     )}
                   </Button>
                 </PopoverTrigger>
-                <PopoverContent className="w-auto p-0">
+                <PopoverContent className="w-auto text-left p-0">
                   <Calendar
                     mode="single"
                     selected={form.watch("date")}

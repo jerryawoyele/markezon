@@ -21,11 +21,13 @@ import {
   AlertTriangle,
   CheckCircle,
   XCircle,
-  CreditCard
+  CreditCard,
+  Shield
 } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { CustomerConfirmationModal } from "@/components/services/CustomerConfirmationModal";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { BookingPaymentCard } from "@/components/services/BookingPaymentCard";
 
 export default function BookingDetailsPage() {
   const { id } = useParams();
@@ -141,17 +143,52 @@ export default function BookingDetailsPage() {
     fetchBookingDetails(); // Refresh the booking after confirmation
   };
 
-  const handleDisputeCompletion = async () => {
-    // This will be handled by the CustomerConfirmationModal
-    fetchBookingDetails(); // Refresh the booking after dispute
+  const handleDisputeCompletion = async (reason = "Customer disputed service completion", details = "") => {
+    if (!booking || !user) return;
+    
+    try {
+      // Check if there's a payment to dispute
+      if (booking.escrow_payments?.[0]?.id) {
+        await EscrowService.createDispute(
+          booking.escrow_payments[0].id,
+          reason,
+          details || "Customer disputed the service completion",
+          user.id
+        );
+        
+        toast({
+          title: "Dispute Filed",
+          description: "Your dispute has been filed. Our team will review it and contact you soon.",
+        });
+      }
+      
+      fetchBookingDetails(); // Refresh the booking after dispute
+    } catch (error) {
+      console.error("Error filing dispute:", error);
+      toast({
+        title: "Error",
+        description: "Failed to file dispute. Please try again or contact support.",
+        variant: "destructive",
+      });
+    }
   };
 
   const handleMakePayment = async () => {
     if (!booking) return;
 
-    // Since payments are handled outside the app, we'll redirect to chat
+    // Redirect to the payment page
     setShowPaymentModal(false);
-    navigate(`/messages?user=${booking.provider_id}`);
+    navigate(`/payment/${booking.id}`);
+  };
+
+  const handlePaymentAction = async (status: string, bookingId: string) => {
+    toast({
+      title: `Payment ${status}`,
+      description: `The payment has been ${status}. The booking details will refresh.`,
+    });
+    
+    // Refresh booking details
+    fetchBookingDetails();
   };
 
   const getStatusBadgeVariant = (status: string) => {
@@ -197,19 +234,20 @@ export default function BookingDetailsPage() {
   };
 
   const isPaymentNeeded = () => {
-    // External payment mode means no in-app payments needed
-    if (EscrowService.isExternalPaymentMode) {
-      return false;
-    }
+    // Check if a payment is needed for this booking
+    if (!booking) return false;
     
-    // If booking is confirmed and no payment has been made or payment is in pending status
-    if (booking.status === 'confirmed') {
+    // If booking is in draft or pending status and no payment has been completed
+    if (booking.status === 'draft' || booking.status === 'pending') {
+      // No payment records or payment status is not completed
       if (!booking.escrow_payments || booking.escrow_payments.length === 0) {
         return true;
       }
+      
       const payment = booking.escrow_payments[0];
       return payment.status === 'pending';
     }
+    
     return false;
   };
 
@@ -319,18 +357,17 @@ export default function BookingDetailsPage() {
                     <AlertTriangle className="h-4 w-4" />
                     <AlertTitle>Payment Required</AlertTitle>
                     <AlertDescription>
-                      Payment is required to proceed with this booking. Please make a payment to secure your booking.
+                      Payment is required to secure your booking. Your payment will be held in escrow until the service is completed successfully.
                     </AlertDescription>
                   </Alert>
                 )}
 
-                {isCustomer() && EscrowService.isExternalPaymentMode && (
-                  <Alert className="mt-2 bg-blue-900">
-                    <MessageSquare className="h-4 w-4 text-blue-600" />
-                    <AlertTitle>Payment Information</AlertTitle>
+                {booking.status === 'pending' && booking.payment_status === 'completed' && (
+                  <Alert className="mt-2 bg-blue-50 border-blue-200">
+                    <Shield className="h-4 w-4 text-blue-600" />
+                    <AlertTitle>Payment Protected</AlertTitle>
                     <AlertDescription>
-                      Payments are currently handled directly between you and the service provider. 
-                      Please use the chat to discuss payment details. The service price is ${booking.services?.price}.
+                      Your payment is securely held in escrow. It will be released to the service provider only after you confirm the service has been completed successfully.
                     </AlertDescription>
                   </Alert>
                 )}
@@ -376,6 +413,13 @@ export default function BookingDetailsPage() {
 
           {/* Actions Sidebar */}
           <div className="space-y-6">
+            {isProvider() && (
+              <BookingPaymentCard 
+                booking={booking} 
+                onPaymentAction={handlePaymentAction} 
+              />
+            )}
+
             <Card>
               <CardHeader>
                 <CardTitle>Actions</CardTitle>
@@ -385,10 +429,10 @@ export default function BookingDetailsPage() {
                   <Button
                     variant="default"
                     className="w-full flex items-center gap-2"
-                    onClick={() => setShowPaymentModal(true)}
+                    onClick={() => navigate(`/payment/${booking.id}`)}
                   >
                     <CreditCard className="h-4 w-4" />
-                    Make Payment
+                    Complete Payment
                   </Button>
                 )}
 

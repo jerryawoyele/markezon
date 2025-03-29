@@ -682,7 +682,7 @@ export default function Home() {
           </div>
           
           <div className="hidden lg:block w-80">
-            <div className="fixed mr-4 top-13">
+            <div className="sticky top-13">
               <TrendingServices />
             </div>
           </div>

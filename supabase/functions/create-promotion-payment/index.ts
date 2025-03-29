@@ -5,6 +5,8 @@ import { Stripe } from 'https://esm.sh/stripe@12.1.1';
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS, GET',
+  'Access-Control-Max-Age': '86400',
 };
 
 interface RequestBody {

@@ -257,4 +257,35 @@ export class PaymentProviderService {
       return true; // Default to available on error
     }
   }
+  
+  /**
+   * Get the appropriate payment provider for a specific transaction
+   * This is used when making payments for services or promotions
+   * 
+   * @param userId The user making the payment
+   * @param serviceType The type of service being paid for
+   * @returns The appropriate payment provider
+   */
+  static async getPaymentProviderForTransaction(
+    userId: string,
+    serviceType: ProviderServiceType = ProviderServiceType.PAYMENT
+  ): Promise<PaymentProvider> {
+    try {
+      if (!userId) return PaymentProvider.STRIPE;
+      
+      // Check if user has country code saved
+      const countryCode = await this.getUserCountry(userId);
+      
+      // If we have a country code, determine provider based on service type
+      if (countryCode) {
+        return this.determineProviderForService(countryCode, serviceType);
+      }
+      
+      // If no country code, determine and save provider
+      return this.determineAndSaveUserProvider(userId);
+    } catch (error) {
+      console.error('Error getting payment provider for transaction:', error);
+      return PaymentProvider.STRIPE; // Default to Stripe on error
+    }
+  }
 } 

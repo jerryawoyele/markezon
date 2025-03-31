@@ -145,7 +145,17 @@ export function Post({
   const [currentUserObj, setCurrentUserObj] = useState<{ id: string } | null>(null);
   const [commentLikes, setCommentLikes] = useState<Record<string, boolean>>({});
   const [showPromoteModal, setShowPromoteModal] = useState(false);
+  const [touchStart, setTouchStart] = useState<number | null>(null);
+  const [touchEnd, setTouchEnd] = useState<number | null>(null);
+  
+  // Minimum distance required for swipe
+  const minSwipeDistance = 50;
 
+  // Add states for caption truncation
+  const [isTruncated, setIsTruncated] = useState(true);
+  const [shouldTruncate, setShouldTruncate] = useState(false);
+  const captionRef = useRef<HTMLParagraphElement>(null);
+  
   useEffect(() => {
     const checkOwnership = async () => {
       if (currentUserId) {
@@ -625,16 +635,49 @@ export function Post({
   };
 
   const handleImageTap = () => {
-    if (showCommentsModal || showLikesModal || showPostModal) return;
-    
     const now = Date.now();
-    const DOUBLE_TAP_DELAY = 300;
+    const doubleTapDelay = 300;
     
-    if (now - lastTap < DOUBLE_TAP_DELAY) {
+    if (lastTap && (now - lastTap) < doubleTapDelay) {
+      // Double tap detected
       handleLike();
     }
     
     setLastTap(now);
+  };
+
+  // Handle touch start
+  const handleTouchStart = (e: React.TouchEvent) => {
+    setTouchEnd(null); // Reset touchEnd
+    setTouchStart(e.targetTouches[0].clientX);
+  };
+  
+  // Handle touch move
+  const handleTouchMove = (e: React.TouchEvent) => {
+    setTouchEnd(e.targetTouches[0].clientX);
+  };
+  
+  // Handle touch end - process the swipe
+  const handleTouchEnd = () => {
+    if (!touchStart || !touchEnd) return;
+    
+    const distance = touchStart - touchEnd;
+    const isLeftSwipe = distance > minSwipeDistance;
+    const isRightSwipe = distance < -minSwipeDistance;
+    
+    // Handle left swipe (next image)
+    if (isLeftSwipe && currentImageIndex < parsedImages.length - 1) {
+      handleNextImage();
+    }
+    
+    // Handle right swipe (previous image)
+    if (isRightSwipe && currentImageIndex > 0) {
+      handlePrevImage();
+    }
+    
+    // Reset values
+    setTouchStart(null);
+    setTouchEnd(null);
   };
 
   const formatTimeAgo = (dateString: string) => {
@@ -745,6 +788,24 @@ export function Post({
     setEditedCaption(captionState);
   }, [captionState]);
 
+  // Add effect to check if caption should be truncated
+  useEffect(() => {
+    const checkHeight = () => {
+      if (captionRef.current) {
+        // If caption exceeds 80px in height, it should be truncated
+        setShouldTruncate(captionRef.current.scrollHeight > 80);
+      }
+    };
+    
+    // Check immediately and when window resizes
+    checkHeight();
+    window.addEventListener('resize', checkHeight);
+    
+    return () => {
+      window.removeEventListener('resize', checkHeight);
+    };
+  }, [captionState]);
+
   // Helper function to get initials from a name
   const getInitials = (name: string): string => {
     if (!name || typeof name !== 'string') return '?';
@@ -829,6 +890,9 @@ export function Post({
               <div 
                 className="w-full flex transition-transform duration-300 ease-in-out" 
                 style={{ transform: `translateX(-${currentImageIndex * 100}%)` }}
+                onTouchStart={handleTouchStart}
+                onTouchMove={handleTouchMove}
+                onTouchEnd={handleTouchEnd}
               >
                 {parsedImages.map((image, index) => (
                   <div key={index} className="w-full flex-shrink-0 relative">
@@ -849,28 +913,29 @@ export function Post({
               
               {parsedImages.length > 1 && (
                 <>
-                  <button 
-                    className="absolute left-2 top-1/2 transform -translate-y-1/2 bg-black/30 hover:bg-black/50 p-1 rounded-full transition-colors duration-200"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handlePrevImage();
-                    }}
-                    disabled={currentImageIndex === 0}
-                    style={{ opacity: currentImageIndex === 0 ? 0.5 : 1 }}
-                  >
-                    <ChevronLeft className="h-5 w-5" />
-                  </button>
-                  <button 
-                    className="absolute right-2 top-1/2 transform -translate-y-1/2 bg-black/30 hover:bg-black/50 p-1 rounded-full transition-colors duration-200"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleNextImage();
-                    }}
-                    disabled={currentImageIndex === parsedImages.length - 1}
-                    style={{ opacity: currentImageIndex === parsedImages.length - 1 ? 0.5 : 1 }}
-                  >
-                    <ChevronRight className="h-5 w-5" />
-                  </button>
+                  {currentImageIndex > 0 && (
+                    <button 
+                      className="absolute left-2 top-1/2 transform -translate-y-1/2 bg-black/30 hover:bg-black/50 p-1 rounded-full transition-colors duration-200"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handlePrevImage();
+                      }}
+                    >
+                      <ChevronLeft className="h-5 w-5" />
+                    </button>
+                  )}
+                  
+                  {currentImageIndex < parsedImages.length - 1 && (
+                    <button 
+                      className="absolute right-2 top-1/2 transform -translate-y-1/2 bg-black/30 hover:bg-black/50 p-1 rounded-full transition-colors duration-200"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleNextImage();
+                      }}
+                    >
+                      <ChevronRight className="h-5 w-5" />
+                    </button>
+                  )}
                   
                   <div className="absolute bottom-2 left-1/2 transform -translate-x-1/2 flex gap-1">
                     {parsedImages.map((_, index) => (
@@ -892,12 +957,30 @@ export function Post({
           
           <div className="p-4">
             {!isTextPost() && captionState && (
-              <p className="mb-3 text-sm">
-                <span className="font-medium mr-1">
+              <div className="mb-3 text-sm">
+                <p className="font-medium inline mr-1">
                   {profiles?.username || profiles?.auth_metadata?.full_name || 'User'}:
-                </span>
-                {captionState}
-              </p>
+                </p>
+                <div>
+                  <p 
+                    ref={captionRef}
+                    className={isTruncated && shouldTruncate ? "line-clamp-3" : ""}
+                  >
+                    {captionState}
+                  </p>
+                  {shouldTruncate && (
+                    <button 
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setIsTruncated(!isTruncated);
+                      }}
+                      className="text-primary text-xs mt-1 hover:underline"
+                    >
+                      {isTruncated ? "Show more" : "Show less"}
+                    </button>
+                  )}
+                </div>
+              </div>
             )}
             
             <div className="flex items-center gap-4">
@@ -1112,7 +1195,13 @@ export function Post({
                     </div>
                   ) : parsedImages.length > 0 && (
                     <div className="relative h-auto flex-grow bg-black flex items-center justify-center overflow-hidden">
-                      <div className="w-full flex transition-transform duration-300 ease-in-out" style={{ transform: `translateX(-${currentImageIndex * 100}%)` }}>
+                      <div 
+                        className="w-full flex transition-transform duration-300 ease-in-out" 
+                        style={{ transform: `translateX(-${currentImageIndex * 100}%)` }}
+                        onTouchStart={handleTouchStart}
+                        onTouchMove={handleTouchMove}
+                        onTouchEnd={handleTouchEnd}
+                      >
                         {parsedImages.map((image, index) => (
                           <div key={index} className="w-full flex-shrink-0 flex items-center justify-center">
                             <img 
@@ -1129,34 +1218,35 @@ export function Post({
                       
                       {parsedImages.length > 1 && (
                         <>
-                          <button 
-                            className="absolute left-2 top-1/2 transform -translate-y-1/2 bg-black/30 hover:bg-black/50 p-1 rounded-full transition-colors duration-200"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handlePrevImage();
-                            }}
-                            disabled={currentImageIndex === 0}
-                            style={{ opacity: currentImageIndex === 0 ? 0.5 : 1 }}
-                          >
-                            <ChevronLeft className="h-6 w-6" />
-                          </button>
-                          <button 
-                            className="absolute right-2 top-1/2 transform -translate-y-1/2 bg-black/30 hover:bg-black/50 p-1 rounded-full transition-colors duration-200"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleNextImage();
-                            }}
-                            disabled={currentImageIndex === parsedImages.length - 1}
-                            style={{ opacity: currentImageIndex === parsedImages.length - 1 ? 0.5 : 1 }}
-                          >
-                            <ChevronRight className="h-6 w-6" />
-                          </button>
+                          {currentImageIndex > 0 && (
+                            <button 
+                              className="absolute left-2 top-1/2 transform -translate-y-1/2 bg-black/30 hover:bg-black/50 p-1 rounded-full transition-colors duration-200"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handlePrevImage();
+                              }}
+                            >
+                              <ChevronLeft className="h-6 w-6" />
+                            </button>
+                          )}
+                          
+                          {currentImageIndex < parsedImages.length - 1 && (
+                            <button 
+                              className="absolute right-2 top-1/2 transform -translate-y-1/2 bg-black/30 hover:bg-black/50 p-1 rounded-full transition-colors duration-200"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleNextImage();
+                              }}
+                            >
+                              <ChevronRight className="h-6 w-6" />
+                            </button>
+                          )}
                           
                           <div className="absolute bottom-2 left-1/2 transform -translate-x-1/2 flex gap-1">
                             {parsedImages.map((_, index) => (
                               <div 
                                 key={index} 
-                                className={`w-2 h-2 rounded-full transition-colors duration-200 ${currentImageIndex === index ? 'bg-primary' : 'bg-white/30'}`}
+                                className={`w-2 h-2 rounded-full transition-colors duration-200 ${index === currentImageIndex ? 'bg-primary' : 'bg-white/30'}`}
                                 onClick={(e) => {
                                   e.stopPropagation();
                                   setCurrentImageIndex(index);
@@ -1223,7 +1313,20 @@ export function Post({
 
                     {!isTextPost() && (
                       <div className="mb-4">
-                        <p className="text-sm">{captionState}</p>
+                        <p ref={captionRef} className={isTruncated && shouldTruncate ? "text-sm line-clamp-4" : "text-sm"}>
+                          {captionState}
+                        </p>
+                        {shouldTruncate && (
+                          <button 
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setIsTruncated(!isTruncated);
+                            }}
+                            className="text-primary text-xs mt-1 hover:underline"
+                          >
+                            {isTruncated ? "Show more" : "Show less"}
+                          </button>
+                        )}
                       </div>
                     )}
 

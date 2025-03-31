@@ -26,6 +26,8 @@ import { Badge } from "@/components/ui/badge";
 import { AvatarWithModal } from "@/components/profile/AvatarWithModal";
 import { updateProfileReviews } from "@/utils/profile-helper";
 import { DeleteServiceModal } from "@/components/services/DeleteServiceModal";
+import { ProfileCard } from "@/components/profile/ProfileCard";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
 // Define ServiceType locally since it's not exported from @/types
 interface ServiceType {
@@ -37,6 +39,67 @@ interface ServiceType {
   owner_id: string;
   created_at: string;
 }
+
+const AboutBusinessSection = ({ content }) => {
+  const [showModal, setShowModal] = useState(false);
+  const [shouldTruncate, setShouldTruncate] = useState(false);
+  const contentRef = useRef<HTMLParagraphElement>(null);
+  
+  useEffect(() => {
+    const checkHeight = () => {
+      if (contentRef.current) {
+        // If text exceeds 100px, it should be truncated
+        setShouldTruncate(contentRef.current.scrollHeight > 100);
+      }
+    };
+    
+    checkHeight();
+    window.addEventListener('resize', checkHeight);
+    
+    return () => {
+      window.removeEventListener('resize', checkHeight);
+    };
+  }, [content]);
+  
+  return (
+    <>
+      <div className="bg-black/20 rounded-md p-4">
+        <p 
+          ref={contentRef}
+          className={cn(
+            "text-white/80 whitespace-pre-wrap",
+            shouldTruncate && "line-clamp-4"
+          )}
+        >
+          {content}
+        </p>
+        
+        {shouldTruncate && (
+          <Button 
+            variant="link" 
+            onClick={() => setShowModal(true)}
+            className="p-0 h-auto mt-1 text-primary hover:text-primary/80"
+          >
+            Show more
+          </Button>
+        )}
+      </div>
+      
+      <Dialog open={showModal} onOpenChange={setShowModal}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>About the Business</DialogTitle>
+          </DialogHeader>
+          <div className="max-h-[60vh] overflow-y-auto mt-4">
+            <p className="whitespace-pre-wrap text-white/80">
+              {content}
+            </p>
+          </div>
+        </DialogContent>
+      </Dialog>
+    </>
+  );
+};
 
 export function UserProfile() {
   const params = useParams();
@@ -1182,7 +1245,7 @@ export function UserProfile() {
                       Back
                     </Button>
 
-                    <div className="flex flex-col md:flex-row gap-6">
+                    <div className="flex flex-row md:flex-row gap-6">
                       <div className="flex-shrink-0">
                         <AvatarWithModal
                           size={80}
@@ -1230,28 +1293,27 @@ export function UserProfile() {
                                 <MessageSquare className="h-4 w-4" />
                                 Message
                               </Button>
-
-
+                              
                             </>
+                            
                           )}
-
                           <Button
-                            variant="outline"
-                            size="sm"
-                            className="flex w-fit items-center gap-2"
-                            onClick={handleShareProfile}
-                          >
-                            <Share2 className="h-4 w-4" />
-                            Share
-                          </Button>
+                                variant="outline"
+                                size="sm"
+                                className="flex w-fit items-center gap-2"
+                                onClick={handleShareProfile}
+                              >
+                                <Share2 className="h-4 w-4" />
+                                Share
+                              </Button>
                         </div>
                       </div>
                     </div>
 
                     {/* Stats row */}
-                    <div className="flex flex-row flex-wrap justify-around mt-4 pt-4 border-t border-white/10">
+                    <div className="flex flex-row flex-wrap justify-around mt-4 pt-4 ">
                       <div
-                        className="text-center cursor-pointer hover:bg-black/20 px-4 py-2 rounded-md transition-colors"
+                        className="text-center cursor-pointer bg-background/50 hover:bg-background/20 px-12 py-4 rounded-md transition-colors"
                         onClick={handlePostsClick}
                       >
                         <p className="font-semibold">{userPosts.length}</p>
@@ -1259,7 +1321,7 @@ export function UserProfile() {
                       </div>
 
                       <div
-                        className="text-center cursor-pointer hover:bg-black/20 px-4 py-2 rounded-md transition-colors"
+                        className="text-center cursor-pointer bg-background/50 hover:bg-background/20 px-8 py-4 rounded-md transition-colors"
                         onClick={() => setShowFollowersModal(true)}
                       >
                         <p className="font-semibold">{profile?.followers_count || 0}</p>
@@ -1267,7 +1329,7 @@ export function UserProfile() {
                       </div>
 
                       <div
-                        className="text-center cursor-pointer hover:bg-black/20 px-4 py-2 rounded-md transition-colors"
+                        className="text-center cursor-pointer bg-background/50 hover:bg-background/20 px-8 py-4 rounded-md transition-colors"
                         onClick={() => setShowFollowingModal(true)}
                       >
                         <p className="font-semibold">{profile?.following_count || 0}</p>
@@ -1276,7 +1338,7 @@ export function UserProfile() {
 
                       {profile?.user_role === "business" && (
                         <div
-                          className="text-center cursor-pointer hover:bg-black/20 px-4 py-2 rounded-md transition-colors"
+                          className="text-center cursor-pointer bg-background/50 hover:bg-background/20 px-6 py-4 rounded-md transition-colors"
                           onClick={handleOpenReviewsModal}
                         >
                           <div className="flex items-center justify-center gap-1">
@@ -1295,6 +1357,14 @@ export function UserProfile() {
                         </div>
                       )}
                     </div>
+
+                    {/* About Business Section - Only for business accounts */}
+                    {profile?.user_role === "business" && profile?.about_business && (
+                      <div className="mt-4 pt-4">
+                        <h3 className="text-lg font-semibold mb-2">About the Business</h3>
+                        <AboutBusinessSection content={profile.about_business} />
+                      </div>
+                    )}
                   </>
                 )}
               </div>

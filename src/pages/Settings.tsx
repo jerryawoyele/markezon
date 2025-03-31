@@ -14,7 +14,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { KYCVerification } from "@/components/kyc/KYCVerification";
 import { MainLayout } from "@/layouts/MainLayout";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Bell, CreditCard, Globe, Lock, LogOut, Save, Shield, User, Wallet, AlertCircle, ExternalLink, CheckCircle, AlertTriangle, Briefcase, Info, Loader2, ArrowLeft } from "lucide-react";
+import { Bell, CreditCard, Globe, Lock, LogOut, Save, Shield, User, Wallet, AlertCircle, ExternalLink, CheckCircle, AlertTriangle, Briefcase, Info, Loader2, ArrowLeft, DollarSign } from "lucide-react";
 import { KYCVerificationService } from "@/utils/kyc-verification-service";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { ProfileAvatar } from "@/components/profile/ProfileAvatar";
@@ -28,6 +28,7 @@ import {
   loadStripe
 } from "@/utils/stripe-components";
 import { StyledCardElement } from "@/utils/stripe-elements";
+import { PaymentProviderService, PaymentProvider, ProviderServiceType } from "@/utils/payment-provider-service";
 
 // Define interfaces
 interface PaymentMethod {
@@ -87,72 +88,18 @@ interface PaymentFormProps {
 const PaymentForm: React.FC<PaymentFormProps> = ({ onSuccess, userId }) => {
   const stripe = useStripe();
   const elements = useElements();
-  const [paymentProvider, setPaymentProvider] = useState<'stripe' | 'paystack'>('stripe');
-  const [isLoading, setIsLoading] = useState(true);
-  const [isLoadingProvider, setIsLoadingProvider] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const { toast } = useToast();
 
-  // Get preferred payment provider based on user's location
-  useEffect(() => {
-    const getPaymentProvider = async () => {
-        setIsLoadingProvider(true);
-        try {
-        // Try to get from API first
-        try {
-          const response = await fetch(`/api/payment-provider`);
-          if (response.ok) {
-            const data = await response.json();
-            if (data.provider) {
-              setPaymentProvider(data.provider as 'stripe' | 'paystack');
-              setIsLoadingProvider(false);
-            return;
-            }
-          }
-        } catch (error) {
-          console.warn("Failed to get payment provider from API:", error);
-        }
-        
-        // Fallback to local storage or default
-        const savedProvider = localStorage.getItem('preferred_payment_provider');
-        if (savedProvider === 'stripe' || savedProvider === 'paystack') {
-          setPaymentProvider(savedProvider);
-        } else {
-          // Default based on common browser locale detection
-          const userLanguage = navigator.language;
-          // Use Paystack for African countries by default (simplified example)
-          if (userLanguage.includes('NG') || userLanguage.includes('GH') || 
-              userLanguage.includes('KE') || userLanguage.includes('ZA')) {
-            setPaymentProvider('paystack');
-          } else {
-          setPaymentProvider('stripe');
-        }
-        }
-      } catch (e) {
-        console.error("Error determining payment provider:", e);
-        // Default to Stripe as fallback
-        setPaymentProvider('stripe');
-      } finally {
-        setIsLoadingProvider(false);
-      }
-    };
-
-    getPaymentProvider();
-  }, []);
-
-  // Handle form submission - combined handler for both payment providers
+  // Handle form submission
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setSubmitting(true);
     setError(null);
 
     try {
-      if (paymentProvider === 'stripe') {
-        await handleStripeSubmit();
-      } else if (paymentProvider === 'paystack') {
-        await handlePaystackSubmit(e.currentTarget as HTMLFormElement);
-      }
+      await handleStripeSubmit();
     } catch (error) {
       console.error('Payment form error:', error);
       setError(error instanceof Error ? error.message : 'An unexpected error occurred');
@@ -166,25 +113,25 @@ const PaymentForm: React.FC<PaymentFormProps> = ({ onSuccess, userId }) => {
     }
   };
 
-  // Handle Stripe payment submission without event parameter
+  // Handle Stripe payment submission
   const handleStripeSubmit = async () => {
     if (!stripe || !elements) {
       setError("Stripe has not been properly initialized");
       return;
     }
     
-        const cardElement = elements.getElement(CardElement);
-        if (!cardElement) {
+    const cardElement = elements.getElement(CardElement);
+    if (!cardElement) {
       setError("Card information is incomplete");
       return;
-        }
-        
+    }
+    
     // Create the payment method - properly typed for Stripe API v3
     const { paymentMethod, error: stripeError } = await stripe.createPaymentMethod({
-          type: 'card',
-          card: cardElement,
-        });
-        
+      type: 'card',
+      card: cardElement,
+    });
+    
     if (stripeError) {
       console.error('Error creating payment method:', stripeError);
       setError(stripeError.message || 'Failed to process your card. Please try again.');
@@ -192,7 +139,7 @@ const PaymentForm: React.FC<PaymentFormProps> = ({ onSuccess, userId }) => {
     }
 
     // Handle successful result
-        if (!paymentMethod) {
+    if (!paymentMethod) {
       setError('Failed to create payment method. Please try again.');
       return;
     }
@@ -230,272 +177,37 @@ const PaymentForm: React.FC<PaymentFormProps> = ({ onSuccess, userId }) => {
     onSuccess();
   };
 
-  // Handle Paystack payment submission with form parameter
-  const handlePaystackSubmit = async (formElement: HTMLFormElement) => {
-    const cardNumber = (formElement.querySelector('#cardNumber') as HTMLInputElement).value.replace(/\s/g, '');
-    const expiryDate = (formElement.querySelector('#expiryDate') as HTMLInputElement).value;
-    const cvv = (formElement.querySelector('#cvv') as HTMLInputElement).value;
-    
-    // Basic validation
-    if (!cardNumber || cardNumber.length < 13) {
-      setError("Please enter a valid card number");
-      return;
-    }
-    
-    if (!expiryDate || !expiryDate.includes('/')) {
-      setError("Please enter a valid expiry date (MM/YY)");
-      return;
-    }
-    
-    if (!cvv || cvv.length < 3) {
-      setError("Please enter a valid CVV code");
-      return;
-    }
-    
-    // Parse expiry date
-    const [expMonth, expYear] = expiryDate.split('/');
-    const expMonthNum = parseInt(expMonth, 10);
-    const expYearNum = parseInt(expYear, 10) + 2000; // Convert 2-digit year to 4-digit
-    
-    // Additional validation
-    const now = new Date();
-    const currentYear = now.getFullYear();
-    const currentMonth = now.getMonth() + 1;
-    
-    if (expYearNum < currentYear || (expYearNum === currentYear && expMonthNum < currentMonth)) {
-      setError("Card has expired");
-      return;
-    }
-    
-    try {
-      // Try to use API if available
-      const response = await fetch('/api/payment-methods/paystack', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          userId,
-          card_number: cardNumber,
-          cvv: cvv,
-          expiry_month: expMonthNum,
-          expiry_year: expYearNum,
-        }),
-      });
-      
-      if (response.ok) {
-        const data = await response.json();
-        // Clear form
-        formElement.reset();
-        toast({
-          title: "Payment method added",
-          description: `Your card has been added to your account.`,
-        });
-        onSuccess();
-        return;
-      } else {
-        const error = await response.json();
-        throw new Error(error.message || "Failed to process payment method");
-      }
-    } catch (apiError) {
-      console.warn("API method failed, using direct database method", apiError);
-      // Fallback: Store with a generated token (in production, you'd get this from Paystack)
-      const last4 = cardNumber.slice(-4);
-      const cardBrand = getCardBrand(cardNumber);
-      
-        const { error: saveError } = await supabase.from('payment_methods').insert([
-          {
-            user_id: userId,
-          id: `pstk_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-          provider: 'paystack',
-          card_brand: cardBrand,
-          card_last4: last4,
-          card_exp_month: expMonthNum,
-          card_exp_year: expYearNum,
-          is_default: true,
-          created_at: new Date().toISOString()
-          }
-        ]);
-
-        if (saveError) {
-          throw saveError;
-        }
-
-      // Clear form
-      formElement.reset();
-
-        toast({
-        title: "Payment method added",
-        description: `Card ending in ${last4} has been added to your account.`,
-      });
-      
-      onSuccess();
-    }
-  };
-  
-  // Helper function to determine card brand from card number
-  const getCardBrand = (cardNumber: string): string => {
-    // Simplified card detection
-    if (cardNumber.startsWith('4')) {
-      return 'visa';
-    } else if (/^5[1-5]/.test(cardNumber)) {
-      return 'mastercard';
-    } else if (/^3[47]/.test(cardNumber)) {
-      return 'amex';
-    } else if (/^6(?:011|5)/.test(cardNumber)) {
-      return 'discover';
-    } else {
-      return 'unknown';
-    }
-  };
-  
-  // Helper for Paystack card number formatting
-  const formatCardNumber = (value: string) => {
-    const v = value.replace(/\s+/g, '').replace(/[^0-9]/gi, '');
-    const matches = v.match(/\d{4,16}/g);
-    const match = matches && matches[0] || '';
-    const parts = [];
-    
-    for (let i = 0, len = match.length; i < len; i += 4) {
-      parts.push(match.substring(i, i + 4));
-    }
-    
-    if (parts.length) {
-      return parts.join(' ');
-    } else {
-      return value;
-    }
-  };
-  
-  // Helper for Paystack expiry date formatting
-  const formatExpiryDate = (value: string) => {
-    const v = value.replace(/\s+/g, '').replace(/[^0-9]/gi, '');
-    if (v.length >= 2) {
-      return `${v.substring(0, 2)}/${v.substring(2, 4)}`;
-    }
-    return value;
-  };
-
-  if (isLoadingProvider) {
-    return <div className="flex items-center justify-center py-6"><Loader2 className="h-6 w-6 animate-spin" /></div>;
-  }
-
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
-      <div className="space-y-2 mb-4">
-        <Label htmlFor="paymentProvider" className="font-medium">Payment Provider</Label>
-        <Select
-          value={paymentProvider}
-          onValueChange={(val) => setPaymentProvider(val as 'stripe' | 'paystack')}
-        >
-          <SelectTrigger id="paymentProvider">
-            <SelectValue placeholder="Select payment provider" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="stripe">
-              <div className="flex items-center">
-                <img src="/stripe-logo.svg" alt="Stripe" className="h-4 mr-2" />
-                Stripe
-        </div>
-            </SelectItem>
-            <SelectItem value="paystack">
-              <div className="flex items-center">
-                <img src="/paystack-logo.svg" alt="Paystack" className="h-4 mr-2" />
-                Paystack
-              </div>
-            </SelectItem>
-          </SelectContent>
-        </Select>
-      </div>
-      
-      {paymentProvider === 'stripe' ? (
-        <>
-          <div className="space-y-2">
-            <Label htmlFor="card-element" className="font-medium">Card Information</Label>
-            <div className="mt-1 p-3 border rounded-md">
-              <StyledCardElement 
-                id="card-element"
+      <div className="space-y-2">
+        <Label htmlFor="card-element" className="font-medium">Card Information</Label>
+        <div className="mt-1 p-3 border rounded-md">
+          <StyledCardElement 
+            id="card-element"
             className="w-full"
-              />
+          />
         </div>
-            <div className="flex gap-2 mt-2">
-              <img src="/visa-logo.svg" alt="Visa" className="h-6" />
-              <img src="/mastercard-logo.svg" alt="Mastercard" className="h-6" />
-              <img src="/discover-logo.svg" alt="Discover" className="h-6" />
-              <img src="/amex-logo.svg" alt="American Express" className="h-6" />
-            </div>
-            <div className="text-xs text-gray-500 mt-1">
-              Your card details are secured with Stripe's encryption.
-            </div>
-          </div>
-        </>
-      ) : (
-        <>
-          <div className="space-y-3">
-            <div>
-              <Label htmlFor="cardNumber" className="font-medium">Card Number</Label>
-              <Input
-                id="cardNumber"
-                type="text"
-                placeholder="4444 4444 4444 4444"
-                onChange={(e) => {
-                  e.target.value = formatCardNumber(e.target.value);
-                }}
-                maxLength={19}
-                className="mt-1"
-                required
-              />
+        <div className="flex gap-2 mt-2">
+          <img src="/visa-logo.svg" alt="Visa" className="h-6" />
+          <img src="/mastercard-logo.svg" alt="Mastercard" className="h-6" />
+          <img src="/discover-logo.svg" alt="Discover" className="h-6" />
+          <img src="/amex-logo.svg" alt="American Express" className="h-6" />
         </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <Label htmlFor="expiryDate" className="font-medium">Expiry Date</Label>
-                <Input
-                  id="expiryDate"
-                  type="text"
-                  placeholder="MM/YY"
-                  onChange={(e) => {
-                    e.target.value = formatExpiryDate(e.target.value);
-                  }}
-                  maxLength={5}
-                  className="mt-1"
-                  required
-                />
-              </div>
-              <div>
-                <Label htmlFor="cvv" className="font-medium">CVV</Label>
-                <Input
-                  id="cvv"
-                  type="text"
-                  placeholder="123"
-                  maxLength={4}
-                  className="mt-1"
-                  required
-                />
-              </div>
-            </div>
-            <div className="flex gap-2 mt-2">
-              <img src="/visa-logo.svg" alt="Visa" className="h-6" />
-              <img src="/mastercard-logo.svg" alt="Mastercard" className="h-6" />
-              <img src="/discover-logo.svg" alt="Discover" className="h-6" />
-              <img src="/verve-logo.svg" alt="Verve" className="h-6" />
-            </div>
-            <div className="text-xs text-gray-500 mt-1">
-              Your card details are secured with Paystack's encryption.
-            </div>
-          </div>
-        </>
-      )}
+        <div className="text-xs text-gray-500 mt-1">
+          Your card details are securely encrypted. The appropriate payment processor will be selected automatically when you make a payment.
+        </div>
+      </div>
       
       {error && (
         <div className="p-3 bg-red-50 border border-red-200 rounded-md text-sm text-red-600">
           {error}
-      </div>
+        </div>
       )}
       
       <Button
         type="submit"
         className="w-full"
-        disabled={submitting || (!stripe && paymentProvider === 'stripe')}
+        disabled={submitting || !stripe}
       >
         {submitting ? (
           <>
@@ -541,8 +253,19 @@ export default function Settings() {
 
   // Payment settings
   const [defaultPaymentMethod, setDefaultPaymentMethod] = useState("");
-  const [paymentMethods, setPaymentMethods] = useState<any[]>([]);
+  const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([]);
   const [paymentMethodsLoading, setPaymentMethodsLoading] = useState(false);
+  const [showAddPaymentForm, setShowAddPaymentForm] = useState(false);
+  const [payoutAccount, setPayoutAccount] = useState<any>(null);
+  const [showAddPayoutAccount, setShowAddPayoutAccount] = useState(false);
+  const [showEditPayoutAccount, setShowEditPayoutAccount] = useState(false);
+  const [payoutFormData, setPayoutFormData] = useState({
+    bank_name: '',
+    account_number: '',
+    account_holder_name: '',
+  });
+  const [isKycStarted, setIsKycStarted] = useState(false);
+  const [kycSessionURL, setKycSessionURL] = useState('');
 
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
   const [isDirty, setIsDirty] = useState(false);
@@ -600,11 +323,64 @@ export default function Settings() {
     }
   }, [location.search, navigate, toast]);
 
+  // Add effect to load payment methods when the payments tab is selected
   useEffect(() => {
+    // Initialize data when userId is available
+    if (userId && activeTab === 'payments' && userProfile?.id) {
+      // Function to load payment methods
+      const loadPaymentData = async () => {
+        try {
+          // Fetch payment methods
+          const { data, error } = await supabase
+            .from('payment_methods')
+            .select('*')
+            .eq('user_id', userProfile.id)
+            .order('is_default', { ascending: false });
+          
+          if (error) {
+            console.error('Error loading payment methods:', error);
+          } else {
+            setPaymentMethods(data || []);
+          }
+          
+          // Fetch payout account for business users
+          if (userProfile.user_role === 'business') {
+            try {
+              const { data: payoutData, error: payoutError } = await supabase
+                .from('payout_accounts')
+                .select('*')
+                .eq('user_id', userProfile.id)
+                .single();
+              
+              if (!payoutError && payoutData) {
+                setPayoutAccount(payoutData);
+                
+                // Pre-fill form data
+                setPayoutFormData({
+                  bank_name: payoutData.bank_name || '',
+                  account_number: payoutData.account_number || '',
+                  account_holder_name: payoutData.account_holder_name || '',
+                });
+              }
+            } catch (e) {
+              console.error('Payout accounts table may not exist:', e);
+              // Continue without payout account data
+            }
+          }
+        } catch (error) {
+          console.error('Error loading payment data:', error);
+        }
+      };
+      
+      loadPaymentData();
+    }
+  }, [userId, activeTab, userProfile]);
+
+  // Add an effect to initialize user data
+  useEffect(() => {
+    // Function to initialize user data
     const initializeUserData = async () => {
       try {
-        setLoading(true);
-        
         // Get the authenticated user
         const { data: { user }, error: userError } = await supabase.auth.getUser();
         
@@ -644,38 +420,6 @@ export default function Settings() {
           setMarketingEmails(profileData.marketing_emails === true);
           setProfileVisibility(profileData.profile_visibility || "public");
           setActivityVisibility(profileData.activity_visibility || "followers");
-          
-          // Check if payment is blocked based on KYC status for business accounts only
-          setPaymentBlocked(profileData.user_role === "business" && profileData.kyc_status !== "verified");
-          
-          // Check KYC status for business accounts
-          if (profileData.user_role === 'business') {
-            try {
-              // Fetch KYC verification data
-              const { data: kycData, error: kycError } = await supabase
-                .from('kyc_verifications')
-                .select('*')
-                .eq('user_id', profileData.id)
-                .order('created_at', { ascending: false })
-                .limit(1)
-                .single();
-                
-                if (kycError && kycError.code !== 'PGRST116') {
-                  console.error("Error fetching KYC data:", kycError);
-                } else if (kycData) {
-                  setKycStatus(kycData.status);
-                  // Store KYC data in profile state instead of separate variables
-                  setUserProfile(prev => ({
-                    ...prev,
-                    kyc_provider: kycData.provider || 'sumsub',
-                    kyc_reference_id: kycData.reference_id || ''
-                  }));
-                  setPaymentBlocked(kycData.status !== 'verified');
-                }
-            } catch (kycCheckError) {
-              console.error("Error checking KYC status:", kycCheckError);
-            }
-          }
         } else {
           // Create a new profile if one doesn't exist
           const { data: newProfileData, error: createError } = await supabase
@@ -697,12 +441,6 @@ export default function Settings() {
             setUsername(newProfileData[0].username || "");
           }
         }
-        
-        // Try to detect user's location
-        await detectUserLocation(user.id);
-        
-        // Fetch payment methods
-        fetchPaymentMethods();
       } catch (error) {
         console.error("Error initializing user data:", error);
         toast({
@@ -711,12 +449,14 @@ export default function Settings() {
           variant: "destructive",
         });
       } finally {
+        // Set loading to false to show the main content
         setLoading(false);
       }
     };
     
+    // Call the initialize function
     initializeUserData();
-  }, [navigate]);
+  }, [navigate, toast]);
 
   const checkUsernameAvailability = async (username: string) => {
     if (!username || username.trim() === "" || username === userProfile?.username) {
@@ -901,114 +641,23 @@ export default function Settings() {
   };
 
   const handleStartKYCVerification = async () => {
-    setSaving(true);
+    setIsKycStarted(true);
+    
     try {
-      // Check if user is eligible for verification
-      const isEligible = await KYCVerificationService.isEligibleForVerification(userId);
-      if (!isEligible) {
-        toast({
-          title: "Not Eligible",
-          description: "Business verification is only available for business accounts",
-          variant: "destructive",
-        });
-        return;
-      }
-
-      // Test mode for local development
-      if (import.meta.env.DEV && import.meta.env.VITE_USE_MOCK_VERIFICATION === 'true') {
-        setVerificationResult({
-          status: 'success',
-          message: 'TEST MODE: Setting your account to verified status (this only works in development)'
-        });
-        
-        // Directly update the user's status
-        if (userId) {
-          await supabase
-            .from('profiles')
-            .update({
-              kyc_status: 'verified',
-              kyc_verified: true,
-              updated_at: new Date().toISOString()
-            })
-            .eq('id', userId);
-            
-          setKycStatus('verified');
-          setPaymentBlocked(false);
-          
-          toast({
-            title: "TEST MODE",
-            description: "Your business has been verified in test mode.",
-          });
-        }
-        
-        setSaving(false);
-        return;
-      }
-
-      const result = await KYCVerificationService.startVerification(userId);
-
-      if (result.status === 'success' && result.url) {
-        // Success case - open verification URL in a new tab
-        setVerificationResult({
-          status: 'success',
-          message: result.message || 'Verification process started. You will be redirected to complete verification.'
-        });
-
-        // Open verification link in a new tab
-        window.open(result.url, '_blank');
-
-        // Poll for status updates
-        setKycStatus('started');
-
-        // Start polling for updates
-        const statusInterval = setInterval(async () => {
-          const status = await KYCVerificationService.checkVerificationStatus(userId);
-          if (status !== 'started' && status !== 'not_started') {
-            setKycStatus(status);
-            clearInterval(statusInterval);
-          }
-        }, 10000); // Check every 10 seconds
-
-        // Clear interval after 10 minutes to avoid indefinite polling
-        setTimeout(() => {
-          clearInterval(statusInterval);
-        }, 10 * 60 * 1000);
+      const result = await KYCVerificationService.startVerification(userProfile.id);
+      if (result && result.url) {
+        setKycSessionURL(result.url);
       } else {
-        // Error case
-        setVerificationResult({
-          status: 'error',
-          message: result.message || 'An error occurred starting verification'
-        });
-
-        toast({
-          title: "Verification Failed",
-          description: result.message || 'Failed to start verification',
-          variant: "destructive",
-        });
+        throw new Error("Failed to start verification process");
       }
     } catch (error) {
-      console.error('Error starting KYC verification:', error);
-      setVerificationResult({
-        status: 'error',
-        message: error instanceof Error ? error.message : 'Connection error. Please try again later.'
+      console.error("Error starting KYC verification:", error);
+      toast({
+        title: "Verification Error",
+        description: "There was a problem starting the verification process. Please try again later.",
+        variant: "destructive",
       });
-
-      // Show appropriate toast based on error type
-      if (error instanceof TypeError && error.message.includes('Failed to fetch')) {
-        toast({
-          title: "Connection Error",
-          description: 'Unable to connect to verification service. Please check your internet connection and try again.',
-          variant: "destructive",
-        });
-      } else {
-        toast({
-          title: "Verification Error",
-          description: 'Error starting verification: ' + (error instanceof Error ? error.message : 'Unknown error'),
-          variant: "destructive",
-        });
-      }
-    } finally {
-      setSaving(false);
+      setIsKycStarted(false);
     }
   };
 
@@ -1088,113 +737,140 @@ export default function Settings() {
     }
   };
 
-  const fetchPaymentMethods = async () => {
-    if (!userId) return;
-
-    try {
-      setPaymentMethodsLoading(true);
-
-      // Try API endpoint first
-      try {
-        const response = await fetch(`/api/payment-methods?userId=${userId}`);
-        if (response.ok) {
-          const data = await response.json();
-          setPaymentMethods(data);
-
-          // Set default payment method
-          const defaultMethod = data.find((method: PaymentMethod) => method.is_default);
-          if (defaultMethod) {
-            setDefaultPaymentMethod(defaultMethod.id);
+  const handlePaymentMethodAdded = () => {
+    setShowAddPaymentForm(false);
+    
+    // Refresh payment methods by updating activeTab to trigger the useEffect
+    // This is a workaround since we've moved fetchPaymentMethods inside the useEffect
+    if (activeTab === 'payments') {
+      const refreshTab = async () => {
+        // Directly fetch payment methods
+        if (userProfile?.id) {
+          try {
+            const { data, error } = await supabase
+              .from('payment_methods')
+              .select('*')
+              .eq('user_id', userProfile.id)
+              .order('is_default', { ascending: false });
+            
+            if (error) throw error;
+            setPaymentMethods(data || []);
+          } catch (error) {
+            console.error('Error refreshing payment methods:', error);
           }
-          return;
         }
-      } catch (error) {
-        console.warn("API call for payment methods failed, checking database:", error);
-      }
-
-      // Fallback: check database directly
-      const { data, error } = await supabase
+      };
+      refreshTab();
+    }
+    
+    toast({
+      title: "Payment method added",
+      description: "Your payment method has been successfully added.",
+    });
+  };
+  
+  const handleRemovePaymentMethod = async (methodId: string) => {
+    try {
+      const { error } = await supabase
         .from('payment_methods')
-        .select('*')
-        .eq('user_id', userId)
-        .order('created_at', { ascending: false });
-
-      if (error) {
-        console.error("Error fetching payment methods:", error);
-        toast({
-          title: "Error",
-          description: "Failed to load payment methods. Please try again.",
-          variant: "destructive",
-        });
-        return;
-      }
-
-      setPaymentMethods(data || []);
-
-      // Set default payment method
-      const defaultMethod = data?.find(method => method.is_default);
-      if (defaultMethod) {
-        setDefaultPaymentMethod(defaultMethod.id);
-      }
+        .delete()
+        .eq('id', methodId);
+      
+      if (error) throw error;
+      
+      setPaymentMethods(prev => prev.filter(method => method.id !== methodId));
+      
+      toast({
+        title: "Payment method removed",
+        description: "Your payment method has been successfully removed.",
+      });
     } catch (error) {
-      console.error("Error in fetchPaymentMethods:", error);
+      console.error('Error removing payment method:', error);
       toast({
         title: "Error",
-        description: "Failed to load payment methods",
+        description: "Failed to remove payment method. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
+  
+  const handleSavePayoutAccount = async () => {
+    if (!userProfile?.id) return;
+    
+    setSaving(true);
+    
+    try {
+      // Validate form data
+      if (!payoutFormData.bank_name || !payoutFormData.account_number || 
+          !payoutFormData.account_holder_name) {
+        throw new Error("Please fill in all required fields");
+      }
+      
+      // Mask account number for display and storage
+      const fullAccountNumber = payoutFormData.account_number;
+      const last4 = fullAccountNumber.slice(-4);
+      
+      const payoutAccountData = {
+        user_id: userProfile.id,
+        bank_name: payoutFormData.bank_name,
+        account_number: fullAccountNumber, // Will be encrypted in DB
+        account_last4: last4,
+        account_holder_name: payoutFormData.account_holder_name,
+        status: 'pending', // New accounts need verification
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      };
+      
+      if (payoutAccount) {
+        // Update existing account
+        const { error } = await supabase
+          .from('payout_accounts')
+          .update(payoutAccountData)
+          .eq('id', payoutAccount.id);
+        
+        if (error) throw error;
+      } else {
+        // Create new account
+        const { error } = await supabase
+          .from('payout_accounts')
+          .insert(payoutAccountData);
+        
+        if (error) throw error;
+      }
+      
+      toast({
+        title: "Payout account saved",
+        description: "Your payout account has been successfully saved and is pending verification.",
+      });
+      
+      setShowAddPayoutAccount(false);
+      
+      // Refresh payout account data directly
+      if (userProfile?.id) {
+        try {
+          const { data, error } = await supabase
+            .from('payout_accounts')
+            .select('*')
+            .eq('user_id', userProfile.id)
+            .single();
+          
+          if (!error && data) {
+            setPayoutAccount(data);
+          }
+        } catch (refreshError) {
+          console.error('Error refreshing payout account data:', refreshError);
+        }
+      }
+    } catch (error) {
+      console.error('Error saving payout account:', error);
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to save payout account. Please try again.",
         variant: "destructive",
       });
     } finally {
-      setPaymentMethodsLoading(false);
+      setSaving(false);
     }
-  };
-
-  // Try to detect user's location - simplified since we don't need it for payments anymore
-  const detectUserLocation = async (userId: string) => {
-    // Return a default country code since we don't need this functionality anymore
-    // after removing the payments tab
-    return "US";
-    
-    /* Original implementation:
-    try {
-      // First try the API endpoint
-      try {
-        const locationResponse = await fetch(`/api/location-detect?userId=${userId}`);
-        if (locationResponse.ok) {
-          const locationData = await locationResponse.json();
-          if (locationData.country_code) {
-            console.log("Location detected:", locationData.country_code);
-            return locationData.country_code;
-          }
-        }
-      } catch (error) {
-        console.warn("API location detection failed, using IP-based fallback:", error);
-      }
-
-      // Fallback to IP-based geolocation if available
-      try {
-        const geoResponse = await fetch('https://ipapi.co/json/');
-        if (geoResponse.ok) {
-          const geoData = await geoResponse.json();
-          if (geoData.country_code) {
-            console.log("IP-based location detected:", geoData.country_code);
-            
-            // Update the user's profile with the detected country code
-            await supabase
-              .from('profiles')
-              .update({ country_code: geoData.country_code })
-              .eq('id', userId);
-              
-            return geoData.country_code;
-          }
-        }
-      } catch (geoError) {
-        console.warn("IP-based location detection failed:", geoError);
-      }
-    } catch (locationError) {
-      console.warn("All location detection methods failed:", locationError);
-    }
-    return null;
-    */
   };
 
   // Main layout loading placeholder
@@ -1227,24 +903,34 @@ export default function Settings() {
         </div>
 
         <Tabs defaultValue="profile" value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="mb-6 bg-background border-b w-full justify-start rounded-none gap-4 h-auto p-0 overflow-x-auto whitespace-nowrap">
-            <TabsTrigger value="profile" className="data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none py-2 px-1">
-              <User className="h-4 w-4 mr-2" />
-              Profile
-            </TabsTrigger>
-            <TabsTrigger value="notifications" className="data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none py-2 px-1">
-              <Bell className="h-4 w-4 mr-2" />
-              Notifications
-            </TabsTrigger>
-            <TabsTrigger value="privacy" className="data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none py-2 px-1">
-              <Lock className="h-4 w-4 mr-2" />
-              Privacy
-            </TabsTrigger>
-            <TabsTrigger value="verification" className="data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none py-2 px-1">
-              <Shield className="h-4 w-4 mr-2" />
-              Verification
-            </TabsTrigger>
-          </TabsList>
+          <div className="overflow-x-auto pb-2">
+            <TabsList className="inline-flex w-max min-w-full md:w-full md:grid md:grid-cols-6 gap-2">
+              <TabsTrigger value="profile" className="flex items-center gap-2">
+                <User size={16} />
+                <span>Profile</span>
+              </TabsTrigger>
+              <TabsTrigger value="notifications" className="flex items-center gap-2">
+                <Bell size={16} />
+                <span>Notifications</span>
+              </TabsTrigger>
+              <TabsTrigger value="privacy" className="flex items-center gap-2">
+                <Lock size={16} />
+                <span>Privacy</span>
+              </TabsTrigger>
+              <TabsTrigger value="security" className="flex items-center gap-2">
+                <Shield size={16} />
+                <span>Security</span>
+              </TabsTrigger>
+              <TabsTrigger value="payments" className="flex items-center gap-2">
+                <Wallet size={16} />
+                <span>Payments</span>
+              </TabsTrigger>
+              <TabsTrigger value="kyc" className="flex items-center gap-2">
+                <Briefcase size={16} />
+                <span>Business Verification</span>
+              </TabsTrigger>
+            </TabsList>
+          </div>
 
           <TabsContent value="profile" className="space-y-6">
             <div>
@@ -1713,29 +1399,28 @@ export default function Settings() {
                   )}
 
                   {/* Verification Benefits */}
-                  <div>
-                    <h3 className="font-medium mb-2">Benefits of Business Verification</h3>
-                    <ul className="space-y-2 text-sm">
-                      <li className="flex items-start gap-2">
-                        <CheckCircle className="h-4 w-4 text-green-600 mt-0.5" />
-                        <span>Offer services in the marketplace</span>
-                      </li>
-                      <li className="flex items-start gap-2">
-                        <CheckCircle className="h-4 w-4 text-green-600 mt-0.5" />
-                        <span>Receive payments from customers</span>
-                      </li>
-                      <li className="flex items-start gap-2">
-                        <CheckCircle className="h-4 w-4 text-green-600 mt-0.5" />
-                        <span>Build trust with verified status badge</span>
-                      </li>
-                      <li className="flex items-start gap-2">
-                        <CheckCircle className="h-4 w-4 text-green-600 mt-0.5" />
-                        <span>Access to advanced business tools and analytics</span>
-                      </li>
-                    </ul>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="p-4 border rounded-md">
+                      <div className="flex items-center gap-2 mb-2">
+                        <Shield className="h-5 w-5 text-primary" />
+                        <h3 className="font-medium">Trust & Safety</h3>
+                      </div>
+                      <p className="text-sm text-muted-foreground">
+                        Verification adds a trust badge to your profile and increases customer confidence in your services.
+                      </p>
+                    </div>
+                    
+                    <div className="p-4 border rounded-md">
+                      <div className="flex items-center gap-2 mb-2">
+                        <DollarSign className="h-5 w-5 text-primary" />
+                        <h3 className="font-medium">Accept Payments</h3>
+                      </div>
+                      <p className="text-sm text-muted-foreground">
+                        Verified businesses can receive payments and manage service bookings through the platform.
+                      </p>
+                    </div>
                   </div>
 
-                  {/* Verification Provider Info */}
                   <div className="rounded-md border p-4 bg-muted/50">
                     <h3 className="font-medium mb-2">Verification Information</h3>
                     <p className="text-sm text-muted-foreground">
@@ -1775,17 +1460,482 @@ export default function Settings() {
 
                   {/* For regular users - account upgrade button */}
                   {userProfile?.user_role !== "business" && (
-                    <Button
-                      onClick={() => setActiveTab("profile")} // Direct to profile tab where they can upgrade
-                      variant="outline"
-                      className="w-full"
-                    >
-                      Upgrade to Business Account
-                    </Button>
+                    <div className="flex justify-center">
+                      <Button
+                        variant="outline"
+                        onClick={() => setActiveTab("profile")}
+                      >
+                        <Briefcase className="mr-2 h-4 w-4" />
+                        Upgrade to Business Account
+                      </Button>
+                    </div>
                   )}
                 </CardContent>
               </Card>
             </div>
+          </TabsContent>
+
+          {/* Payments Tab */}
+          <TabsContent value="payments" className="space-y-6">
+            <div>
+              <h3 className="text-lg font-medium mb-4">Payment Settings</h3>
+              
+              <Card>
+                <CardHeader>
+                  <CardTitle>Payment Methods</CardTitle>
+                  <CardDescription>
+                    Manage your payment methods for transactions on the platform.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {loading ? (
+                    <div className="flex justify-center py-4">
+                      <Loader2 className="h-6 w-6 animate-spin" />
+                    </div>
+                  ) : (
+                    <>
+                      {/* Payment methods list */}
+                      <div className="space-y-4">
+                        {paymentMethods.length > 0 ? (
+                          <div className="grid gap-3">
+                            {paymentMethods.map((method) => (
+                              <div
+                                key={method.id}
+                                className="flex items-center justify-between p-3 border rounded-lg"
+                              >
+                                <div className="flex items-center gap-3">
+                                  <CreditCard className="h-8 w-8 text-primary" />
+                                  <div>
+                                    <p className="font-medium">
+                                      {method.card_brand} •••• {method.card_last4}
+                                    </p>
+                                    <p className="text-sm text-gray-500">
+                                      Expires {method.card_exp_month}/{method.card_exp_year}
+                                    </p>
+                                  </div>
+                                  {method.is_default && (
+                                    <Badge variant="outline" className="ml-2">
+                                      Default
+                                    </Badge>
+                                  )}
+                                </div>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => handleRemovePaymentMethod(method.id)}
+                                >
+                                  Remove
+                                </Button>
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <div className="text-center py-6">
+                            <p className="text-gray-500">No payment methods added yet.</p>
+                          </div>
+                        )}
+
+                        <div className="mt-4">
+                          <Button onClick={() => setShowAddPaymentForm(!showAddPaymentForm)}>
+                            {showAddPaymentForm ? "Cancel" : "Add Payment Method"}
+                          </Button>
+                        </div>
+
+                        {showAddPaymentForm && (
+                          <div className="mt-6 border rounded-lg p-4">
+                            <h4 className="font-medium mb-4">Add New Payment Method</h4>
+                            <StripeWrapper>
+                              <PaymentForm onSuccess={handlePaymentMethodAdded} userId={userProfile.id} />
+                            </StripeWrapper>
+                          </div>
+                        )}
+                      </div>
+                    </>
+                  )}
+                </CardContent>
+              </Card>
+
+              {/* Payout account section - Only for business users */}
+              {userProfile?.user_role === "business" && (
+                <Card className="mt-6">
+                  <CardHeader>
+                    <CardTitle>Payout Account</CardTitle>
+                    <CardDescription>
+                      Manage your account details for receiving payments.
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    {loading ? (
+                      <div className="flex justify-center py-4">
+                        <Loader2 className="h-6 w-6 animate-spin" />
+                      </div>
+                    ) : (
+                      <>
+                        {payoutAccount ? (
+                          <div className="p-3 border rounded-lg">
+                            <div className="flex items-center justify-between">
+                              <div>
+                                <p className="font-medium">
+                                  {payoutAccount.bank_name}
+                                </p>
+                                <p className="text-sm text-gray-500">
+                                  Account ending in {payoutAccount.account_last4}
+                                </p>
+                                {payoutAccount.status === "verified" && (
+                                  <Badge variant="outline" className="mt-2 bg-green-50">
+                                    <CheckCircle className="h-3 w-3 mr-1" /> Verified
+                                  </Badge>
+                                )}
+                                {payoutAccount.status === "pending" && (
+                                  <Badge variant="outline" className="mt-2 bg-yellow-50">
+                                    <AlertCircle className="h-3 w-3 mr-1" /> Verification Pending
+                                  </Badge>
+                                )}
+                              </div>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => setShowEditPayoutAccount(true)}
+                              >
+                                Edit
+                              </Button>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="text-center py-6">
+                            <p className="text-gray-500">No payout account added.</p>
+                            <p className="text-sm text-red-500 mt-2">
+                              You need to add a payout account to receive payments for your services.
+                            </p>
+                          </div>
+                        )}
+
+                        <div className="mt-4">
+                          <Button onClick={() => setShowAddPayoutAccount(!showAddPayoutAccount)}>
+                            {payoutAccount ? "Update Payout Account" : "Add Payout Account"}
+                          </Button>
+                        </div>
+
+                        {showAddPayoutAccount && (
+                          <div className="mt-6 border rounded-lg p-4">
+                            <h4 className="font-medium mb-4">
+                              {payoutAccount ? "Update Payout Account" : "Add Payout Account"}
+                            </h4>
+                            <div className="space-y-4">
+                              <div className="grid gap-2">
+                                <Label htmlFor="bank_name">Bank Name</Label>
+                                <Input
+                                  id="bank_name"
+                                  value={payoutFormData.bank_name}
+                                  onChange={(e) => setPayoutFormData({ ...payoutFormData, bank_name: e.target.value })}
+                                  placeholder="Enter bank name"
+                                />
+                              </div>
+                              <div className="grid gap-2">
+                                <Label htmlFor="account_number">Account Number</Label>
+                                <Input
+                                  id="account_number"
+                                  value={payoutFormData.account_number}
+                                  onChange={(e) => setPayoutFormData({ ...payoutFormData, account_number: e.target.value })}
+                                  placeholder="Enter account number"
+                                />
+                              </div>
+                              <div className="grid gap-2">
+                                <Label htmlFor="account_holder_name">Account Holder Name</Label>
+                                <Input
+                                  id="account_holder_name"
+                                  value={payoutFormData.account_holder_name}
+                                  onChange={(e) => setPayoutFormData({ ...payoutFormData, account_holder_name: e.target.value })}
+                                  placeholder="Enter account holder name"
+                                />
+                              </div>
+                              <Alert className="mt-2">
+                                <AlertCircle className="h-4 w-4" />
+                                <AlertTitle>About Payout Accounts</AlertTitle>
+                                <AlertDescription>
+                                  Your payout account is where you'll receive payments for services you provide. Once verified, payments will be automatically deposited to this account when a service is completed.
+                                </AlertDescription>
+                              </Alert>
+                              <div className="flex justify-end space-x-2 mt-4">
+                                <Button variant="outline" onClick={() => setShowAddPayoutAccount(false)}>
+                                  Cancel
+                                </Button>
+                                <Button onClick={handleSavePayoutAccount}>
+                                  {saving ? (
+                                    <>
+                                      <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Saving...
+                                    </>
+                                  ) : (
+                                    "Save Account"
+                                  )}
+                                </Button>
+                              </div>
+                            </div>
+                          </div>
+                        )}
+                      </>
+                    )}
+                  </CardContent>
+                </Card>
+              )}
+            </div>
+          </TabsContent>
+
+          <TabsContent value="kyc" className="space-y-6">
+            <div className="flex-1">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Shield className="h-5 w-5 text-primary" />
+                    Business Verification
+                  </CardTitle>
+                  <CardDescription>
+                    {userProfile?.user_role === "business"
+                      ? "Complete business verification to unlock full marketplace features and provide services to customers. This helps maintain a safe and trusted marketplace."
+                      : "Business verification is only required for business accounts offering services on the platform."}
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-6">
+                  {/* Account Type Alert */}
+                  {userProfile?.user_role !== "business" && (
+                    <Alert>
+                      <div className="flex items-center gap-2">
+                        <AlertCircle className="h-4 w-4" />
+                        <AlertTitle>Standard Account</AlertTitle>
+                      </div>
+                      <AlertDescription>
+                        You have a standard account. Verification is only required for business accounts.
+                        If you wish to offer services on the platform, you can upgrade to a business account in the Profile tab.
+                      </AlertDescription>
+                    </Alert>
+                  )}
+
+                  {/* Verification Result Messages */}
+                  {verificationResult && (
+                    <Alert variant={verificationResult.status === 'success' ? "default" : "destructive"}
+                      className={verificationResult.status === 'success' ? "bg-green-900 border-green-200" : ""}
+                    >
+                      <div className="flex items-center gap-2">
+                        {verificationResult.status === 'success' ? (
+                          <CheckCircle className="h-4 w-4 text-green-600" />
+                        ) : (
+                          <AlertTriangle className="h-4 w-4" />
+                        )}
+                        <AlertTitle>
+                          {verificationResult.status === 'success' ? "Verification Submitted" : "Verification Error"}
+                        </AlertTitle>
+                      </div>
+                      <AlertDescription>
+                        {verificationResult.message}
+                      </AlertDescription>
+                    </Alert>
+                  )}
+
+                  {/* KYC Status Section */}
+                  <div className="rounded-md border p-4">
+                    <div className="flex items-start justify-between">
+                      <div>
+                        <h3 className="font-medium">Verification Status</h3>
+                        <p className="text-sm text-muted-foreground mt-1">
+                          {userProfile?.kyc_verified
+                            ? "Your business has been successfully verified."
+                            : userProfile?.user_role === "business"
+                              ? "Your business verification is pending or incomplete."
+                              : "Not applicable for standard accounts."}
+                        </p>
+                      </div>
+
+                      <div>
+                        {userProfile?.kyc_verified ? (
+                          <div className="flex items-center gap-1 bg-green-100 text-green-800 px-3 py-1 rounded-full text-sm">
+                            <CheckCircle className="h-4 w-4" />
+                            <span>Verified</span>
+                          </div>
+                        ) : userProfile?.user_role !== "business" ? (
+                          <div className="flex items-center gap-1 bg-gray-100 text-gray-800 px-3 py-1 rounded-full text-sm">
+                            <AlertCircle className="h-4 w-4" />
+                            <span>Not Required</span>
+                          </div>
+                        ) : (
+                          <div className="flex items-center gap-1 bg-yellow-100 text-yellow-800 px-3 py-1 rounded-full text-sm">
+                            <AlertTriangle className="h-4 w-4" />
+                            <span>Not Verified</span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Status details if available */}
+                  {userProfile?.user_role === "business" && (
+                    <>
+                      {kycStatus === 'started' || kycStatus === 'pending' ? (
+                        <Alert className="bg-blue-900 border-blue-200">
+                          <div className="flex items-center gap-2">
+                            <AlertCircle className="h-4 w-4 text-blue-600" />
+                            <AlertTitle>Verification In Progress</AlertTitle>
+                          </div>
+                          <AlertDescription>
+                            Your business verification is being processed. This usually takes 1-3 business days.
+                            You'll receive a notification when it's complete.
+                          </AlertDescription>
+                        </Alert>
+                      ) : kycStatus === 'rejected' ? (
+                        <Alert variant="destructive">
+                          <div className="flex items-center gap-2">
+                            <AlertTriangle className="h-4 w-4" />
+                            <AlertTitle>Verification Rejected</AlertTitle>
+                          </div>
+                          <AlertDescription>
+                            {userProfile?.kyc_rejection_reason ||
+                              "Your verification was rejected. Please ensure your business documents are clear and valid, then try again. Contact support if you need assistance."}
+                          </AlertDescription>
+                        </Alert>
+                      ) : null}
+                    </>
+                  )}
+
+                  {/* Verification Benefits */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="p-4 border rounded-md">
+                      <div className="flex items-center gap-2 mb-2">
+                        <Shield className="h-5 w-5 text-primary" />
+                        <h3 className="font-medium">Trust & Safety</h3>
+                      </div>
+                      <p className="text-sm text-muted-foreground">
+                        Verification adds a trust badge to your profile and increases customer confidence in your services.
+                      </p>
+                    </div>
+                    
+                    <div className="p-4 border rounded-md">
+                      <div className="flex items-center gap-2 mb-2">
+                        <DollarSign className="h-5 w-5 text-primary" />
+                        <h3 className="font-medium">Accept Payments</h3>
+                      </div>
+                      <p className="text-sm text-muted-foreground">
+                        Verified businesses can receive payments and manage service bookings through the platform.
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="rounded-md border p-4 bg-muted/50">
+                    <h3 className="font-medium mb-2">Verification Information</h3>
+                    <p className="text-sm text-muted-foreground">
+                      We use Sumsub for secure, compliant business verification. Verification typically takes 1-2 business days 
+                      after document submission. Your information is encrypted and securely stored.
+                    </p>
+                    <div className="flex items-center mt-2">
+                      <ExternalLink className="h-4 w-4 mr-1 text-muted-foreground" />
+                      <a 
+                        href="https://sumsub.com/document-verification/" 
+                        target="_blank" 
+                        rel="noopener noreferrer"
+                        className="text-xs text-primary hover:underline"
+                      >
+                        Learn more about Sumsub verification
+                      </a>
+                    </div>
+                  </div>
+
+                  {/* Start Verification Button */}
+                  {userProfile?.user_role === "business" && !userProfile?.kyc_verified && kycStatus !== 'pending' && (
+                    <Button
+                      onClick={handleStartKYCVerification}
+                      disabled={saving}
+                      className="w-full"
+                    >
+                      {saving ? (
+                        <>Loading...</>
+                      ) : (
+                        <>
+                          <ExternalLink className="mr-2 h-4 w-4" />
+                          Start Business Verification
+                        </>
+                      )}
+                    </Button>
+                  )}
+
+                  {/* For regular users - account upgrade button */}
+                  {userProfile?.user_role !== "business" && (
+                    <div className="flex justify-center">
+                      <Button
+                        variant="outline"
+                        onClick={() => setActiveTab("profile")}
+                      >
+                        <Briefcase className="mr-2 h-4 w-4" />
+                        Upgrade to Business Account
+                      </Button>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+          </TabsContent>
+
+          <TabsContent value="security" className="space-y-6">
+            <Card>
+              <CardHeader>
+                <CardTitle>Security Settings</CardTitle>
+                <CardDescription>
+                  Manage your account security settings
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <div className="space-y-0.5">
+                      <Label>Password</Label>
+                      <p className="text-sm text-muted-foreground">
+                        Last changed: Never
+                      </p>
+                    </div>
+                    <Button variant="outline" onClick={() => navigate('/reset-password')}>
+                      Change Password
+                    </Button>
+                  </div>
+
+                  <Separator />
+
+                  <div className="space-y-3">
+                    <h3 className="font-medium">Login Sessions</h3>
+                    <div className="p-3 border rounded-md">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="font-medium">Current Session</p>
+                          <p className="text-xs text-muted-foreground">
+                            Started: {new Date().toLocaleDateString()}
+                          </p>
+                        </div>
+                        <Badge variant="outline" className="bg-green-50 text-green-600">
+                          Active
+                        </Badge>
+                      </div>
+                    </div>
+                    <Button variant="outline" onClick={handleLogout} className="w-full sm:w-auto">
+                      <LogOut className="h-4 w-4 mr-2" />
+                      Sign Out of All Devices
+                    </Button>
+                  </div>
+
+                  <Separator />
+
+                  <div className="space-y-3">
+                    <h3 className="font-medium">Account Protection</h3>
+                    <div className="flex items-center justify-between">
+                      <div className="space-y-0.5">
+                        <Label htmlFor="two-factor">Two-Factor Authentication</Label>
+                        <p className="text-sm text-muted-foreground">
+                          Add an extra layer of security to your account
+                        </p>
+                      </div>
+                      <Button variant="outline" disabled>
+                        Coming Soon
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
           </TabsContent>
         </Tabs>
       </div>

@@ -54,45 +54,88 @@ export const NotificationProvider = ({ children }: { children: React.ReactNode }
   // Fetch notification and message counts whenever userId changes
   useEffect(() => {
     if (userId) {
+      // Initial fetch
       refreshCounts();
       
       // Set up real-time subscription for notifications
-      const notificationsSubscription = supabase
-        .channel('notifications-changes')
-        .on(
-          'postgres_changes',
-          {
-            event: '*',
-            schema: 'public',
-            table: 'notifications',
-            filter: `user_id=eq.${userId}`
-          },
-          () => {
-            refreshCounts();
-          }
-        )
-        .subscribe();
-        
+      const notificationsChannel = supabase.channel('notifications-changes');
+      
+      // Subscribe to INSERT events
+      notificationsChannel.on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'notifications',
+          filter: `user_id=eq.${userId}`
+        },
+        () => {
+          console.log('New notification received');
+          refreshCounts();
+        }
+      );
+      
+      // Subscribe to UPDATE events
+      notificationsChannel.on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'notifications',
+          filter: `user_id=eq.${userId}`
+        },
+        () => {
+          console.log('Notification updated');
+          refreshCounts();
+        }
+      );
+      
       // Set up real-time subscription for messages
-      const messagesSubscription = supabase
-        .channel('messages-changes')
-        .on(
-          'postgres_changes',
-          {
-            event: '*',
-            schema: 'public',
-            table: 'messages',
-            filter: `receiver_id=eq.${userId}`
-          },
-          () => {
-            refreshCounts();
-          }
-        )
-        .subscribe();
+      const messagesChannel = supabase.channel('messages-changes');
+      
+      // Subscribe to INSERT events
+      messagesChannel.on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'messages',
+          filter: `receiver_id=eq.${userId}`
+        },
+        () => {
+          console.log('New message received');
+          refreshCounts();
+        }
+      );
+      
+      // Subscribe to UPDATE events
+      messagesChannel.on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'messages',
+          filter: `receiver_id=eq.${userId}`
+        },
+        () => {
+          console.log('Message updated');
+          refreshCounts();
+        }
+      );
+      
+      // Subscribe to both channels
+      notificationsChannel.subscribe();
+      messagesChannel.subscribe();
+      
+      // Set a 30-second polling interval as fallback
+      const pollingInterval = setInterval(() => {
+        refreshCounts();
+      }, 30000);
         
       return () => {
-        notificationsSubscription.unsubscribe();
-        messagesSubscription.unsubscribe();
+        notificationsChannel.unsubscribe();
+        messagesChannel.unsubscribe();
+        clearInterval(pollingInterval);
       };
     }
   }, [userId]);

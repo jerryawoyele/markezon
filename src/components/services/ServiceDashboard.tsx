@@ -95,6 +95,10 @@ export function ServiceDashboard({ services, loading, userRole, onRefresh }: Ser
     }
   }, [services]);
 
+  useEffect(() => {
+    calculateStats();
+  }, [bookings, services]);
+
   const fetchBookings = async () => {
     try {
       // Get all service IDs owned by this user
@@ -104,51 +108,41 @@ export function ServiceDashboard({ services, loading, userRole, onRefresh }: Ser
         setBookings([]);
         return;
       }
-      
-      // Just fetch the bookings without trying to access related data through foreign keys
+
+      // Fetch bookings with enriched data
       const { data, error } = await supabase
         .from('bookings')
-        .select('*')
-        .in('service_id', serviceIds)
-        .order('created_at', { ascending: false });
+        .select(`
+          *,
+          escrow_payments (*)
+        `)
+        .in('service_id', serviceIds);
 
       if (error) throw error;
       
-      // If we need related data, we'll have to fetch it separately
-      if (data && data.length > 0) {
-        // Get customer profiles
-        const customerIds = [...new Set(data.map(booking => booking.customer_id))];
-        const { data: customerData } = await supabase
+      // Get customer profiles for the bookings
+      const customerIds = [...new Set(data?.map(booking => booking.customer_id) || [])];
+      
+      if (customerIds.length > 0) {
+        const { data: customerProfiles, error: customersError } = await supabase
           .from('profiles')
-          .select('*')
+          .select('id, username, avatar_url')
           .in('id', customerIds);
+          
+        if (customersError) throw customersError;
         
-        // Get services
-        const { data: servicesData } = await supabase
-          .from('services')
-          .select('*')
-          .in('id', serviceIds);
-        
-        // Get payments
-        const bookingIds = data.map(booking => booking.id);
-        const { data: paymentsData } = await supabase
-          .from('escrow_payments')
-          .select('*')
-          .in('booking_id', bookingIds);
-        
-        // Now join this data manually
-        const enrichedBookings = data.map(booking => {
+        // Enrich booking data with customer profiles
+        const enrichedBookings = data?.map(booking => {
+          const customer = customerProfiles?.find(profile => profile.id === booking.customer_id);
           return {
             ...booking,
-            service: servicesData?.find(s => s.id === booking.service_id) || null,
-            customer: customerData?.find(c => c.id === booking.customer_id) || null,
-            escrow_payments: paymentsData?.filter(p => p.booking_id === booking.id) || []
+            customer
           };
         });
         
-        setBookings(enrichedBookings);
+        setBookings(enrichedBookings || []);
       } else {
-        setBookings([]);
+        setBookings(data || []);
       }
     } catch (error) {
       console.error("Error fetching bookings:", error);
@@ -288,40 +282,36 @@ export function ServiceDashboard({ services, loading, userRole, onRefresh }: Ser
   };
 
   const calculateStats = () => {
-    // Calculate the total revenue
+    // Calculate the total revenue from completed bookings
     const totalRevenue = bookings.reduce((sum, booking) => {
-      const amount = booking.escrow_payments?.[0]?.amount || 0;
-      return sum + amount;
+      if (booking.status === 'completed') {
+        const amount = booking.escrow_payments?.[0]?.amount || 0;
+        return sum + amount;
+      }
+      return sum;
     }, 0);
 
     // Count bookings by status
-    const activeBookings = bookings.filter(b => b.status === 'confirmed' || b.status === 'pending').length;
-    const completedBookings = bookings.filter(b => b.status === 'completed').length;
-    const canceledBookings = bookings.filter(b => b.status === 'canceled').length;
-
-    // Calculate average rating
-    const ratingsCount = services.reduce((sum, service) => sum + (service.ratings_count || 0), 0);
-    const ratingsSum = services.reduce((sum, service) => sum + ((service.ratings_sum || 0)), 0);
-    const averageRating = ratingsCount > 0 ? (ratingsSum / ratingsCount).toFixed(1) : 0;
-
-    // Find most popular service
-    const serviceBookingCounts = services.map(service => ({
-      id: service.id,
-      title: service.title,
-      count: bookings.filter(b => b.service_id === service.id).length
-    }));
+    const activeBookings = bookings.filter(b => 
+      b.status === 'confirmed' || b.status === 'pending' || b.status === 'in_progress'
+    ).length;
     
-    const popularService = serviceBookingCounts.reduce(
-      (max, service) => (service.count > max.count ? service : max),
-      { title: "None", count: 0 }
-    );
+    const completedBookings = bookings.filter(b => b.status === 'completed').length;
+    
+    // Calculate ratings data directly from services
+    let totalRating = 0;
+    let ratingCount = 0;
 
-    // Calculate status data for chart
-    const statusData = [
-      { name: 'Active', value: activeBookings },
-      { name: 'Completed', value: completedBookings },
-      { name: 'Canceled', value: canceledBookings }
-    ];
+    services.forEach(service => {
+      if (service.ratings_count && service.ratings_count > 0) {
+        totalRating += (service.ratings_sum || 0);
+        ratingCount += service.ratings_count;
+      }
+    });
+
+    const averageRating = ratingCount > 0 ? 
+      (totalRating / ratingCount).toFixed(1) : 
+      "0.0";
     
     setActiveBookings(activeBookings);
     setCompletedBookings(completedBookings);
@@ -367,10 +357,10 @@ export function ServiceDashboard({ services, loading, userRole, onRefresh }: Ser
           trend={null}
         />
         <StatsCard
-          title="Total Bookings"
-          value={activeBookings + completedBookings}
+          title={activeBookings > 0 ? "Active Bookings" : "Total Bookings"}
+          value={activeBookings > 0 ? activeBookings : (activeBookings + completedBookings)}
           icon={<Calendar className="h-5 w-5 text-primary" />}
-          description="All-time booking count"
+          description={activeBookings > 0 ? "Current active bookings" : "All-time booking count"}
           trend={null}
         />
         <StatsCard
@@ -382,11 +372,24 @@ export function ServiceDashboard({ services, loading, userRole, onRefresh }: Ser
         />
         <StatsCard
           title="Average Rating"
-          value={services.length > 0 
-            ? (services.reduce((sum, service) => sum + (service.ratings_sum || 0), 0) / services.length).toFixed(1) 
-            : "0.0"}
+          value={services.length > 0 ? 
+            (() => {
+              let totalRating = 0;
+              let ratingCount = 0;
+              
+              services.forEach(service => {
+                if (service.ratings_count && service.ratings_count > 0) {
+                  totalRating += (service.ratings_sum || 0);
+                  ratingCount += service.ratings_count;
+                }
+              });
+              
+              return ratingCount > 0 ? (totalRating / ratingCount).toFixed(1) : "0.0";
+            })() : 
+            "0.0"
+          }
           icon={<Star className="h-5 w-5 text-primary" />}
-          description="Customer satisfaction"
+          description={`From ${services.reduce((sum, service) => sum + (service.ratings_count || 0), 0)} ratings`}
           trend={null}
         />
       </div>

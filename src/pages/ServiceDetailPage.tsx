@@ -294,68 +294,76 @@ export default function ServiceDetailPage() {
   // Add function to handle booking status changes
   const handleUpdateBookingStatus = async (bookingId: string, newStatus: string) => {
     try {
-      // Special handling for completed status - change to pending_completion
-      if (newStatus === "completed") {
-        const { error } = await supabase
-          .from('bookings')
-          .update({ status: "pending_completion" })
-          .eq('id', bookingId);
-
-        if (error) throw error;
-
-        // Update local state
-        setBookings(bookings.map(booking =>
-          booking.id === bookingId
-            ? { ...booking, status: "pending_completion" }
-            : booking
-        ));
-
-        toast({
-          title: "Status Updated",
-          description: "Booking status has been changed to pending customer confirmation",
-        });
-      } else {
-        // Handle other status changes normally
-        const { error } = await supabase
-          .from('bookings')
-          .update({ status: newStatus })
-          .eq('id', bookingId);
-
-        if (error) throw error;
-
-        // Handle escrow status changes based on booking status change
-        if (newStatus === "canceled") {
-          // Refund the payment
-          const booking = bookings.find(b => b.id === bookingId);
-          if (booking?.escrow_payments?.[0]?.id) {
-            try {
-              await EscrowService.refundPayment(
-                booking.escrow_payments[0].id,
-                "Service canceled by provider"
-              );
-            } catch (paymentError) {
-              console.error("Error refunding payment:", paymentError);
-            }
-          }
+      // If confirming a booking, check if business has a payout account set up
+      if (newStatus === "confirmed" && user?.id === service.owner_id) {
+        // Check if the business has set up their payout account
+        const { data: payoutAccount, error: payoutError } = await supabase
+          .from("payout_accounts")
+          .select("*")
+          .eq("user_id", user.id)
+          .single();
+          
+        if (payoutError || !payoutAccount) {
+          toast({
+            title: "Payment Account Required",
+            description: "You need to set up your payout account before accepting bookings. Please go to Settings > Payments to set up your account.",
+            variant: "destructive",
+          });
+          
+          // Direct the user to the settings page
+          navigate("/settings?tab=payments");
+          return;
         }
-
-        // Update local state
-        setBookings(bookings.map(booking =>
-          booking.id === bookingId
-            ? { ...booking, status: newStatus }
-            : booking
-        ));
-
-        toast({
-          title: "Status Updated",
-          description: `Booking status has been changed to ${newStatus}`,
-        });
       }
+    
+      const { error } = await supabase
+        .from("bookings")
+        .update({ status: newStatus, updated_at: new Date().toISOString() })
+        .eq("id", bookingId);
+
+      if (error) throw error;
+
+      // Update the local state
+      setBookings(prevBookings => 
+        prevBookings.map(booking => 
+          booking.id === bookingId 
+            ? { ...booking, status: newStatus } 
+            : booking
+        )
+      );
+
+      // If the provider is accepting the booking, create an escrow
+      if (newStatus === "confirmed") {
+        // Create an escrow for the booking - handles the payment process
+        try {
+          await EscrowService.createEscrow(bookingId);
+        } catch (escrowError) {
+          console.error("Failed to create escrow:", escrowError);
+          // Don't fail the booking process, just log the error
+          // The payment can be processed manually if needed
+        }
+      }
+
+      // If the service is completed, release funds from escrow
+      if (newStatus === "completed") {
+        try {
+          await EscrowService.completeEscrow(bookingId);
+        } catch (escrowError) {
+          console.error("Failed to complete escrow:", escrowError);
+          // Don't fail the booking process, just log the error
+          // The payment can be processed manually if needed
+        }
+      }
+
+      toast({
+        title: "Booking updated",
+        description: `The booking status has been updated to ${newStatus}`,
+      });
     } catch (error) {
       console.error("Error updating booking status:", error);
       toast({
-        title: "Error",
-        description: "Failed to update booking status",
+        title: "Update failed",
+        description: "There was a problem updating the booking status",
         variant: "destructive",
       });
     }

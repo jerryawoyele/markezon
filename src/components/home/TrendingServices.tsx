@@ -19,7 +19,7 @@ interface TrendingService {
   description: string;
   engagement_score: number;
   user_id?: string;
-  owner_id?: string | {
+  profiles?: string | {
     id: string;
     username: string;
     avatar_url: string;
@@ -77,7 +77,7 @@ export function TrendingServices() {
       // First fetch just the services without any joins
       const { data: servicesData, error: servicesError } = await supabase
         .from('services')
-        .select('*, owner_id(*)')
+        .select('*, profiles(*)')
         .order('created_at', { ascending: false });
       
       if (servicesError) throw servicesError;
@@ -240,12 +240,12 @@ export function TrendingServices() {
       
       // Map profile data to services
       const servicesWithProfiles = selectedServices.map(service => {
-        const profileMatch = service.owner_id ? 
-          profileData.find(profile => profile.id === service.owner_id) : null;
+        const profileMatch = service.profiles ? 
+          profileData.find(profile => profile.id === service.profiles) : null;
         
         return {
           ...service,
-          owner_id: profileMatch || null
+          profiles: profileMatch || null
         };
       });
       
@@ -401,13 +401,13 @@ export function TrendingServices() {
                           <Avatar className="h-6 w-6">
                             <AvatarImage 
                               src={
-                                typeof service.owner_id === 'object' 
-                                  ? service.owner_id?.avatar_url 
+                                typeof service.profiles === 'object' 
+                                  ? service.profiles?.avatar_url 
                                   : service.user_profile?.avatar_url || service.profile?.avatar_url
                               }
                               alt={
-                                typeof service.owner_id === 'object'
-                                  ? service.owner_id?.display_name || service.owner_id?.business_name || service.owner_id?.username
+                                typeof service.profiles === 'object'
+                                  ? service.profiles?.display_name || service.profiles?.business_name || service.profiles?.username
                                   : service.user_profile?.display_name || service.user_profile?.username || service.profile?.display_name || service.profile?.username || "Business"
                               } 
                             />
@@ -417,8 +417,8 @@ export function TrendingServices() {
                           </Avatar>
                           <span className="text-xs text-muted-foreground">
                             {
-                              typeof service.owner_id === 'object'
-                                ? service.owner_id?.display_name || service.owner_id?.business_name || service.owner_id?.username || "Business"
+                              typeof service.profiles === 'object'
+                                ? service.profiles?.display_name || service.profiles?.business_name || service.profiles?.username || "Business"
                                 : service.user_profile?.display_name || service.user_profile?.username || service.profile?.display_name || service.profile?.username || "Business"
                             }
                           </span>

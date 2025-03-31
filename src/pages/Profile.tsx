@@ -30,7 +30,8 @@ import {
   ShoppingCart, 
   Settings, 
   MoreVertical, 
-  LogOut 
+  LogOut,
+  Edit
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -56,6 +57,8 @@ import { createNotification } from '@/utils/notification-helper';
 import { AvatarWithModal } from "@/components/profile/AvatarWithModal";
 import { ServiceModal } from "@/components/services/ServiceModal";
 import { DeleteServiceModal } from "@/components/services/DeleteServiceModal";
+import { updateProfileReviews } from "@/utils/profile-helper";
+import { ProfileCard } from "@/components/profile/ProfileCard";
 
 // Define ServiceType locally since it's not exported from @/types
 interface ServiceType {
@@ -73,6 +76,65 @@ interface ServiceType {
   ratings_sum?: number;
   owner_id?: string;
 }
+
+const AboutBusinessSection = ({ content, isOwner, onEdit }) => {
+  const [isTruncated, setIsTruncated] = useState(true);
+  const [shouldTruncate, setShouldTruncate] = useState(false);
+  const [showModal, setShowModal] = useState(false);
+  const contentRef = useRef<HTMLParagraphElement>(null);
+  
+  useEffect(() => {
+    const checkHeight = () => {
+      if (contentRef.current) {
+        // If text exceeds 100px, it should be truncated
+        setShouldTruncate(contentRef.current.scrollHeight > 100);
+      }
+    };
+    
+    checkHeight();
+    window.addEventListener('resize', checkHeight);
+    
+    return () => {
+      window.removeEventListener('resize', checkHeight);
+    };
+  }, [content]);
+  
+  return (
+    <>
+      <div className="bg-black/20 rounded-md p-3">
+        <p 
+          ref={contentRef}
+          className={isTruncated && shouldTruncate ? "text-white/80 line-clamp-4" : "text-white/80"}
+        >
+          {content}
+        </p>
+        
+        {shouldTruncate && (
+          <Button 
+            variant="link" 
+            onClick={() => setShowModal(true)}
+            className="p-0 h-auto mt-1 text-primary"
+          >
+            Show more
+          </Button>
+        )}
+      </div>
+      
+      <Dialog open={showModal} onOpenChange={setShowModal}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>About the Business</DialogTitle>
+          </DialogHeader>
+          <div className="max-h-[60vh] overflow-y-auto mt-4">
+            <p className="whitespace-pre-wrap text-white/80">
+              {content}
+            </p>
+          </div>
+        </DialogContent>
+      </Dialog>
+    </>
+  );
+};
 
 export function Profile() {
   const navigate = useNavigate();
@@ -1043,8 +1105,6 @@ export function Profile() {
     if (!serviceToDelete) return;
     
     try {
-      setShowDeleteServiceModal(false); // Close the modal immediately to prevent double-clicking
-      
       const { error } = await supabase
         .from('services')
         .delete()
@@ -1057,11 +1117,7 @@ export function Profile() {
         description: "Your service has been successfully deleted",
       });
       
-      // Reset state variables
-      setServiceToDelete(null);
-      setServiceDeleteTitle("");
-      
-      // Fetch updated services
+      // Refresh services
       fetchUserServices();
     } catch (error) {
       console.error("Error deleting service:", error);
@@ -1072,6 +1128,60 @@ export function Profile() {
       });
     }
   };
+
+  // Also add the missing fetchUserServices function if it doesn't exist
+  const fetchUserServices = async () => {
+    try {
+      setLoadingServices(true);
+
+      if (!profile?.id) return;
+
+      const { data, error } = await supabase
+        .from('services')
+        .select('*')
+        .eq('owner_id', profile.id)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+
+      setServices(data || []);
+    } catch (error) {
+      console.error("Error fetching services:", error);
+      setServices([]);
+    } finally {
+      setLoadingServices(false);
+    }
+  };
+
+  // Add this function
+  const ensureReviewsData = async () => {
+    if (!profile?.id) return;
+
+    try {
+      console.log("Updating reviews data for profile");
+      // Use our utility function
+      const { reviews_count, reviews_rating } = await updateProfileReviews(profile.id);
+
+      // Only update profile if values are different
+      if (profile.reviews_count !== reviews_count || profile.reviews_rating !== reviews_rating) {
+        setProfile({
+          ...profile,
+          reviews_count,
+          reviews_rating
+        });
+      }
+    } catch (err) {
+      console.error("Error in ensureReviewsData:", err);
+    }
+  };
+
+  // Add this useEffect to update reviews when profile is loaded
+  useEffect(() => {
+    if (profile?.id) {
+      // Update reviews data when profile is loaded
+      ensureReviewsData();
+    }
+  }, [profile?.id]);
 
   if (loading && loadingProfile) {
     return (
@@ -1192,67 +1302,17 @@ export function Profile() {
                                       </h1>
                                       <p className="text-muted-foreground mb-1">@{profile?.username}</p>
                                     </>
-                        ) : (
-                          <>
-                            <h1 className="text-2xl font-bold mb-1">
-                              {profile?.username}
-                            </h1>
+                                  ) : (
+                                    <>
+                                      <h1 className="text-2xl font-bold mb-1">
+                                        {profile?.username}
+                                      </h1>
                                       <p className="text-muted-foreground mb-1">@{profile?.username}</p>
                                     </>
                                   )}
-                            <p className="text-white/60 mb-3">{profile?.bio}</p>
+                                  <p className="text-white/60 mb-3">{profile?.bio}</p>
                                 </div>
                               </div>
-                              
-                              {/* Only show buttons on desktop */}
-                              <div className="flex flex-wrap gap-2 mb-4">
-                  <Button 
-                    variant="outline" 
-                    size="sm" 
-                    onClick={() => setIsEditingProfile(true)}
-                  >
-                    Edit Profile
-                  </Button>
-                
-                                {/* Notification icon */}
-                                <Button 
-                                  variant="outline" 
-                                  size="sm" 
-                                  onClick={() => navigate('/notifications')}
-                                  className="flex items-center gap-1 relative"
-                                >
-                                  <Bell className="h-4 w-4" />
-                                  {notificationCount > 0 && (
-                                    <span className="absolute -top-1 -right-1 bg-primary text-white text-xs font-bold rounded-full h-4 w-4 flex items-center justify-center">
-                                      {notificationCount > 99 ? '99+' : notificationCount}
-                                    </span>
-                                  )}
-                                </Button>
-                
-                                {/* Only show these buttons on desktop */}
-                                {windowWidth >= 1024 && (
-                                  <>
-                        <Button 
-                        onClick={handleShareProfile} 
-                        size="sm" 
-                        variant="ghost"
-                                      className="text-primary/70 hover:text-primary hover:bg-primary/10"
-                      >
-                        <Share2 className="h-4 w-4" />
-                                      
-                      </Button>
-                      <Button
-                        size="icon"
-                        variant="ghost"
-                        onClick={() => navigate('/settings')}
-                                      className="rounded-sm text-primary/70 hover:text-primary hover:bg-primary/10"
-                        title="Settings"
-                      >
-                        <Settings className="h-4 w-4" />
-                      </Button>
-                                  </>
-                                )}
-                  </div>
                             </>
                           }
                   </div>
@@ -1260,33 +1320,87 @@ export function Profile() {
                     </div>
                   </div>
                   </div>
-                      
-                {/* Stats row in a column under */}
-                <div className="mt-4 flex flex-row flex-wrap justify-around">
-                  <div className="text-center cursor-pointer hover:bg-black/20 px-4 py-2 rounded-md transition-colors" onClick={handlePostsClick}>
+                
+                {/* Only show buttons on desktop */}
+                <div className="flex flex-wrap gap-2 ml-2 mb-4">
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    onClick={() => setIsEditingProfile(true)}
+                  >
+                    Edit Profile
+                  </Button>
+
+                  {/* Notification icon */}
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    onClick={() => navigate('/notifications')}
+                    className="flex items-center gap-1 relative"
+                  >
+                    <Bell className="h-4 w-4" />
+                    {notificationCount > 0 && (
+                      <span className="absolute -top-1 -right-1 bg-primary text-white text-xs font-bold rounded-full h-4 w-4 flex items-center justify-center">
+                        {notificationCount > 99 ? '99+' : notificationCount}
+                      </span>
+                    )}
+                  </Button>
+
+                  {/* Only show these buttons on desktop */}
+                  {windowWidth >= 1024 && (
+                    <>
+                      <Button 
+                        onClick={handleShareProfile} 
+                        size="sm" 
+                        variant="ghost"
+                        className="text-primary/70 hover:text-primary hover:bg-primary/10"
+                      >
+                        <Share2 className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        onClick={() => navigate('/settings')}
+                        className="rounded-sm text-primary/70 hover:text-primary hover:bg-primary/10"
+                        title="Settings"
+                      >
+                        <Settings className="h-4 w-4" />
+                      </Button>
+                    </>
+                  )}
+                </div>
+
+
+                {/* Stats row */}
+                <div className="flex flex-row flex-wrap justify-around mt-4 pt-4">
+                  <div
+                    className="text-center cursor-pointer bg-background/50 hover:bg-background/20 px-12 py-4 rounded-md transition-colors"
+                    onClick={handlePostsClick}
+                  >
                     <p className="font-semibold">{userPosts.length}</p>
                     <p className="text-white/60 text-sm">Posts</p>
                   </div>
-                      <div 
-                        onClick={() => setShowFollowersModal(true)}
-                    className="text-center cursor-pointer hover:bg-black/20 px-4 py-2 rounded-md transition-colors"
+                  
+                  <div
+                    className="text-center cursor-pointer bg-background/50 hover:bg-background/20 px-8 py-4 rounded-md transition-colors"
+                    onClick={() => setShowFollowersModal(true)}
                   >
                     <p className="font-semibold">{profile?.followers_count || 0}</p>
                     <p className="text-white/60 text-sm">Followers</p>
                   </div>
-                
-                      <div 
-                        onClick={() => setShowFollowingModal(true)}
-                    className="text-center cursor-pointer hover:bg-black/20 px-4 py-2 rounded-md transition-colors"
-                      >
+                  
+                  <div
+                    className="text-center cursor-pointer bg-background/50 hover:bg-background/20 px-8 py-4 rounded-md transition-colors"
+                    onClick={() => setShowFollowingModal(true)}
+                  >
                     <p className="font-semibold">{profile?.following_count || 0}</p>
                     <p className="text-white/60 text-sm">Following</p>
                   </div>
-                
-                      {profile?.user_role === "business" && (
-                        <div 
-                          onClick={() => setShowReviewsModal(true)}
-                      className="text-center cursor-pointer hover:bg-black/20 px-4 py-2 rounded-md transition-colors"
+                  
+                  {profile?.user_role === "business" && (
+                    <div 
+                      onClick={() => setShowReviewsModal(true)}
+                      className="text-center cursor-pointer bg-background/50 hover:bg-background/20 px-6 py-4 rounded-md transition-colors"
                     >
                       <div className="flex items-center justify-center gap-1">
                         <Star className="w-4 h-4 text-yellow-400" />
@@ -1295,15 +1409,46 @@ export function Profile() {
                             ? (profile?.reviews_rating?.toFixed(1) || '0.0')
                             : '-'}
                         </p>
-                          </div>
+                      </div>
                       <p className="text-white/60 text-sm">
                         {profile?.reviews_count && profile.reviews_count > 0
                           ? `Reviews (${profile?.reviews_count})`
                           : 'No reviews'}
                       </p>
-                        </div>
-                      )}
+                    </div>
+                  )}
                 </div>
+
+                {/* About Business Section - Only for business accounts */}
+                {profile?.user_role === "business" && (
+                  <div className="mt-4 pt-4 ">
+                    <div className="flex justify-between items-center mb-2">
+                      <h3 className="text-lg font-semibold">About the Business</h3>
+                      <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        onClick={() => setIsEditingAboutBusiness(true)}
+                        className="h-8 w-8 p-0"
+                      >
+                        <Edit className="h-4 w-4" />
+                      </Button>
+                    </div>
+                    
+                    {profile?.about_business ? (
+                      <AboutBusinessSection 
+                        content={profile.about_business} 
+                        isOwner={true}
+                        onEdit={() => setIsEditingAboutBusiness(true)}
+                      />
+                    ) : (
+                      <div className="text-white/60 italic text-sm">
+                        Add information about your business to help customers learn more about your services.
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                
               </div>
             )}
           </Card>

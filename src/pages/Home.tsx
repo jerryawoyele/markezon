@@ -233,7 +233,13 @@ export default function Home() {
         await fetchEngagementCounts();
         
         // Fetch posts from followed users with ranking
-        await fetchPostsWithRanking(followedUserIds);
+        const result = await fetchPostsWithRanking(followedUserIds);
+        
+        // Fetch random posts for discovery section after main posts are loaded
+        // This ensures we can exclude the main feed posts - use the posts from the result
+        // not the state since the state might not be updated yet
+        const mainFeedPostIds = result.posts.map(post => post.id);
+        await fetchRandomPostsWithExclusions(mainFeedPostIds);
         
         // Mark posts as loaded
         postsAlreadyLoaded.current = true;
@@ -534,9 +540,128 @@ export default function Home() {
     });
   };
 
-  const fetchRandomPostsWithExclusions = async (postsToExclude: PostType[]) => {
-    // Implement your random posts logic here, similar to fetchPostsWithRanking
-    // This code has been omitted for brevity
+  const fetchRandomPostsWithExclusions = async (excludePostIds: string[] = []) => {
+    try {
+      setLoadingRandomPosts(true);
+      
+      console.log(`Fetching random posts, excluding ${excludePostIds.length} posts`);
+      
+      // Calculate pagination
+      const from = (randomPage - 1) * postsPerPage;
+      const to = from + postsPerPage - 1;
+      
+      // Create a base query without post filtering yet
+      let query = supabase
+        .from('posts')
+        .select(`
+          *,
+          profiles (
+            id,
+            username,
+            avatar_url,
+            bio,
+            updated_at,
+            about_business,
+            followers_count,
+            following_count,
+            reviews_count,
+            reviews_rating,
+            user_role,
+            kyc_verified
+          )
+        `)
+        .order('created_at', { ascending: false })
+        .range(from, to);
+      
+      // Add NOT IN filter when we have posts to exclude
+      if (excludePostIds.length > 0) {
+        // Format the filter properly with parentheses
+        const idsString = `(${excludePostIds.join(',')})`;
+        query = query.not('id', 'in', idsString);
+      }
+      
+      const { data: randomPostsData, error } = await query;
+      
+      if (error) {
+        console.error("Error fetching random posts:", error);
+        setLoadingRandomPosts(false);
+        return;
+      }
+      
+      if (randomPostsData && randomPostsData.length > 0) {
+        // Apply the same scoring and promotion logic
+        const scoredPosts: ScoredPost[] = randomPostsData.map(post => {
+          const score = calculateBaseScore(
+            post, 
+            likesCountMap[post.id] || 0, 
+            commentsCountMap[post.id] || 0,
+            userInteractions
+          );
+          
+          return {
+            ...post,
+            score
+          };
+        });
+        
+        // Apply promotion boosts
+        const postsWithPromotion = addPromotionInfo(scoredPosts, promotedPosts);
+        
+        // Sort by score
+        const sortedPosts = postsWithPromotion.sort((a, b) => {
+          // First, prioritize promoted posts by level
+          if (a.isPromoted && b.isPromoted) {
+            const levelOrder = { featured: 3, premium: 2, basic: 1 };
+            const aLevel = a.promotionLevel ? levelOrder[a.promotionLevel] : 0;
+            const bLevel = b.promotionLevel ? levelOrder[b.promotionLevel] : 0;
+            
+            if (aLevel !== bLevel) {
+              return bLevel - aLevel;
+            }
+          } else if (a.isPromoted) {
+            return -1;
+          } else if (b.isPromoted) {
+            return 1;
+          }
+          
+          // Then sort by score
+          return (b.score || 0) - (a.score || 0);
+        });
+        
+        // Check for any posts that might still be duplicates despite the filter
+        const mainFeedPostIds = new Set(posts.map(post => post.id));
+        const trulyUniqueRandomPosts = sortedPosts.filter(post => !mainFeedPostIds.has(post.id));
+        
+        console.log(`Found ${randomPostsData.length} random posts, ${trulyUniqueRandomPosts.length} are truly unique`);
+        
+        // Set the random posts - append if loading more, replace if initial load
+        if (randomPage > 1) {
+          setRandomPosts(prevPosts => [...prevPosts, ...trulyUniqueRandomPosts]);
+        } else {
+          setRandomPosts(trulyUniqueRandomPosts);
+        }
+        
+        // Record impressions for promoted posts
+        trulyUniqueRandomPosts.forEach(post => {
+          if (post.isPromoted && post.promotedPostId) {
+            recordImpression(post.promotedPostId);
+          }
+        });
+        
+        // Set whether there are more posts to load
+        setHasMoreRandomPosts(randomPostsData.length === postsPerPage);
+      } else {
+        if (randomPage === 1) {
+          setRandomPosts([]);
+        }
+        setHasMoreRandomPosts(false);
+      }
+      
+      setLoadingRandomPosts(false);
+    } catch (error) {
+      console.error("Error fetching random posts:", error);
+      setLoadingRandomPosts(false);
+    }
   };
 
   const loadMorePosts = () => {
@@ -548,8 +673,21 @@ export default function Home() {
   };
 
   const loadMoreRandomPosts = () => {
-    // Implement your load more random posts logic here
-    // This code has been omitted for brevity
+    if (loadingMoreRandom || !hasMoreRandomPosts) return;
+    
+    const nextPage = randomPage + 1;
+    setRandomPage(nextPage);
+    setLoadingMoreRandom(true);
+    
+    // Get the IDs of both main feed posts and already loaded random posts
+    const mainFeedPostIds = posts.map(post => post.id);
+    const currentRandomPostIds = randomPosts.map(post => post.id);
+    const allPostIdsToExclude = [...mainFeedPostIds, ...currentRandomPostIds];
+    
+    // Fetch more random posts, excluding both main feed posts and existing random posts
+    fetchRandomPostsWithExclusions(allPostIdsToExclude).finally(() => {
+      setLoadingMoreRandom(false);
+    });
   };
 
   const handlePostSubmit = async (data: { text: string; image_url: string | string[]; isTextPost: boolean }) => {
@@ -614,7 +752,14 @@ export default function Home() {
   const refreshPosts = () => {
     postsAlreadyLoaded.current = false;
     setPage(1);
-    fetchPostsWithRanking(followedUserIds);
+    setRandomPage(1);
+    
+    // First fetch the main feed posts
+    fetchPostsWithRanking(followedUserIds).then(result => {
+      // Then fetch discovery posts, ensuring we exclude the newly fetched main posts
+      const mainPostIds = result.posts.map(post => post.id);
+      fetchRandomPostsWithExclusions(mainPostIds);
+    });
   };
 
   return (
@@ -730,6 +875,84 @@ export default function Home() {
                     Follow some users to see their posts here, or create your own post!
                   </p>
                 </Card>
+              )}
+              
+              {/* Discover more posts section - add this back */}
+              {!loadingPosts && (
+                <div className="mt-10">
+                  <div className="flex justify-between items-center mb-4">
+                    <h2 className="text-lg ml-4 font-semibold">Discover More Posts</h2>
+                  </div>
+                  
+                  {/* Loading state for random posts */}
+                  {loadingRandomPosts && randomPosts.length === 0 && (
+                    <div className="space-y-4">
+                      {[1, 2, 3].map((i) => (
+                        <Card key={i} className="p-4">
+                          <div className="flex items-center space-x-2 mb-4">
+                            <Skeleton className="h-10 w-10 rounded-full" />
+                            <div className="space-y-2">
+                              <Skeleton className="h-4 w-24" />
+                              <Skeleton className="h-3 w-16" />
+                            </div>
+                          </div>
+                          <Skeleton className="h-4 w-full mb-2" />
+                          <Skeleton className="h-4 w-3/4 mb-2" />
+                          <Skeleton className="h-40 w-full mb-4 rounded-md" />
+                        </Card>
+                      ))}
+                    </div>
+                  )}
+                  
+                  {/* Random posts content */}
+                  {!loadingRandomPosts && randomPosts.length > 0 ? (
+                    <div className="space-y-4">
+                      {randomPosts.map((post) => (
+                        <Post
+                          key={`random-${post.id}`}
+                          id={post.id}
+                          user_id={post.user_id || ''}
+                          image_url={post.image_url}
+                          caption={post.caption}
+                          created_at={post.created_at || ''}
+                          profiles={post.profiles || { id: '', username: '', avatar_url: '' }}
+                          currentUserId={async () => user?.id}
+                          isPromoted={post.isPromoted}
+                          promotionLevel={post.promotionLevel}
+                          userRole={userRole}
+                        />
+                      ))}
+                      
+                      {/* Load more button for discovery posts */}
+                      {hasMoreRandomPosts && (
+                        <div className="flex justify-center">
+                          <Button 
+                            variant="outline" 
+                            onClick={loadMoreRandomPosts} 
+                            disabled={loadingMoreRandom}
+                            className="mt-2"
+                          >
+                            {loadingMoreRandom ? (
+                              <>
+                                <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                                Loading...
+                              </>
+                            ) : (
+                              "Discover More"
+                            )}
+                          </Button>
+                        </div>
+                      )}
+                    </div>
+                  ) : !loadingRandomPosts ? (
+                    <Card className="p-8 text-center">
+                      <h3 className="text-lg font-semibold mb-2">No discover posts available</h3>
+                      <p className="text-muted-foreground mb-4">
+                        Try refreshing or create your own post!
+                      </p>
+                    </Card>
+                  ) : null}
+                </div>
               )}
             </div>
           </div>

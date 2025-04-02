@@ -68,7 +68,7 @@ Simply open [Lovable](https://lovable.dev/projects/dae41fd1-06fa-4c8e-ab91-6e09a
 
 We don't support custom domains (yet). If you want to deploy your project under your own domain then we recommend using Netlify. Visit our docs for more details: [Custom domains](https://docs.lovable.dev/tips-tricks/custom-domain/)
 
-# Markezon
+# Venturezon
 
 ## Setting Up Payment Methods
 

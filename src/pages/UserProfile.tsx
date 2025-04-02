@@ -1201,7 +1201,7 @@ export function UserProfile() {
     >
       {!loadingProfile && !profile ? (
         // Profile Not Found State
-        <div className="container mx-auto py-16 px-4 text-center">
+        <div className="container min-h-screen mx-auto py-16 px-4 text-center">
           <div className="max-w-md mx-auto">
             <div className="mb-8">
               <User className="h-16 w-16 mx-auto text-muted-foreground mb-4" />
@@ -1238,15 +1238,29 @@ export function UserProfile() {
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => window.history.back()}
+                      onClick={() => {
+                        // Check if we can go back in history
+                        if (window.history.length > 1) {
+                          // Get the previous URL
+                          const previousUrl = document.referrer;
+                          // Only go back if the previous URL is from our app
+                          if (previousUrl && previousUrl.includes(window.location.origin)) {
+                            window.history.back();
+                          } else {
+                            navigate('/discover');
+                          }
+                        } else {
+                          navigate('/discover');
+                        }
+                      }}
                       className="w-fit mb-4"
                     >
                       <ArrowLeft className="h-4 w-4 mr-2" />
                       Back
                     </Button>
 
-                    <div className="flex flex-row md:flex-row gap-6">
-                      <div className="flex-shrink-0">
+                    <div className="flex flex-col sm:flex-row gap-6">
+                      <div className="flex-shrink-0 flex justify-center sm:justify-start">
                         <AvatarWithModal
                           size={80}
                           className="border-2 border-white/20"
@@ -1255,7 +1269,7 @@ export function UserProfile() {
                         />
                       </div>
 
-                      <div className="flex-1 space-y-4">
+                      <div className="flex-1 space-y-4 text-center sm:text-left">
                         <div>
                           {profile?.user_role === 'business' && profile?.business_name ? (
                             <>
@@ -1271,7 +1285,7 @@ export function UserProfile() {
                           <p className="text-white/60 mt-2">{profile?.bio}</p>
                         </div>
 
-                        <div className="flex flex-row gap-2 mt-4 sm:mt-0">
+                        <div className="flex flex-wrap justify-center sm:justify-start gap-2 mt-4 sm:mt-0">
                           {!isOwnProfile && (
                             <>
                               <Button

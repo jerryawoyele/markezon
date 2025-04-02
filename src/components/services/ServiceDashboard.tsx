@@ -346,7 +346,7 @@ export function ServiceDashboard({ services, loading, userRole, onRefresh }: Ser
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 ">
       {/* Top Stats */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <StatsCard
@@ -444,26 +444,41 @@ export function ServiceDashboard({ services, loading, userRole, onRefresh }: Ser
               Distribution of booking statuses
             </CardDescription>
           </CardHeader>
-          <CardContent className="flex justify-center">
-            <ResponsiveContainer width="100%" height={250}>
-              <PieChart>
+          <CardContent className="flex flex-col items-center justify-center">
+            <ResponsiveContainer width="100%" height={250} minWidth={200}>
+              <PieChart margin={{ top: 10, right: 10, bottom: 10, left: 10 }}>
                 <Pie
                   data={[{ name: 'Active', value: activeBookings }, { name: 'Completed', value: completedBookings }]}
                   cx="50%"
                   cy="50%"
                   labelLine={false}
-                  label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
-                  outerRadius={80}
+                  label={({ name, percent }) => `${name}`}
+                  outerRadius={70}
                   fill="#8884d8"
                   dataKey="value"
+                  startAngle={90}
+                  endAngle={-270}
                 >
                   {[{ name: 'Active', value: activeBookings }, { name: 'Completed', value: completedBookings }].map((entry, index) => (
                     <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                   ))}
                 </Pie>
-                <Tooltip formatter={(value) => [`${value}`, 'Bookings']} />
+                <Legend layout="horizontal" verticalAlign="bottom" align="center" />
+                <Tooltip formatter={(value, name) => [`${value} (${((value / (activeBookings + completedBookings || 1)) * 100).toFixed(0)}%)`, name]} />
               </PieChart>
             </ResponsiveContainer>
+            
+            {/* Status Legend with Percentages */}
+            <div className="flex flex-wrap gap-3 justify-center mt-2">
+              <div className="flex items-center">
+                <div className="w-3 h-3 mr-1 rounded-sm" style={{ backgroundColor: COLORS[0] }}></div>
+                <span className="text-sm">Active: {activeBookings > 0 ? ((activeBookings / (activeBookings + completedBookings)) * 100).toFixed(0) : 0}%</span>
+              </div>
+              <div className="flex items-center">
+                <div className="w-3 h-3 mr-1 rounded-sm" style={{ backgroundColor: COLORS[1] }}></div>
+                <span className="text-sm">Completed: {completedBookings > 0 ? ((completedBookings / (activeBookings + completedBookings)) * 100).toFixed(0) : 0}%</span>
+              </div>
+            </div>
           </CardContent>
         </Card>
       </div>

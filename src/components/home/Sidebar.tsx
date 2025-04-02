@@ -24,23 +24,8 @@ import {
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 import { AuthRequiredModal } from "@/components/auth/AuthRequiredModal";
-
-// Define navigation items for different user roles
-export const CUSTOMER_NAV_ITEMS = [
-  { icon: HomeIcon, label: "Home", path: "/home" },
-  { icon: Compass, label: "Discover", path: "/discover" },
-  { icon: Send, label: "Messages", path: "/messages" },
-  { icon: ShoppingCart, label: "Bookings", path: "/bookings" },
-  { icon: User, label: "Profile", path: "/profile" },
-];
-
-export const BUSINESS_NAV_ITEMS = [
-  { icon: HomeIcon, label: "Home", path: "/home" },
-  { icon: Compass, label: "Discover", path: "/discover" },
-  { icon: Send, label: "Messages", path: "/messages" },
-  { icon: BriefcaseIcon, label: "Services", path: "/services" },
-  { icon: User, label: "Profile", path: "/profile" },
-];
+import { Link } from "react-router-dom";
+import { CUSTOMER_NAV_ITEMS, BUSINESS_NAV_ITEMS } from "@/constants/navigation";
 
 interface SidebarProps {
   activeTab: string;
@@ -172,12 +157,9 @@ export function Sidebar({
   const desktopNav = (
     <div className="hidden lg:flex flex-col fixed left-0 top-0 h-screen w-64 bg-black border-r border-white/5 z-30">
       <div className="p-4 border-b border-white/10 mb-2">
-        <h1 
-          className="text-2xl font-bold bg-gradient-to-r from-purple-500 to-blue-500 bg-clip-text text-transparent cursor-pointer"
-          onClick={() => navigate('/')}
-        >
-          Markezon
-        </h1>
+        <Link to="/" className="flex items-center space-x-2">
+          <span className="font-bold text-2xl bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-purple-600">Venturezon</span>
+        </Link>
       </div>
 
       <div className="flex-1 px-3 py-2">

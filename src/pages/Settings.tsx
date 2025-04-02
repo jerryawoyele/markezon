@@ -877,7 +877,7 @@ export default function Settings() {
   if (loading) {
     return (
       <MainLayout activeTab="settings" setActiveTab={setActiveTab} userRole={userProfile?.user_role}>
-        <div className="animate-pulse space-y-4 my-8">
+        <div className="animate-pulse min-h-screen space-y-4 my-8">
           <div className="h-8 bg-gray-700/30 rounded w-1/3"></div>
           <div className="h-64 bg-gray-700/30 rounded"></div>
           <div className="h-32 bg-gray-700/30 rounded"></div>
@@ -888,7 +888,7 @@ export default function Settings() {
 
   return (
     <MainLayout activeTab="settings" setActiveTab={setActiveTab} userRole={userProfile?.user_role}>
-      <div className="py-6 w-full overflow-x-hidden pb-16 md:pb-6">
+      <div className="py-6 min-h-screen w-full overflow-x-hidden pb-16 md:pb-6">
         <div className="flex items-center mb-6">
           <Button 
             variant="outline" 

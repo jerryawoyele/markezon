@@ -31,7 +31,8 @@ import {
   Settings, 
   MoreVertical, 
   LogOut,
-  Edit
+  Edit,
+  ArrowLeft
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -1202,7 +1203,7 @@ export function Profile() {
       unreadNotifications={unreadNotifications}
       unreadMessages={unreadMessages}
     >
-      <div className="w-full overflow-x-hidden pb-16 md:pb-0">
+      <div className="w-full min-h-screen overflow-x-hidden pb-16 md:pb-0">
         <div>
           {/* Profile header with skeleton loader */}
           <Card className="rounded-lg overflow-hidden mb-8">
@@ -1251,130 +1252,88 @@ export function Profile() {
                 
                 <div className="flex flex-col md:flex-row gap-6">
                   <div className="flex flex-col sm:flex-row items-start gap-4 w-full">
-                  <AvatarWithModal
-                      size={100}
-                      className="h-full w-full border-2 border-white/20"
-                    avatarUrl={profile?.avatar_url}
-                    username={profile?.username}
-                  />
-              
-              <div className="flex-1">
-                      <div className="flex flex-col justify-between mb-4">
+                    
+
+                    <div className="flex-shrink-0 flex justify-center sm:justify-start">
+                      <AvatarWithModal
+                        size={80}
+                        className="border-2 border-white/20"
+                        avatarUrl={profile?.avatar_url}
+                        username={profile?.username}
+                      />
+                    </div>
+
+                    <div className="flex-1 space-y-4 text-center sm:text-left">
                       <div>
-                        {isEditingProfile ? (
-                          <div className="mb-4">
-                    <Label htmlFor="username">Username</Label>
-                    <Input 
-                      id="username" 
-                      value={username} 
-                      onChange={handleUsernameChange} 
-                              className="mb-2"
-                    />
-                    <Label htmlFor="bio">Bio</Label>
-                    <Textarea 
-                      id="bio" 
-                      value={bio} 
-                      onChange={(e) => setBio(e.target.value)} 
-                              className="mb-2 min-h-[80px]"
-                            />
-                            <div className="flex gap-2 mt-4">
-                              <Button onClick={handleUpdateProfile}>Save</Button>
-                              <Button
-                                variant="outline"
-                                onClick={() => {
-                                  setUsername(profile?.username || "");
-                                  setBio(profile?.bio || "");
-                                  setIsEditingProfile(false);
-                                }}
-                              >
-                                Cancel
-                              </Button>
-                            </div>
-                          </div>
-                          ) :
-                            <>
-                              <div className="flex justify-between items-start">
-                                <div>
-                                  {profile?.user_role === 'business' && profile?.business_name ? (
-                                    <>
-                                      <h1 className="text-2xl font-bold mb-1">
-                                        {profile.business_name}
-                                      </h1>
-                                      <p className="text-muted-foreground mb-1">@{profile?.username}</p>
-                                    </>
-                                  ) : (
-                                    <>
-                                      <h1 className="text-2xl font-bold mb-1">
-                                        {profile?.username}
-                                      </h1>
-                                      <p className="text-muted-foreground mb-1">@{profile?.username}</p>
-                                    </>
-                                  )}
-                                  <p className="text-white/60 mb-3">{profile?.bio}</p>
-                                </div>
-                              </div>
-                            </>
-                          }
-                  </div>
-                  </div>
+                        {profile?.user_role === 'business' && profile?.business_name ? (
+                          <>
+                            <h1 className="text-2xl font-bold">{profile.business_name}</h1>
+                            <p className="text-muted-foreground mb-1">@{profile?.username}</p>
+                          </>
+                        ) : (
+                          <>
+                            <h1 className="text-2xl font-bold">{profile?.display_name || profile?.username || "User"}</h1>
+                            {profile?.username && <p className="text-muted-foreground mb-1">@{profile?.username}</p>}
+                          </>
+                        )}
+                        <p className="text-white/60 mt-2">{profile?.bio}</p>
+                      </div>
+
+                      <div className="flex flex-wrap justify-center sm:justify-start gap-2 mt-4 sm:mt-0">
+                        <Button 
+                          variant="outline" 
+                          size="sm" 
+                          onClick={() => setIsEditingProfile(true)}
+                        >
+                          Edit Profile
+                        </Button>
+
+                        {/* Notification icon */}
+                        <Button 
+                          variant="outline" 
+                          size="sm" 
+                          onClick={() => navigate('/notifications')}
+                          className="flex items-center gap-1 relative"
+                        >
+                          <Bell className="h-4 w-4" />
+                          {notificationCount > 0 && (
+                            <span className="absolute -top-1 -right-1 bg-primary text-white text-xs font-bold rounded-full h-4 w-4 flex items-center justify-center">
+                              {notificationCount > 99 ? '99+' : notificationCount}
+                            </span>
+                          )}
+                        </Button>
+
+                        {/* Only show these buttons on desktop */}
+                        {windowWidth >= 1024 && (
+                          <>
+                            <Button 
+                              onClick={handleShareProfile} 
+                              size="sm" 
+                              variant="ghost"
+                              className="text-primary/70 hover:text-primary hover:bg-primary/10"
+                            >
+                              <Share2 className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              onClick={() => navigate('/settings')}
+                              className="rounded-sm text-primary/70 hover:text-primary hover:bg-primary/10"
+                              title="Settings"
+                            >
+                              <Settings className="h-4 w-4" />
+                            </Button>
+                          </>
+                        )}
+                      </div>
                     </div>
                   </div>
-                  </div>
-                
-                {/* Only show buttons on desktop */}
-                <div className="flex flex-wrap gap-2 ml-2 mb-4">
-                  <Button 
-                    variant="outline" 
-                    size="sm" 
-                    onClick={() => setIsEditingProfile(true)}
-                  >
-                    Edit Profile
-                  </Button>
-
-                  {/* Notification icon */}
-                  <Button 
-                    variant="outline" 
-                    size="sm" 
-                    onClick={() => navigate('/notifications')}
-                    className="flex items-center gap-1 relative"
-                  >
-                    <Bell className="h-4 w-4" />
-                    {notificationCount > 0 && (
-                      <span className="absolute -top-1 -right-1 bg-primary text-white text-xs font-bold rounded-full h-4 w-4 flex items-center justify-center">
-                        {notificationCount > 99 ? '99+' : notificationCount}
-                      </span>
-                    )}
-                  </Button>
-
-                  {/* Only show these buttons on desktop */}
-                  {windowWidth >= 1024 && (
-                    <>
-                      <Button 
-                        onClick={handleShareProfile} 
-                        size="sm" 
-                        variant="ghost"
-                        className="text-primary/70 hover:text-primary hover:bg-primary/10"
-                      >
-                        <Share2 className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        size="icon"
-                        variant="ghost"
-                        onClick={() => navigate('/settings')}
-                        className="rounded-sm text-primary/70 hover:text-primary hover:bg-primary/10"
-                        title="Settings"
-                      >
-                        <Settings className="h-4 w-4" />
-                      </Button>
-                    </>
-                  )}
                 </div>
-
-
+                
                 {/* Stats row */}
                 <div className="flex flex-row flex-wrap justify-around mt-4 pt-4">
                   <div
-                    className="text-center cursor-pointer bg-background/50 hover:bg-background/20 px-12 py-4 rounded-md transition-colors"
+                    className="text-center cursor-pointer mb-4 bg-background/50 hover:bg-background/20 px-12 py-4 rounded-md transition-colors"
                     onClick={handlePostsClick}
                   >
                     <p className="font-semibold">{userPosts.length}</p>
@@ -1382,7 +1341,7 @@ export function Profile() {
                   </div>
                   
                   <div
-                    className="text-center cursor-pointer bg-background/50 hover:bg-background/20 px-8 py-4 rounded-md transition-colors"
+                    className="text-center cursor-pointer mb-4 bg-background/50 hover:bg-background/20 px-8 py-4 rounded-md transition-colors"
                     onClick={() => setShowFollowersModal(true)}
                   >
                     <p className="font-semibold">{profile?.followers_count || 0}</p>
@@ -1390,7 +1349,7 @@ export function Profile() {
                   </div>
                   
                   <div
-                    className="text-center cursor-pointer bg-background/50 hover:bg-background/20 px-8 py-4 rounded-md transition-colors"
+                    className="text-center cursor-pointer mb-4 bg-background/50 hover:bg-background/20 px-8 py-4 rounded-md transition-colors"
                     onClick={() => setShowFollowingModal(true)}
                   >
                     <p className="font-semibold">{profile?.following_count || 0}</p>
@@ -1400,7 +1359,7 @@ export function Profile() {
                   {profile?.user_role === "business" && (
                     <div 
                       onClick={() => setShowReviewsModal(true)}
-                      className="text-center cursor-pointer bg-background/50 hover:bg-background/20 px-6 py-4 rounded-md transition-colors"
+                      className="text-center cursor-pointer mb-4 bg-background/50 hover:bg-background/20 px-6 py-4 rounded-md transition-colors"
                     >
                       <div className="flex items-center justify-center gap-1">
                         <Star className="w-4 h-4 text-yellow-400" />

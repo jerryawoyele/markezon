@@ -139,7 +139,7 @@ export function RoleSetupModal({ isOpen, onComplete }: RoleSetupModalProps) {
     <Dialog open={isOpen} onOpenChange={() => {}}>
       <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
-          <DialogTitle>Welcome to Markezon!</DialogTitle>
+          <DialogTitle>Welcome to Venturezon!</DialogTitle>
           <DialogDescription>
             Let's set up your profile before you get started.
           </DialogDescription>

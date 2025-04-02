@@ -3,6 +3,7 @@ import { Input } from "@/components/ui/input";
 import { Search, X } from "lucide-react";
 import { SearchUsers } from "./SearchUsers";
 import { useLocation, useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom";
 
 interface MobileHeaderProps {
   onSearch?: (query: string) => void;
@@ -72,12 +73,9 @@ export function MobileHeader({
 
   return (
     <div className="flex flex-row items-center justify-between bg-black/80 backdrop-blur-md border-b border-white/10 p-4 lg:hidden fixed top-0 left-0 right-0 z-50">
-      <h1 
-        className="text-xl font-bold bg-gradient-to-r from-purple-500 to-blue-500 bg-clip-text text-transparent cursor-pointer mr-2"
-        onClick={() => navigate('/')}
-      >
-        Markezon
-      </h1>
+      <Link to="/" className="flex items-center space-x-2">
+        <span className="font-bold text-2xl bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-purple-600">Venturezon</span>
+      </Link>
       
       <div className="relative search-container ml-auto">
         <div className="relative">

@@ -723,7 +723,9 @@ export default function ServicesAndBookingsPage() {
             Only customer accounts can book services. As a business account, you can provide 
             services but cannot make bookings. To make bookings, please create a customer account.
           </p>
-          <Button onClick={() => navigate("/profile")}>Go to Profile</Button>
+          <Button onClick={() => navigate(pageType === "bookings" ? "/services" : "/bookings")}>
+            {pageType === "bookings" ? "Go to Services" : "Go to Bookings"}
+          </Button>
         </Card>
       ) : (
         <>
@@ -1091,7 +1093,7 @@ export default function ServicesAndBookingsPage() {
 
   return (
     <MainLayout activeTab={activeTab} setActiveTab={setActiveTab} userRole={userRole} isAuthenticated={isAuthenticated}>
-      <div className="w-full overflow-x-hidden pb-16 md:pb-0">
+      <div className="w-full min-h-screen overflow-x-hidden pb-16 md:pb-0">
         {pageType === "services" ? renderServicesContent() : renderBookingsContent()}
       </div>
     </MainLayout>

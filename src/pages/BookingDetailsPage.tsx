@@ -283,7 +283,7 @@ export default function BookingDetailsPage() {
 
   return (
     <MainLayout activeTab="Bookings" setActiveTab={() => {}} userRole="customer" isAuthenticated={true}>
-      <div className="container py-8">
+      <div className="container min-h-screen py-8">
         <div className="mb-6">
           <Button
             variant="ghost"

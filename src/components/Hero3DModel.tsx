@@ -98,7 +98,7 @@ export function Hero3DModel({ className }: Hero3DModelProps) {
       {/* Layer 4: Foreground content */}
       <div className="layer absolute inset-0 flex items-center justify-center transition-transform duration-200 ease-out">
         <div className="bg-black/30 backdrop-blur-lg p-8 rounded-xl text-center text-white">
-          <h2 className="text-xl font-bold mb-2">Markezon</h2>
+          <h2 className="text-xl font-bold mb-2 bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-purple-600">Venturezon</h2>
           <p className="text-sm text-white/80">Your marketplace for services</p>
         </div>
       </div>

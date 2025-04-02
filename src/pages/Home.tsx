@@ -767,7 +767,7 @@ export default function Home() {
       activeTab={activeTab} 
       setActiveTab={setActiveTab}
     >
-      <div className="max-lg:max-w-4xl max-lg:pt-16 py-4 mb-20">
+      <div className="max-lg:max-w-4xl min-h-screen max-lg:pt-16 py-4 mb-20">
         <MobileHeader />
         
         {/* Content area */}

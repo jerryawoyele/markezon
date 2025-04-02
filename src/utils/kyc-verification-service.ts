@@ -66,9 +66,9 @@ interface VerificationResult {
  */
 export class KYCVerificationService {
   // Base URL for API calls to our backend
-  private static apiUrl = import.meta.env.VITE_API_URL || "https://api.markezon.com/api";
+  private static apiUrl = import.meta.env.VITE_API_URL || "https://api.venturezon.com/api";
   // Fallback URL if main API is down
-  private static fallbackApiUrl = "https://backup-api.markezon.com/api";
+  private static fallbackApiUrl = "https://backup-api.venturezon.com/api";
 
   /**
    * Check if a user is eligible for verification (business accounts only)

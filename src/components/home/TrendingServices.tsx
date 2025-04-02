@@ -466,7 +466,7 @@ export function TrendingServices() {
       </Card>
 
       <div className="text-center text-sm text-white/60 p-4 mt-0">
-        <p>&copy; {new Date().getFullYear()} Markezon</p>
+        <p>&copy; {new Date().getFullYear()} Venturezon</p>
         <p className="mt-1">All rights reserved.</p>
       </div>
     </div>

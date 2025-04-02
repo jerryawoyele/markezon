@@ -172,7 +172,7 @@ export function UsernameSetup() {
               </p>
             )}
             <p className="text-xs text-white/60">
-              Your profile URL will be: markezon.com/@{username || "username"}
+              Your profile URL will be: venturezon.com/@{username || "username"}
             </p>
           </div>
           

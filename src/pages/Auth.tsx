@@ -303,7 +303,7 @@ export default function Auth() {
         <div className="container flex justify-between items-center">
           <a href="/" className="flex items-center">
             <h1 className="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-purple-600">
-              Markezon
+              Venturezon
             </h1>
           </a>
         </div>
@@ -370,7 +370,7 @@ export default function Auth() {
               <CardHeader>
                 <CardTitle className="text-center text-2xl font-bold mb-1">
                   <span className="bg-clip-text text-transparent bg-slate-300">
-                    Welcome to Markezon
+                    Welcome to Venturezon
                   </span>
                 </CardTitle>
                 <CardDescription className="text-center text-white/70">

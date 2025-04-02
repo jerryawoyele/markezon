@@ -32,7 +32,7 @@ export default function PromotionSuccess() {
       activeTab="Home"
       setActiveTab={() => {}}
     >
-      <div className="container max-w-4xl mx-auto px-4 py-12">
+      <div className="container min-h-screen max-w-4xl mx-auto px-4 py-12">
         <Card className="p-8 flex flex-col items-center text-center">
           <CheckCircle className="h-16 w-16 text-green-500 mb-4" />
           <h1 className="text-2xl font-bold mb-2">Payment Successful!</h1>

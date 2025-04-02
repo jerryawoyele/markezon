@@ -21,8 +21,8 @@ export function ShareProfileButton({ userId, username, className = "" }: SharePr
       // Use the Web Share API if available (mobile devices)
       try {
         await navigator.share({
-          title: `${username || 'User'}'s Profile on Markezon`,
-          text: `Check out ${username || 'this user'}'s profile on Markezon!`,
+          title: `${username || 'User'}'s Profile on Venturezon`,
+          text: `Check out ${username || 'this user'}'s profile on Venturezon!`,
           url: profileUrl
         });
       } catch (error) {

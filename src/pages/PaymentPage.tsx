@@ -402,7 +402,7 @@ export default function PaymentPage() {
   if (authLoading || loading) {
     return (
       <MainLayout activeTab={activeTab} setActiveTab={setActiveTab}>
-        <div className="container py-10">
+        <div className="container min-h-screen py-10">
           <div className="flex flex-col items-center justify-center py-12 space-y-4">
             <Loader2 className="h-12 w-12 animate-spin" />
             <div className="text-center">
@@ -419,7 +419,7 @@ export default function PaymentPage() {
   if (paymentComplete) {
     return (
       <MainLayout activeTab={activeTab} setActiveTab={setActiveTab}>
-        <div className="container max-w-4xl py-10">
+        <div className="container min-h-screen max-w-4xl py-10">
           <div className="flex flex-col items-center text-center px-4 py-10">
             <div className="w-16 h-16 rounded-full bg-green-100 flex items-center justify-center mb-6">
               <CheckCircle className="h-8 w-8 text-green-600" />
@@ -476,7 +476,7 @@ export default function PaymentPage() {
 
   return (
     <MainLayout activeTab={activeTab} setActiveTab={setActiveTab}>
-      <div className="container max-w-4xl py-10">
+      <div className="container min-h-screen max-w-4xl py-10">
         <Button
           variant="ghost"
           size="sm"
